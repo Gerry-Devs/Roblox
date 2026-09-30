@@ -131,7 +131,7 @@ function UIStyle.rarityCard(card, color)
 	local gg = child(glow, "UIGradient", "UIGradient")
 	gg.Rotation = 90
 	gg.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.85), NumberSequenceKeypoint.new(1, 0.2) })
-	UIStyle.studs(card, 22, 0.35)
+	UIStyle.studs(card, 22, 0.6)
 	return card
 end
 
@@ -196,11 +196,23 @@ function UIStyle.closeButton(button, header)
 	end
 	local label = button:FindFirstChild("Label")
 	if not label and button:IsA("TextButton") then
-		-- script-built X: the text is on the button itself
-		button.TextColor3 = Color3.new(1, 1, 1)
-		button.TextStrokeTransparency = 0
-		button.TextStrokeColor3 = UIStyle.OUTLINE
-		return button
+		-- script-built X: its text is on the button itself, under the studs;
+		-- draw it with a Label on top instead
+		label = mk("TextLabel", {
+			Name = "Label",
+			BackgroundTransparency = 1,
+			Text = button.Text ~= "" and button.Text or "X",
+			Font = button.Font,
+			TextScaled = true,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.55),
+			Size = UDim2.fromScale(0.62, 0.62),
+		}, button)
+		button.Text = ""
+		local pad = button:FindFirstChildOfClass("UIPadding")
+		if pad then
+			pad:Destroy()
+		end
 	end
 	if label then
 		label.TextColor3 = Color3.new(1, 1, 1)
@@ -217,6 +229,55 @@ function UIStyle.closeButton(button, header)
 		label.Visible = true
 	end
 	return button
+end
+
+-- studs (and dark panels) for the parts inside a window
+local SKIP_NAMES = { Studs = true, Rim = true, SkinHeader = true, Fill = true, Bar = true, Track = true, Line = true, Edge = true, RarityGlow = true, BottomFill = true, SquareLeft = true, SquareBottom = true }
+local function isNavy(c)
+	-- the old dark-blue panel colors
+	local r, g, b = c.R * 255, c.G * 255, c.B * 255
+	return b > r + 25 and b > g + 10 and r < 70 and g < 90 and b < 160
+end
+local function studOne(d)
+	if not d:IsA("GuiObject") or d:IsA("TextLabel") or d:IsA("TextBox") or d:IsA("ImageLabel") then
+		return
+	end
+	if SKIP_NAMES[d.Name] or d:GetAttribute("NoStuds") or d.BackgroundTransparency > 0.6 then
+		return
+	end
+	if d:IsA("ImageButton") and d.Image ~= "" then
+		return -- a picture button: leave the picture alone
+	end
+	if d.Size.Y.Scale == 0 and d.Size.Y.Offset < 20 then
+		return -- thin bars
+	end
+	if d:IsA("Frame") and isNavy(d.BackgroundColor3) then
+		d.BackgroundColor3 = UIStyle.BODY_DARK
+	end
+	local hasText = d:IsA("TextButton") and d.Text ~= ""
+	UIStyle.studs(d, d:IsA("GuiButton") and 26 or 32, (d:IsA("GuiButton") and not hasText) and 0.3 or 0.6)
+end
+function UIStyle.studInside(window, skip)
+	local function skipped(d)
+		for s in pairs(skip) do
+			if s and (d == s or d:IsDescendantOf(s)) then
+				return true
+			end
+		end
+		return false
+	end
+	for _, d in ipairs(window:GetDescendants()) do
+		if not skipped(d) then
+			pcall(studOne, d)
+		end
+	end
+	window.DescendantAdded:Connect(function(d)
+		task.defer(function()
+			if d.Parent and not skipped(d) and d.Name ~= "Studs" then
+				pcall(studOne, d)
+			end
+		end)
+	end)
 end
 
 -- Turn any window into the Backpack look: a blue-to-cyan studded header
@@ -274,7 +335,7 @@ function UIStyle.skinWindow(window, closeBtn)
 	end
 	window.Size += UDim2.fromOffset(0, shift)
 
-	UIStyle.studs(window, 44, 0.35)
+	UIStyle.studs(window, 44, 0.65)
 	local rim = child(window, "Frame", "Rim")
 	rim.Size = UDim2.new(1, -10, 1, -10)
 	rim.Position = UDim2.fromOffset(5, 5)
@@ -314,37 +375,49 @@ function UIStyle.skinWindow(window, closeBtn)
 		hs.ZIndex = z + 4
 	end
 
-	-- title: icon + text on the left of the header
+	-- title: icon + text on the left of the header. The title keeps its
+	-- place in the window (scripts look it up there); it's only moved and
+	-- restyled so it sits inside the header.
+	if oldTitle and oldTitle:IsA("GuiObject") then
+		oldTitle.AnchorPoint = Vector2.new(0, 0)
+		oldTitle.Position = UDim2.fromOffset(0, 0)
+		oldTitle.Size = UDim2.new(1, -(H + 12), 0, H)
+		oldTitle.BackgroundTransparency = 1
+		oldTitle.ZIndex = z + 5
+		for _, c in ipairs(oldTitle:GetChildren()) do
+			if c:IsA("UIStroke") or c:IsA("UIGradient") then
+				c.Enabled = false
+			end
+		end
+	end
 	local x = 18
 	if titleIcon then
-		titleIcon.Parent = header
 		titleIcon.AnchorPoint = Vector2.new(0, 0.5)
 		titleIcon.Position = UDim2.new(0, 10, 0.5, 0)
 		titleIcon.Size = UDim2.fromOffset(H - 12, H - 12)
 		titleIcon.Rotation = 0
+		titleIcon.ZIndex = z + 6
 		for _, d in ipairs(titleIcon:GetDescendants()) do
 			if d:IsA("GuiObject") then
-				d.ZIndex = z + 6
+				d.ZIndex = z + 7
 			end
 		end
-		titleIcon.ZIndex = z + 5
 		x = H + 6
 	end
 	if titleText then
-		titleText.Parent = header
 		titleText.AnchorPoint = Vector2.new(0, 0.5)
 		titleText.Position = UDim2.new(0, x, 0.5, 0)
-		titleText.Size = UDim2.new(1, -(x + H + 20), 0.58, 0)
+		titleText.Size = UDim2.new(1, -(x + (oldTitle and 10 or H + 22)), 0.58, 0)
 		titleText.TextXAlignment = Enum.TextXAlignment.Left
 		titleText.TextColor3 = Color3.new(1, 1, 1)
 		titleText.TextStrokeTransparency = 0
 		titleText.TextStrokeColor3 = UIStyle.OUTLINE
 		titleText.BackgroundTransparency = 1
-		titleText.ZIndex = z + 6
+		titleText.ZIndex = z + 7
 	end
-	if oldTitle and oldTitle:IsA("GuiObject") then
-		oldTitle.Visible = false
-	end
+
+	-- the parts inside get studs too (and the old navy panels go dark)
+	UIStyle.studInside(window, { [closeBtn or false] = true, [header] = true, [rim] = true })
 
 	-- the red X at the header's right end
 	if closeBtn then

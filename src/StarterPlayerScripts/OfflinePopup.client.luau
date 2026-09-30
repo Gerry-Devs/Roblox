@@ -61,6 +61,13 @@ remote.OnClientEvent:Connect(function(data)
 	end
 	local ok = mk("TextButton", { Size = UDim2.fromOffset(180, 50), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 232), BackgroundColor3 = GREEN, Text = "COLLECT", Font = FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = true }, panel)
 	round(ok, 14, 3)
+	-- the studded window look (header bar with "WELCOME BACK!")
+	local styleMod = folder:FindFirstChild("UIStyle")
+	if styleMod then
+		pcall(function()
+			require(styleMod).skinWindow(panel, nil)
+		end)
+	end
 	mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, ok)
 
 	-- count up

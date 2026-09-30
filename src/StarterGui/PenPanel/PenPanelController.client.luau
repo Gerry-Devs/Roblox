@@ -529,7 +529,7 @@ hatchAllButton.Activated:Connect(function()
 			note = "HATCHES " .. r.waiting .. " EGG" .. (r.waiting == 1 and "" or "S"),
 		})
 	elseif (r.hatched or 0) == 0 then
-		notify:Fire("No eggs in your pen.", RED)
+		notify:Fire((r.busy or 0) > 0 and "Your eggs are already hatching!" or "No eggs in your pen.", (r.busy or 0) > 0 and Color3.fromRGB(255, 205, 93) or RED)
 	end
 end)
 

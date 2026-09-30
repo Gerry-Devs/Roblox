@@ -607,7 +607,8 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 	if not entry or entry.kind ~= "egg" then
 		return { success = false, message = "There is no egg there." }
 	end
-	if entry.hatching then
+	-- an egg stuck "hatching" (something went wrong last time) can hatch again
+	if entry.hatching and os.clock() - (entry.hatchStartedAt or 0) < Config.HatchShakeTime + 8 then
 		return { success = false, message = "It's already hatching!" }
 	end
 	if os.time() < entry.readyAt then
@@ -623,7 +624,7 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 			return
 		end
 		local egg, index = findInBase(profile, baseUid)
-		if not egg then
+		if not egg or egg.kind ~= "egg" then
 			return
 		end
 
@@ -649,8 +650,12 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 		end
 		profile.owned[egg.monsterId] = (profile.owned[egg.monsterId] or 0) + 1
 
-		WorldService.MarkHatched(player, monsterEntry, not fitsInPen, position)
-		announceHatch(player, monsterEntry)
+		-- (each step on its own: one failing never leaves the pen out of date)
+		local okMark, errMark = pcall(WorldService.MarkHatched, player, monsterEntry, not fitsInPen, position)
+		if not okMark then
+			warn("[Hatch] " .. tostring(errMark))
+		end
+		pcall(announceHatch, player, monsterEntry)
 		WorldService.UpdateBase(player, profile)
 		updateLeaderstats(player)
 		sync(player)
@@ -2912,13 +2917,21 @@ do
 		end
 		local hatched, waiting = 0, 0
 		local uids = {}
+		local busy = 0
 		for _, e in ipairs(profile.base) do
-			if e.kind == "egg" and not e.hatching then
-				if os.time() >= (e.readyAt or 0) then
+			local stuck = e.hatching and os.clock() - (e.hatchStartedAt or 0) >= Config.HatchShakeTime + 8
+			if e.kind == "egg" and (not e.hatching or stuck) then
+				-- done incubating (or less than a second left): free
+				if os.time() + 1 >= (e.readyAt or 0) then
+					if os.time() < (e.readyAt or 0) then
+						e.readyAt = os.time()
+					end
 					table.insert(uids, e.uid)
 				else
 					waiting += 1
 				end
+			elseif e.kind == "egg" then
+				busy += 1
 			end
 		end
 		for _, uid in ipairs(uids) do
@@ -2926,7 +2939,7 @@ do
 				hatched += 1
 			end
 		end
-		return { success = true, hatched = hatched, waiting = waiting, productId = Config.Products.hatchAll.id }
+		return { success = true, hatched = hatched, waiting = waiting, busy = busy, productId = Config.Products.hatchAll.id }
 	end
 
 	-- the player picked an egg to skip: returns which product to buy

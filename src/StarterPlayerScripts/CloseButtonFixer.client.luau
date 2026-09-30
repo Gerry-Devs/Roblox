@@ -25,6 +25,7 @@ do
 	UIStyle = ok and res or nil
 end
 local fixed = setmetatable({}, { __mode = "k" })
+local SELF_STYLED = { Backpack = true }
 
 local function isCloseButton(b)
 	if not b:IsA("GuiButton") then
@@ -45,6 +46,11 @@ local function fix(b)
 		return
 	end
 	fixed[b] = true
+	-- windows that style their own header (never auto-style these)
+	local screen = window:FindFirstAncestorOfClass("ScreenGui")
+	if screen and SELF_STYLED[screen.Name] then
+		return
+	end
 	-- give the window's own script a moment to say it styles itself
 	-- (KeepPlace / NoSkin), so a window never gets two headers
 	task.wait(0.4)

@@ -950,6 +950,7 @@ local restyled, restyleErr = pcall(function()
 	title.Position = UDim2.fromOffset(0, 0)
 	title.Size = UDim2.new(1, 0, 0, HEADER)
 	title.BackgroundColor3 = Color3.new(1, 1, 1)
+	title.BackgroundTransparency = 0 -- (in case it was auto-styled first: that makes it see-through)
 	title.ZIndex = 5
 	title:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
 	local ts = title:FindFirstChildOfClass("UIStroke")

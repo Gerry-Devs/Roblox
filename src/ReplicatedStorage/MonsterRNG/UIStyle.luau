@@ -91,7 +91,16 @@ function UIStyle.studs(frame, tile, transparency, color)
 	studs.TileSize = UDim2.fromOffset(tile or 40, tile or 40)
 	studs.ImageTransparency = transparency or 0.2
 	studs.ImageColor3 = color or Color3.new(1, 1, 1)
-	studs.ZIndex = frame.ZIndex
+	-- behind everything else inside the frame: at the same ZIndex a later
+	-- child draws on top, so the studs would cover the frame's rows / cards
+	-- (and their own studs showed through: doubled bubbles)
+	local lowest = frame.ZIndex
+	for _, c in ipairs(frame:GetChildren()) do
+		if c ~= studs and c:IsA("GuiObject") and c.ZIndex < lowest then
+			lowest = c.ZIndex
+		end
+	end
+	studs.ZIndex = lowest - 1
 	local corner = frame:FindFirstChildOfClass("UICorner")
 	if corner then
 		child(studs, "UICorner", "UICorner").CornerRadius = corner.CornerRadius

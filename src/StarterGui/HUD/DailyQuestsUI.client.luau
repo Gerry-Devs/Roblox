@@ -83,14 +83,25 @@ local page = mk("Frame", { Name = "QuestsPage", Size = UDim2.new(1, 0, 1, -48), 
 local streakBox = mk("Frame", { Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = NAVY }, page)
 round(streakBox, 12, 3)
 label(streakBox, "7-DAY QUEST STREAK", UDim2.new(0.45, 0, 0, 24), UDim2.fromOffset(12, 6), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
-local dots = mk("Frame", { Size = UDim2.new(0.45, 0, 0, 34), Position = UDim2.fromOffset(12, 36), BackgroundTransparency = 1 }, streakBox)
-mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6) }, dots)
+-- streak path: 7 studded day bricks on a track that fills up gold
+local dots = mk("Frame", { Name = "StreakPath", Size = UDim2.new(0.45, 0, 0, 36), Position = UDim2.fromOffset(12, 36), BackgroundTransparency = 1 }, streakBox)
+dots:SetAttribute("NoStuds", true)
+local track = mk("Frame", { Name = "Track", Size = UDim2.new(1, -36, 0, 8), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(22, 24, 34), BorderSizePixel = 0, ZIndex = 2 }, dots)
+round(track, 4, 2)
+local trackFill = mk("Frame", { Name = "Fill", Size = UDim2.fromScale(0, 1), BackgroundColor3 = GOLD, BorderSizePixel = 0, ZIndex = 3 }, track)
+round(trackFill, 4)
 local dotList = {}
 for i = 1, 7 do
-	local d = mk("Frame", { Size = UDim2.fromOffset(30, 30), BackgroundColor3 = Color3.fromRGB(50, 60, 100) }, dots)
-	round(d, 15, 2)
-	local t = label(d, tostring(i), UDim2.fromScale(0.7, 0.7), UDim2.fromScale(0.15, 0.15))
-	dotList[i] = d
+	local big = i == 7
+	local size = big and 36 or 30
+	local d = mk("Frame", { Name = "Day" .. i, Size = UDim2.fromOffset(size, size), AnchorPoint = Vector2.new((i - 1) / 6, 0.5), Position = UDim2.fromScale((i - 1) / 6, 0.5), BackgroundColor3 = Color3.fromRGB(58, 62, 80), ZIndex = 4 }, dots)
+	d:SetAttribute("NoStuds", true)
+	mk("UICorner", { CornerRadius = UDim.new(0, 8) }, d)
+	local stroke = mk("UIStroke", { Name = "Rim", Thickness = 3, Color = OUT, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, d)
+	-- soft top shine, like a plastic brick
+	mk("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(175, 180, 195)) }, d)
+	local t = label(d, tostring(i), UDim2.fromScale(0.62, 0.62), UDim2.fromScale(0.5, 0.52), { AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = 6 })
+	dotList[i] = { frame = d, stroke = stroke, text = t, big = big }
 end
 label(streakBox, "Finish all 5 quests every day for 7 days in a row:", UDim2.new(0.52, -12, 0, 20), UDim2.new(0.48, 0, 0, 8), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Color3.fromRGB(200, 210, 255) })
 label(streakBox, rewardText(Config.DailyQuestWeekBonus), UDim2.new(0.52, -12, 0, 42), UDim2.new(0.48, 0, 0, 30), { TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, TextColor3 = GOLD })
@@ -189,8 +200,15 @@ function render()
 	-- streak dots (today's dot lights up once all 5 are claimed)
 	local streak = state.streak or 0
 	for i, d in ipairs(dotList) do
-		d.BackgroundColor3 = i <= streak and GOLD or Color3.fromRGB(50, 60, 100)
+		local done, nextDay = i <= streak, i == streak + 1
+		d.frame.BackgroundColor3 = done and GREEN or (d.big and Color3.fromRGB(120, 90, 30) or Color3.fromRGB(58, 62, 80))
+		d.text.Text = done and "\u{2714}" or tostring(i)
+		d.text.TextColor3 = (d.big and not done) and GOLD or Color3.new(1, 1, 1)
+		-- the day you're working on gets a white rim; the big day 7 a gold one
+		d.stroke.Color = nextDay and Color3.fromRGB(245, 248, 255) or (d.big and GOLD or OUT)
+		d.stroke.Thickness = (nextDay or d.big) and 3.5 or 3
 	end
+	trackFill.Size = UDim2.fromScale(math.clamp((streak - 1) / 6, 0, 1), 1)
 	questBadge.Visible = anyReady
 end
 

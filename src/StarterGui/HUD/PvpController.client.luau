@@ -253,7 +253,8 @@ local function renderChallenges()
 			end
 			askFight(p, function()
 			busy = true
-			fight.Text = "..."
+			fight.Text = "WAITING..."
+			flashMessage("Waiting for " .. (p.display or p.name or "them") .. " to accept...", true)
 			local ok, r = pcall(function()
 				return pvpRemote:InvokeServer("fight", p.userId)
 			end)
@@ -488,6 +489,104 @@ local function waitArenaLoaded(origin, count)
 	return false
 end
 
+--------------------------------------------------------------------
+-- someone wants to fight YOUR posted challenge: ACCEPT or DECLINE
+-- (shows anywhere, even with the PvP window closed; no answer in
+-- time = the fight starts, like before)
+--------------------------------------------------------------------
+local reqGui = mk("ScreenGui", { Name = "PvpRequest", ResetOnSpawn = false, DisplayOrder = 70, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Enabled = false }, player:WaitForChild("PlayerGui"))
+local reqBox = mk("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 70), Size = UDim2.fromOffset(440, 236), BackgroundColor3 = Color3.fromRGB(28, 31, 42) }, reqGui)
+mk("UICorner", { CornerRadius = UDim.new(0, 18) }, reqBox)
+mk("UIStroke", { Color = Color3.fromRGB(235, 70, 70), Thickness = 5 }, reqBox)
+local reqScale = mk("UIScale", {}, reqBox)
+local reqHead = mk("Frame", { Size = UDim2.new(1, 0, 0, 48), BackgroundColor3 = WHITE }, reqBox)
+mk("UICorner", { CornerRadius = UDim.new(0, 18) }, reqHead)
+mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(235, 70, 70), Color3.fromRGB(255, 150, 60)) }, reqHead)
+local reqHeadFill = mk("Frame", { Size = UDim2.new(1, 0, 0, 18), Position = UDim2.new(0, 0, 1, -18), BackgroundColor3 = WHITE, BorderSizePixel = 0 }, reqHead)
+mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(235, 70, 70), Color3.fromRGB(255, 150, 60)) }, reqHeadFill)
+local reqTitle = label(reqHead, "CHALLENGER!", UDim2.new(1, -24, 0.7, 0), UDim2.new(0, 12, 0.15, 0), { ZIndex = 2 })
+local reqWho = label(reqBox, "", UDim2.new(1, -24, 0, 24), UDim2.fromOffset(12, 56), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(220, 226, 245) })
+local reqYou = label(reqBox, "", UDim2.new(0.42, 0, 0, 50), UDim2.new(0.04, 0, 0, 86), { TextColor3 = Color3.fromRGB(150, 190, 255) })
+label(reqBox, "VS", UDim2.new(0.12, 0, 0, 34), UDim2.new(0.44, 0, 0, 94), { TextColor3 = GOLD })
+local reqThem = label(reqBox, "", UDim2.new(0.42, 0, 0, 50), UDim2.new(0.54, 0, 0, 86), { TextColor3 = Color3.fromRGB(255, 150, 150) })
+local reqHint = label(reqBox, "", UDim2.new(1, -24, 0, 18), UDim2.fromOffset(12, 138), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1 })
+local reqAccept = button(reqBox, "ACCEPT", UDim2.new(0.44, 0, 0, 46), UDim2.new(0.04, 0, 0, 162), GREEN)
+local reqDecline = button(reqBox, "DECLINE", UDim2.new(0.44, 0, 0, 46), UDim2.new(0.52, 0, 0, 162), RED)
+local reqBarBack = mk("Frame", { Size = UDim2.new(0.92, 0, 0, 10), Position = UDim2.new(0.04, 0, 0, 216), BackgroundColor3 = Color3.fromRGB(14, 16, 26) }, reqBox)
+mk("UICorner", { CornerRadius = UDim.new(1, 0) }, reqBarBack)
+local reqBar = mk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = GOLD }, reqBarBack)
+mk("UICorner", { CornerRadius = UDim.new(1, 0) }, reqBar)
+local currentReq
+local showRequest
+
+local function answer(accept)
+	local req = currentReq
+	if not req then
+		return
+	end
+	currentReq = nil
+	TweenService:Create(reqScale, TweenInfo.new(0.15), { Scale = 0 }):Play()
+	task.delay(0.16, function()
+		if not currentReq then
+			reqGui.Enabled = false
+		end
+	end)
+	task.spawn(function()
+		pcall(function()
+			pvpRemote:InvokeServer("respond", { id = req.id, accept = accept })
+		end)
+	end)
+	if not accept then
+		notify:Fire("You declined " .. (req.from or "the") .. "'s fight. Your challenge stays up.", Color3.fromRGB(255, 200, 140))
+	end
+end
+reqAccept.Activated:Connect(function()
+	answer(true)
+end)
+reqDecline.Activated:Connect(function()
+	answer(false)
+end)
+
+showRequest = function(d)
+	currentReq = d
+	local mine, theirs = d.yourPower or 0, d.power or 0
+	reqTitle.Text = "CHALLENGER!"
+	reqWho.Text = (d.from or "Someone") .. " (@" .. (d.fromUser or "?") .. ") wants to fight your team!"
+	reqYou.Text = "YOU\n" .. Config.FormatNumber(mine)
+	reqThem.Text = string.upper(d.from or "?") .. "\n" .. Config.FormatNumber(theirs)
+	local ratio = mine / math.max(1, theirs)
+	if ratio >= 1.25 then
+		reqHint.Text = "Your team is stronger!"
+		reqHint.TextColor3 = Color3.fromRGB(150, 255, 170)
+	elseif ratio >= 0.85 then
+		reqHint.Text = "Close fight - it could go either way."
+		reqHint.TextColor3 = Color3.fromRGB(255, 230, 140)
+	else
+		reqHint.Text = "Their team is stronger - be careful!"
+		reqHint.TextColor3 = Color3.fromRGB(255, 150, 150)
+	end
+	local v = workspace.CurrentCamera.ViewportSize
+	local fit = math.min(1, (v.X - 30) / 440, (v.Y - 100) / 236)
+	reqScale.Scale = 0
+	reqGui.Enabled = true
+	TweenService:Create(reqScale, TweenInfo.new(0.3, Enum.EasingStyle.Back), { Scale = fit }):Play()
+	-- countdown bar: no answer = the fight starts
+	local total = d.seconds or 15
+	local t0 = os.clock()
+	task.spawn(function()
+		while currentReq == d do
+			local left = total - (os.clock() - t0)
+			if left <= 0 then
+				answer(true)
+				break
+			end
+			reqBar.Size = UDim2.fromScale(left / total, 1)
+			reqAccept.Text = "ACCEPT (" .. math.ceil(left) .. ")"
+			task.wait(0.1)
+		end
+	end)
+end
+
 pvpEvent.OnClientEvent:Connect(function(d)
 	if type(d) ~= "table" then
 		return
@@ -544,6 +643,8 @@ pvpEvent.OnClientEvent:Connect(function(d)
 			bigText.Text = ""
 			subText.Text = ""
 		end)
+	elseif d.kind == "request" then
+		showRequest(d)
 	elseif d.kind == "defended" then
 		local text = (d.opponent or "Someone") .. " fought your challenge: " .. (d.win and "YOU WON" or "you lost") .. "!  +" .. (d.credits or 0) .. " credits"
 		notify:Fire(text, d.win and GOLD or Color3.fromRGB(255, 160, 160))

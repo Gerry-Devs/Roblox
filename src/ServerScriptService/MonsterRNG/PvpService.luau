@@ -35,6 +35,11 @@ pcall(function()
 	resultStore = DataStoreService:GetDataStore("MonsterRNG_PvpResults")
 end)
 local RESULT_TOPIC = "MonsterRNG_PvpResult"
+-- the poster accepts / declines a fight (they can be in another server)
+local REQUEST_TOPIC = "MonsterRNG_PvpRequest"
+local RESPONSE_TOPIC = "MonsterRNG_PvpResponse"
+local ACCEPT_SECONDS = 15 -- no answer in time (AFK / offline) = the fight starts
+local pendingRequests = {} -- request id -> { posterId, answer }
 
 local localPosts = {} -- Studio fallback when MemoryStore isn't available
 local inBattle = {} -- player -> true
@@ -774,6 +779,68 @@ local function getBoard()
 end
 
 --------------------------------------------------------------------
+-- ask the poster: ACCEPT or DECLINE (popup on their screen, any server)
+--------------------------------------------------------------------
+local function showRequest(posterId, req)
+	local poster = Players:GetPlayerByUserId(posterId)
+	if poster then
+		pvpEvent:FireClient(poster, req)
+		return true
+	end
+	return false
+end
+
+-- yields until the poster answers (true = fight) or the time runs out
+local function askPoster(post, challenger, profile)
+	local team = buildTeam(profile)
+	local id = HttpService:GenerateGUID(false)
+	local req = {
+		kind = "request",
+		id = id,
+		from = challenger.DisplayName,
+		fromUser = challenger.Name,
+		power = Config.TeamPower(team),
+		count = #team,
+		yourPower = post.power or 0,
+		seconds = ACCEPT_SECONDS,
+	}
+	pendingRequests[id] = { posterId = post.userId }
+	if not showRequest(post.userId, req) then
+		pcall(function()
+			MessagingService:PublishAsync(REQUEST_TOPIC, { posterId = post.userId, req = req })
+		end)
+	end
+	local t0 = os.clock()
+	local answer
+	while os.clock() - t0 < ACCEPT_SECONDS + 2 do
+		answer = pendingRequests[id].answer
+		if answer ~= nil or not challenger.Parent then
+			break
+		end
+		task.wait(0.2)
+	end
+	pendingRequests[id] = nil
+	if answer == nil then
+		return true, "timeout" -- no answer (away / offline): the challenge was open, so fight
+	end
+	return answer, answer and "accepted" or "declined"
+end
+
+local function answerRequest(posterId, id, accept)
+	local pend = type(id) == "string" and pendingRequests[id]
+	if pend then
+		if pend.posterId == posterId then
+			pend.answer = accept
+		end
+		return
+	end
+	-- the challenger is in another server
+	pcall(function()
+		MessagingService:PublishAsync(RESPONSE_TOPIC, { id = id, posterId = posterId, accept = accept })
+	end)
+end
+
+--------------------------------------------------------------------
 -- remote
 --------------------------------------------------------------------
 local function info(player, profile)
@@ -836,6 +903,9 @@ local function onAction(player, action, arg)
 			posted = os.time(),
 		})
 		return { success = true, message = "Challenge posted! Anyone can fight your team for the next " .. P.postMinutes .. " minutes." }
+	elseif action == "respond" and type(arg) == "table" then
+		answerRequest(player.UserId, arg.id, arg.accept == true)
+		return { success = true }
 	elseif action == "cancel" then
 		removePost(player.UserId)
 		return { success = true, message = "Challenge removed." }
@@ -859,6 +929,19 @@ local function onAction(player, action, arg)
 			return { success = false, message = "That challenge was already taken or ended." }
 		end
 		lastFight[player] = os.clock()
+		-- the poster decides (popup on their screen)
+		local accepted, why = askPoster(post, player, profile)
+		if not player.Parent then
+			return { success = false }
+		end
+		if not accepted then
+			post.taken = nil
+			setPost(post.userId, post) -- back on the list for others
+			return { success = false, message = (post.display or post.name or "They") .. " declined your challenge." }
+		end
+		if why == "timeout" and inBattle[player] then
+			return { success = false, message = "You're already fighting!" }
+		end
 		task.spawn(function()
 			local ok, err = pcall(runBattle, player, profile, post)
 			if not ok then
@@ -887,6 +970,26 @@ function PvpService.Start(d)
 		end
 		return r
 	end
+	-- fight requests / answers between servers
+	task.spawn(function()
+		pcall(function()
+			MessagingService:SubscribeAsync(REQUEST_TOPIC, function(msg)
+				local dta = msg.Data
+				if type(dta) == "table" and type(dta.req) == "table" then
+					showRequest(tonumber(dta.posterId) or 0, dta.req)
+				end
+			end)
+		end)
+		pcall(function()
+			MessagingService:SubscribeAsync(RESPONSE_TOPIC, function(msg)
+				local dta = msg.Data
+				local pend = type(dta) == "table" and pendingRequests[dta.id]
+				if pend and pend.posterId == tonumber(dta.posterId) then
+					pend.answer = dta.accept == true
+				end
+			end)
+		end)
+	end)
 	-- the poster's results when their post was fought in another server
 	task.spawn(function()
 		pcall(function()

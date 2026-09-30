@@ -45,6 +45,12 @@ local function fix(b)
 		return
 	end
 	fixed[b] = true
+	-- give the window's own script a moment to say it styles itself
+	-- (KeepPlace / NoSkin), so a window never gets two headers
+	task.wait(0.4)
+	if b:GetAttribute("KeepPlace") or not b.Parent or b.Parent ~= window then
+		return
+	end
 	-- the Backpack look for every window: header bar + red X at its end
 	if UIStyle and UIStyle.skinWindow and not window:GetAttribute("NoSkin") then
 		local ok, err = pcall(UIStyle.skinWindow, window, b)
@@ -88,7 +94,7 @@ end
 
 local function scan(root)
 	for _, d in ipairs(root:GetDescendants()) do
-		fix(d)
+		task.spawn(fix, d)
 	end
 end
 
@@ -96,7 +102,7 @@ scan(playerGui)
 playerGui.DescendantAdded:Connect(function(d)
 	task.defer(function()
 		if d.Parent then
-			fix(d)
+			task.spawn(fix, d)
 		end
 	end)
 end)

@@ -1,18 +1,23 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local Debris = game:GetService("Debris")
 
 --------------------------------------------------------------------
 -- WindowAnimator: every window (anything with an X / CloseButton in it)
--- slides up and pops in when it opens, and shrinks down and away when
--- it closes. Works for windows made in StarterGui and ones built by
--- scripts, without changing them: it watches each window's Visible.
+-- slides up when it opens, and slides down + shrinks away when it
+-- closes. It never changes how the window itself works:
+--   * open: only the window's Position is animated (its own scripts
+--     keep control of its size / UIScale)
+--   * close: the real window closes right away as usual; a copy of it
+--     plays the closing animation and is then removed
 --------------------------------------------------------------------
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local OPEN_TIME = 0.25
-local CLOSE_TIME = 0.13
+local OPEN_TIME = 0.22
+local CLOSE_TIME = 0.14
 local SLIDE = 36 -- pixels
+local GHOST = "WindowAnimGhost"
 
 local watched = setmetatable({}, { __mode = "k" })
 
@@ -23,77 +28,81 @@ local function isCloseButton(b)
 	return b.Name == "CloseButton" or (b:IsA("TextButton") and b.Text == "X")
 end
 
-local function watch(window)
-	if watched[window] or not window:IsA("GuiObject") then
+-- copy of the window that animates out (no scripts, not clickable)
+local function playClose(window, basePos)
+	local ok, ghost = pcall(function()
+		return window:Clone()
+	end)
+	if not ok or not ghost then
 		return
 	end
-	local w = { basePos = window.Position, busy = false, token = 0 }
-	watched[window] = w
-
-	-- windows that don't pop in by themselves get their own scale
-	local scale = window:FindFirstChildOfClass("UIScale")
-	local ownScale = false
-	if not scale then
-		scale = Instance.new("UIScale")
-		scale.Name = "WindowAnimScale"
-		scale.Parent = window
-		ownScale = true
-	end
-
-	local function open()
-		w.token += 1
-		w.basePos = window.Position
-		window.Position = w.basePos + UDim2.fromOffset(0, SLIDE)
-		TweenService:Create(window, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = w.basePos }):Play()
-		if ownScale then
-			scale.Scale = 0.85
-			TweenService:Create(scale, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	ghost:SetAttribute(GHOST, true)
+	for _, d in ipairs(ghost:GetDescendants()) do
+		if d:IsA("BaseScript") then
+			d:Destroy()
+		elseif d:IsA("GuiButton") then
+			d.Active = false
+			d.AutoButtonColor = false
 		end
 	end
-
-	local function close()
-		-- the window was just hidden: show it a moment longer to animate out
-		w.token += 1
-		local token = w.token
-		local fromScale = scale.Scale
-		w.busy = true
-		window.Visible = true
-		w.busy = false
-		TweenService:Create(window, TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			Position = w.basePos + UDim2.fromOffset(0, SLIDE),
-		}):Play()
-		TweenService:Create(scale, TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = fromScale * 0.8 }):Play()
-		task.delay(CLOSE_TIME, function()
-			if w.token ~= token then
-				return -- opened again meanwhile
-			end
-			w.busy = true
-			window.Visible = false
-			w.busy = false
-			window.Position = w.basePos
-			scale.Scale = fromScale
-		end)
+	ghost.Position = basePos
+	ghost.Visible = true
+	local scale = ghost:FindFirstChildOfClass("UIScale")
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Parent = ghost
 	end
+	ghost.Parent = window.Parent
+	local info = TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	TweenService:Create(ghost, info, { Position = basePos + UDim2.fromOffset(0, SLIDE) }):Play()
+	TweenService:Create(scale, info, { Scale = scale.Scale * 0.8 }):Play()
+	Debris:AddItem(ghost, CLOSE_TIME + 0.02)
+end
+
+local function watch(window)
+	if watched[window] or not window:IsA("GuiObject") or window:GetAttribute(GHOST) then
+		return
+	end
+	local w = { basePos = window.Position, tween = nil }
+	watched[window] = w
 
 	window:GetPropertyChangedSignal("Visible"):Connect(function()
-		if w.busy or not window.Parent then
+		if not window.Parent then
 			return
 		end
 		if window.Visible then
-			if w.token > 0 and window.Position ~= w.basePos then
-				-- reopened while closing: put it back first
-				window.Position = w.basePos
+			-- where the window really sits (not a spot left over from an
+			-- unfinished slide)
+			if w.tween then
+				w.tween:Cancel()
+				w.tween = nil
+			else
+				w.basePos = window.Position
 			end
-			open()
+			window.Position = w.basePos + UDim2.fromOffset(0, SLIDE)
+			local tw = TweenService:Create(window, TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = w.basePos })
+			w.tween = tw
+			tw.Completed:Connect(function()
+				if w.tween == tw then
+					w.tween = nil
+				end
+			end)
+			tw:Play()
 		else
-			close()
+			if w.tween then
+				w.tween:Cancel()
+				w.tween = nil
+			end
+			window.Position = w.basePos
+			playClose(window, w.basePos)
 		end
 	end)
 end
 
 local function check(d)
-	if isCloseButton(d) and d.Parent and d.Parent:IsA("GuiObject") then
-		watch(d.Parent)
+	local window = d.Parent
+	if isCloseButton(d) and window and window:IsA("GuiObject") and not window:GetAttribute(GHOST) then
+		watch(window)
 	end
 end
 

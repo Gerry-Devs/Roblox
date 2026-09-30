@@ -1227,9 +1227,9 @@ Config.Combat = {
 	shardChance = 0.35,
 	potionChance = 0.04,
 	warpRemoteChance = 0, -- Warp Remotes are sold in the Gear Shop now (not dropped)
-	giftCardChance = 0.001, -- as rare as a Revive Potion; only drops for Rebirth 3+
+	giftCardChance = 0.0015, -- ~1 in 670 kills; only drops for Rebirth 3+
 	giftCardMinRebirth = 3,
-	potionWeights = { luck = 25, health = 20, damage = 20, cash = 20, level = 13, revive = 5 },
+	potionWeights = { luck = 25, health = 20, damage = 20, cash = 20, level = 13, revive = 8 }, -- revive: ~1 in 330 kills
 }
 Config.RarityPower = { 1, 1.2, 1.45, 1.75, 2.1, 2.5 }
 Config.PetSizePower = { Normal = 1, Huge = 1.3, Titan = 1.7 }

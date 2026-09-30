@@ -143,6 +143,10 @@ local function listKey(kind)
 		end
 	end
 	table.sort(ids)
+	-- the pet cap too (a +1 Monster gamepass / upgrade updates the title)
+	if kind == "monster" then
+		table.insert(ids, "cap" .. (Config.GetPenMonsterCap(profile.upgrades) + Config.PassExtraMonsters(profile)))
+	end
 	return table.concat(ids, ",")
 end
 
@@ -280,7 +284,8 @@ local function renderMonsters()
 	table.sort(list, function(a, b)
 		return Config.GetEntryIncome(a) > Config.GetEntryIncome(b)
 	end)
-	local cap = Config.GetPenMonsterCap(profile.upgrades)
+	-- upgrades + the +1 Monster gamepass (same as the server)
+	local cap = Config.GetPenMonsterCap(profile.upgrades) + Config.PassExtraMonsters(profile)
 	monsterPanel.Title.Text.Text = string.format("PETS %d/%d", #list, cap)
 	monsterPanel.Empty.Text = "No monsters in your pen."
 	monsterPanel.Empty.Visible = #list == 0

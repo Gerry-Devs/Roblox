@@ -56,8 +56,6 @@ remote.OnClientEvent:Connect(function(data)
 	local amount = mk("TextLabel", { Size = UDim2.new(1, -40, 0, 64), Position = UDim2.fromOffset(20, 106), BackgroundTransparency = 1, Text = "+$0", Font = FONT, TextScaled = true, TextColor3 = Color3.fromRGB(130, 255, 140) }, panel)
 	mk("UIStroke", { Thickness = 3, Color = Color3.fromRGB(10, 40, 15) }, amount)
 	local capped = data.away > data.seconds
-	local info = string.format("Away %s  •  earned for %s (max %dh)  •  %d%% speed", hm(data.away), hm(data.seconds), data.maxHours, math.floor(data.rate * 100 + 0.5))
-	mk("TextLabel", { Size = UDim2.new(1, -40, 0, 22), Position = UDim2.fromOffset(20, 174), BackgroundTransparency = 1, Text = info, Font = FONT, TextScaled = true, TextColor3 = Color3.fromRGB(170, 180, 220) }, panel)
 	if capped then
 		mk("TextLabel", { Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(20, 198), BackgroundTransparency = 1, Text = "Upgrade OFFLINE TIME in the Upgrade tree to earn for longer!", Font = FONT, TextScaled = true, TextColor3 = GOLD }, panel)
 	end

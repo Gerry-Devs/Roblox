@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local TextService = game:GetService("TextService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -503,8 +504,8 @@ local function paintTile(node)
 	t.question.Visible = st == "locked"
 	t.name.Visible = st ~= "locked"
 	t.cost.Visible = st == "available"
-	if t.shardIcon then
-		t.shardIcon.Visible = st == "available"
+	if t.costIcon then
+		t.costIcon.Visible = st == "available"
 	end
 	local canPay = Config.UpgradeFunds(profile, node) >= node.cost
 	t.cost.TextColor3 = canPay and priceColor(node) or Color3.fromRGB(255, 70, 70)
@@ -568,12 +569,22 @@ openBranch = function(bi)
 			local t = makeTile(x, y, BLUE, BLUE_DARK, img)
 			local statInfo = Config.UpgradeStatInfo[node.statKey] or { name = node.statKey }
 			t.name = label(t.holder, statInfo.name .. " " .. node.tier, UDim2.fromScale(0.86, 0.2), UDim2.fromScale(0.07, 0.3), { ZIndex = 7 })
-			t.cost = label(t.holder, (node.currency == "shards" and "" or "$") .. Config.FormatNumber(node.cost), UDim2.fromScale(0.62, 0.18), UDim2.fromScale(0.19, 0.55), { ZIndex = 7, TextColor3 = priceColor(node) })
-			if node.currency == "shards" then
-				-- shard price: the Rift Shard icon in front of the number
-				t.cost.Size = UDim2.fromScale(0.5, 0.18)
-				t.cost.Position = UDim2.fromScale(0.33, 0.55)
-				t.shardIcon = mk("ImageLabel", { Name = "ShardIcon", Size = UDim2.fromScale(0.16, 0.16), Position = UDim2.fromScale(0.17, 0.56), BackgroundTransparency = 1, Image = Config.RiftShardImage or "", ScaleType = Enum.ScaleType.Fit, ZIndex = 7 }, t.holder)
+			-- price + its icon (cash or Rift Shard) after it, centered; the
+			-- whole row shrinks when a long price doesn't fit the hex
+			do
+				local txt = Config.FormatNumber(node.cost)
+				local h = math.floor(TILE * 0.17)
+				local avail = TILE * 0.64
+				local gap = 3
+				local textW = TextService:GetTextSize(txt, h, FONT, Vector2.new(1000, h)).X + 4
+				local total = textW + gap + h
+				local k = math.min(1, avail / total)
+				local th, tw = h * k, textW * k
+				local x0 = (TILE - (tw + gap * k + th)) / 2
+				local y0 = TILE * 0.55
+				t.cost = label(t.holder, txt, UDim2.fromOffset(tw, th), UDim2.fromOffset(x0, y0), { ZIndex = 7, TextScaled = false, TextSize = th, TextColor3 = priceColor(node) })
+				local image = node.currency == "shards" and Config.RiftShardImage or Config.CashImage
+				t.costIcon = mk("ImageLabel", { Name = "PriceIcon", Size = UDim2.fromOffset(th, th), Position = UDim2.fromOffset(x0 + tw + gap * k, y0), BackgroundTransparency = 1, Image = image or "", ScaleType = Enum.ScaleType.Fit, ZIndex = 7 }, t.holder)
 			end
 			t.question = label(t.holder, "?", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(0.25, 0.25), { ZIndex = 7, TextColor3 = Color3.fromRGB(200, 205, 220) })
 			t.vein = vein

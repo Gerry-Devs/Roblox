@@ -434,10 +434,33 @@ Players.PlayerRemoving:Connect(function(p)
 		task.defer(renderPlayers)
 	end
 end)
+-- The server sends the profile every second (income): only rebuild the
+-- list when what it shows changed, so it doesn't lag or jump to the top.
+local function listSignature(p)
+	local parts = { tab }
+	local src = p[tab]
+	if tab == "monsters" or tab == "eggs" then
+		for _, e in ipairs(src or {}) do
+			table.insert(parts, tostring(e.uid) .. (e.favorite and "*" or "") .. ":" .. tostring(e.level or 0))
+		end
+	else
+		for key, count in pairs(src or {}) do
+			table.insert(parts, key .. "=" .. tostring(count))
+		end
+		table.sort(parts, function(a, b)
+			return a < b
+		end)
+	end
+	return table.concat(parts, "|")
+end
+
 profileUpdated.OnClientEvent:Connect(function(newProfile)
+	local changed = listSignature(newProfile) ~= listSignature(profile)
 	profile = newProfile
 	if main.Visible and not confirm.Visible then
-		renderItems()
+		if changed then
+			renderItems()
+		end
 		refreshInfo()
 	end
 end)

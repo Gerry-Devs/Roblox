@@ -423,16 +423,18 @@ end
 local function sortedFiltered(list, kind)
 	local needle = search.Text:lower()
 	local out = {}
+	local tiers = {}
 	for _, item in ipairs(list) do
 		if needle == "" or string.find(getDisplayName(kind, item):lower(), needle, 1, true) then
 			table.insert(out, item)
+			tiers[item] = getRarity(kind, item).tier
 		end
 	end
 	table.sort(out, function(a, b)
 		if (a.favorite == true) ~= (b.favorite == true) then
 			return a.favorite == true
 		end
-		local ta, tb = getRarity(kind, a).tier, getRarity(kind, b).tier
+		local ta, tb = tiers[a], tiers[b]
 		if sortDescending then
 			return ta > tb
 		end
@@ -657,7 +659,38 @@ local function renderConsumables()
 	end
 end
 
+-- Everything the grid shows. The server sends the whole profile every
+-- second (income), so only rebuild the cards when this actually changes.
+local lastSignature
+local function gridSignature()
+	local parts = { activeTab, search.Text, tostring(sortDescending) }
+	if activeTab == "Potion" or activeTab == "Item" then
+		for _, src in ipairs({ profile.potions, profile.items, profile.gears }) do
+			for key, count in pairs(src or {}) do
+				table.insert(parts, key .. "=" .. tostring(count))
+			end
+		end
+		table.sort(parts, function(a, b)
+			return a < b
+		end)
+		return table.concat(parts, "|")
+	end
+	for _, src in ipairs({ profile.eggs or {}, profile.monsters or {} }) do
+		for _, item in ipairs(src) do
+			table.insert(parts, tostring(item.uid) .. (item.favorite and "*" or "") .. ":" .. tostring(item.level or 0))
+		end
+	end
+	return table.concat(parts, "|")
+end
+
 renderGrid = function()
+	local signature = gridSignature()
+	if signature == lastSignature then
+		updateCount()
+		return
+	end
+	lastSignature = signature
+
 	for _, child in ipairs(grid:GetChildren()) do
 		if child:IsA("GuiObject") then
 			child:Destroy()

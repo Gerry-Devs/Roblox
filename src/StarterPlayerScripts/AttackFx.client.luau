@@ -469,9 +469,9 @@ FX.phoenix = {
 -- Storm Leviathan -------------------------------------------------
 FX.leviathan = {
 	attack = function(c) -- Water Blast
-		local p = part(Vector3.one * 1.3, CFrame.new(c.from), rgb(70, 170, 255), { Shape = Enum.PartType.Ball, Transparency = 0.15, Material = Enum.Material.Glass })
+		local p = part(Vector3.one * 1.3, CFrame.new(c.mouth), rgb(70, 170, 255), { Shape = Enum.PartType.Ball, Transparency = 0.15, Material = Enum.Material.Glass })
 		trail(p, rgb(140, 210, 255), SPARK, 45, 0.7)
-		shoot(p, c.from + Vector3.new(0, 1, 0), c.to, 0.25, { arc = 1 }, function(at)
+		shoot(p, c.mouth, c.to, 0.25, { arc = 1 }, function(at)
 			ring(c.ground, rgb(90, 180, 255), c.s * 1.1, 0.35)
 			emit(at, rgb(120, 200, 255), 16, { speed = 14, size = 0.7, life = 0.45, gravity = Vector3.new(0, -40, 0), light = 0.5 })
 		end)
@@ -502,14 +502,17 @@ FX["void-dragon"] = {
 		for i = 1, 7 do
 			task.delay(i * 0.03, function()
 				local sz = 0.6 + i * 0.12
-				local p = part(Vector3.one * sz, CFrame.new(c.from), i % 2 == 0 and rgb(120, 40, 200) or rgb(30, 10, 50), { Shape = Enum.PartType.Ball, Transparency = 0.1 + i * 0.05 })
-				shoot(p, c.from + Vector3.new(0, 1, 0), c.to + Vector3.new((math.random() - 0.5) * c.s * 0.5, (math.random() - 0.5) * c.s * 0.4, 0), 0.25, {}, function(at)
+				local p = part(Vector3.one * sz, CFrame.new(c.mouth), i % 2 == 0 and rgb(120, 40, 200) or rgb(30, 10, 50), { Shape = Enum.PartType.Ball, Transparency = 0.1 + i * 0.05 })
+				shoot(p, c.mouth, c.to + Vector3.new((math.random() - 0.5) * c.s * 0.5, (math.random() - 0.5) * c.s * 0.4, 0), 0.25, {}, function(at)
 					emit(at, rgb(160, 70, 255), 3, { speed = 6, size = 0.6, life = 0.3 })
 				end)
 			end)
 		end
 	end,
 	crit = function(c) -- Void Blast
+		local len = (c.to - c.mouth).Magnitude
+		local beam = part(Vector3.new(c.s * 0.35, c.s * 0.35, len), CFrame.lookAt((c.mouth + c.to) / 2, c.to), rgb(130, 50, 220), { Transparency = 0.15 })
+		fade(beam, 0.3, Vector3.new(0.1, 0.1, len), 0.15)
 		local core = part(Vector3.one * c.s * 0.3, CFrame.new(c.to), rgb(15, 5, 25), { Shape = Enum.PartType.Ball, Material = Enum.Material.SmoothPlastic, Transparency = 0.05 })
 		tween(core, 0.3, { Size = Vector3.one * c.s * 1.6 }, Enum.EasingStyle.Back)
 		task.delay(0.35, function()
@@ -641,6 +644,13 @@ FX.emperor = {
 -- hook up every pet
 --------------------------------------------------------------------
 
+-- when each critical effect starts (seconds into the 0.8s critical move)
+local CRIT_DELAY = {
+	bat = 0.4, slime = 0.5, mushroom = 0.3, crab = 0, wolf = 0.2, golem = 0.35,
+	phoenix = 0.05, leviathan = 0.35, ["void-dragon"] = 0.45, wraith = 0.1,
+	seraph = 0.3, titan = 0.45, emperor = 0.4,
+}
+
 local enemiesFolder = workspace:WaitForChild("Enemies", 30)
 local function findEnemy(id)
 	if not enemiesFolder or not id or id == 0 then
@@ -669,6 +679,9 @@ local function play(model, body, isCrit)
 	local s = enemy:GetAttribute("BodySize") or 4
 	local petSize = body.Size.Y
 	local from = body.Position + Vector3.new(0, petSize * 0.3, 0)
+	-- breath / blasts come out of the mouth (the jaw or head joint)
+	local mouthPivot = body:FindFirstChild("Pivot_jaw") or body:FindFirstChild("Pivot_head")
+	local mouth = mouthPivot and mouthPivot.Position or from
 	local to = root.Position
 	local flat = Vector3.new(to.X - from.X, 0, to.Z - from.Z)
 	local ctx = {
@@ -678,12 +691,20 @@ local function play(model, body, isCrit)
 		s = s,
 		ground = Vector3.new(to.X, to.Y - s * 0.6, to.Z),
 		petSize = petSize,
+		mouth = mouth,
 	}
 	local fn = isCrit and set.crit or set.attack
-	local ok, err = pcall(fn, ctx)
-	if not ok then
-		warn("AttackFx", id, err)
-	end
+	-- critical effects wait for the big moment of the critical animation
+	task.delay(isCrit and (CRIT_DELAY[id] or 0.3) or 0, function()
+		if isCrit then
+			-- the mouth has moved during the animation: measure it again
+			ctx.mouth = mouthPivot and mouthPivot.Parent and mouthPivot.Position or ctx.mouth
+		end
+		local ok, err = pcall(fn, ctx)
+		if not ok then
+			warn("AttackFx", id, err)
+		end
+	end)
 end
 
 local hooked = setmetatable({}, { __mode = "k" })

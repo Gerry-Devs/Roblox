@@ -1077,6 +1077,7 @@ Config.Combat = {
 	aggroRange = 24, -- "tap an enemy to attack" hint shows when you're this close to one
 	orderRange = 35, -- you must be this close to an enemy to tap it and send your pets
 	leashRange = 80, -- walk further than this from the enemy and your pets come back
+	rangedExtra = 6, -- ranged pets (Config.RangedPets) fight this much further back; enemies still reach them
 	regenDelay = 5, -- seconds out of combat before pets heal
 	regenPerSecond = 0.05, -- 5% of max health per second
 	xpBase = 25,
@@ -1095,6 +1096,9 @@ Config.PetSizePower = { Normal = 1, Huge = 1.3, Titan = 1.7 }
 Config.PetFinishPower = { Normal = 1, Gold = 1.15, Silver = 1.25, Rainbow = 1.5 }
 
 -- special enemies: much tougher, more XP and loot (mult applies to all)
+-- pets that attack from a little further away (fire / breath attacks)
+Config.RangedPets = { phoenix = true, ["void-dragon"] = true }
+
 Config.EnemySizes = {
 	{ key = "Titanic", chance = 0.01, mult = 5, scale = 2.3 },
 	{ key = "Huge", chance = 0.05, mult = 2.5, scale = 1.6 },

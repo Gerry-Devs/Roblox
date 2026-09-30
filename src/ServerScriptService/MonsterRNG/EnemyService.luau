@@ -629,7 +629,7 @@ local function combatTick(now)
 				end
 				assigned[uid] = pick
 				if pick then
-					targets[uid] = { Vector3.new(pick.root.Position.X, 0, pick.root.Position.Z), pick.size * 0.5 }
+					targets[uid] = { Vector3.new(pick.root.Position.X, 0, pick.root.Position.Z), pick.size * 0.5, Config.RangedPets[p.entry.monsterId] and C.rangedExtra or 0 }
 				end
 				local model = pen.pets:FindFirstChild(uid)
 				local targetId = pick and pick.id or 0
@@ -651,8 +651,10 @@ local function combatTick(now)
 					local model = pen.pets:FindFirstChild(p.entry.uid)
 					local body = model and model:FindFirstChild("MonsterBody")
 					-- a pet only hits once it has actually reached its enemy
+					-- ranged pets (phoenix, void dragon) hit from further back
+					local ranged = Config.RangedPets[p.entry.monsterId] and C.rangedExtra or 0
 					if body and now >= (petNextAttack[p.entry.uid] or 0)
-						and flatDistance(body.Position, best.root.Position) <= best.size * 0.5 + body.Size.X * 0.5 + 4 then
+						and flatDistance(body.Position, best.root.Position) <= best.size * 0.5 + body.Size.X * 0.5 + 4 + ranged then
 						petNextAttack[p.entry.uid] = now + C.petAttackInterval * rng:NextNumber(0.9, 1.1)
 						p.st.lastHit = now
 						model:SetAttribute("LungeAt", now)
@@ -723,7 +725,12 @@ local function combatTick(now)
 			local profile = DataService.Get(player)
 			local body = getTargetPetBody(e)
 			if profile and body then
-				if flatDistance(body.Position, e.root.Position) <= e.size * 0.5 + body.Size.X * 0.5 + 5 then
+				-- ranged pets stand further back, but the enemy can still hit them
+				local reach = e.size * 0.5 + body.Size.X * 0.5 + 5
+				if Config.RangedPets[body:GetAttribute("RigId")] then
+					reach += C.rangedExtra
+				end
+				if flatDistance(body.Position, e.root.Position) <= reach then
 					e.nextAttack = now + C.enemyAttackInterval
 					local victim
 					for _, entry in ipairs(profile.base) do

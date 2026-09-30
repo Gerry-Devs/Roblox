@@ -2530,7 +2530,7 @@ local function animatePetBody(model, body, homePosition, bodySize, penState)
 				local target = petTarget and petTarget[1]
 				if target then
 					local ang = formationIndex * (math.pi * 2 / 6)
-					local radius = (petTarget[2] or 3) + bodySize * 0.6 + 2
+					local radius = (petTarget[2] or 3) + bodySize * 0.6 + 2 + (petTarget[3] or 0) -- [3]: ranged pets stay back
 					targetPos = target + Vector3.new(math.cos(ang) * radius, 0, math.sin(ang) * radius)
 				end
 				targetPos = Vector3.new(targetPos.X, homePosition.Y, targetPos.Z)

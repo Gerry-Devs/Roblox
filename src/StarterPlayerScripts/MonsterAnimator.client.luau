@@ -80,6 +80,10 @@ local function register(model, root)
 	model:GetAttributeChangedSignal("LungeAt"):Connect(function()
 		st.attackAt = os.clock()
 	end)
+	-- a critical hit: set together with LungeAt (either one can arrive first)
+	model:GetAttributeChangedSignal("CritAt"):Connect(function()
+		st.critClock = os.clock()
+	end)
 	model:GetAttributeChangedSignal("Attacks"):Connect(function()
 		st.attackAt = os.clock()
 	end)
@@ -1661,6 +1665,293 @@ end
 -- Stone Golem (double fist smash), Moss Slime (rear up + crash) and Storm
 -- Leviathan (coil + strike) keep the attacks in their own animations.
 
+--------------------------------------------------------------------
+-- New normal attacks (replace the older moves)
+--------------------------------------------------------------------
+local function ease(x)
+	return 1 - (1 - math.clamp(x, 0, 1)) ^ 3
+end
+local function bump(k, a, b)
+	-- 0 -> 1 -> 0 between k = a and k = b
+	return (k > a and k < b) and math.sin((k - a) / (b - a) * math.pi) or 0
+end
+
+-- Runestone Golem: Punch - right arm pulls back, body twists, straight jab
+ATTACKS.golem = function(st, k, s)
+	local wind = bump(k, 0, 0.45)
+	local hit = bump(k, 0.35, 1)
+	set(st, "body", CF(0, 0, -0.18 * s * hit) * A(R(-6) * hit, R(25) * wind - R(20) * hit, 0))
+	set(st, "armR", A(R(35) * wind - R(95) * hit, 0, R(10) * wind))
+	set(st, "armRLow", A(R(-70) * wind + R(10) * hit, 0, 0))
+	set(st, "armL", A(R(-25) * hit + R(15) * wind, 0, R(-10) * hit))
+	set(st, "head", A(R(-8) * hit, R(-10) * wind + R(10) * hit, 0))
+	attackBurst(st, hit > 0.8, 12)
+end
+
+-- Ember Phoenix: Fire Feathers - hovers back, wings swept high and back,
+-- then flings both wings forward to throw its burning feathers
+ATTACKS.phoenix = function(st, k, s)
+	local draw = bump(k, 0, 0.5)
+	local fling = bump(k, 0.35, 1)
+	set(st, "body", CF(0, 0.1 * s * draw, 0.15 * s * draw - 0.08 * s * fling) * A(R(18) * draw - R(12) * fling, 0, 0))
+	set(st, "head", A(R(-15) * draw + R(12) * fling, 0, 0))
+	set(st, "jaw", A(-R(30) * fling, 0, 0))
+	phoenixWings(st, R(55) * draw - R(10) * fling, R(60) - R(20) * draw, R(-35) * draw + R(55) * fling, -R(20) * draw + R(10) * fling)
+	set(st, "tail", A(R(15) * draw - R(10) * fling, 0, 0))
+	set(st, "legL", A(R(20) * draw, 0, 0))
+	set(st, "legR", A(R(20) * draw, 0, 0))
+	attackBurst(st, fling > 0.7, 20)
+end
+
+-- Frostfang Wolf: Bite - quick crouch, snaps forward twice
+ATTACKS.wolf = function(st, k, s)
+	local crouch = bump(k, 0, 0.35)
+	local lunge = bump(k, 0.25, 1)
+	local snap = math.abs(math.sin(math.clamp((k - 0.3) / 0.6, 0, 1) * math.pi * 2))
+	set(st, "body", CF(0, -0.1 * s * crouch, -0.4 * s * lunge) * A(R(-6) * crouch - R(8) * lunge, 0, 0))
+	set(st, "head", A(R(-12) * crouch + R(8) * lunge * snap, 0, 0))
+	set(st, "jaw", A(-R(45) * lunge * snap, 0, 0))
+	set(st, "fl", A(R(35) * lunge, 0, 0))
+	set(st, "fr", A(R(35) * lunge, 0, 0))
+	set(st, "hl", A(-R(25) * lunge, 0, 0))
+	set(st, "hr", A(-R(25) * lunge, 0, 0))
+	set(st, "earL", A(R(-50), 0, 0))
+	set(st, "earR", A(R(-50), 0, 0))
+	set(st, "tail", A(R(10) * lunge, 0, 0))
+	attackBurst(st, lunge > 0.8, 16)
+end
+
+-- Storm Leviathan: Water Blast - pulls the head back, then thrusts it
+-- forward with the jaw wide open (the water orb comes out of the mouth)
+ATTACKS.leviathan = function(st, k, s)
+	local draw = bump(k, 0, 0.45)
+	local blast = bump(k, 0.3, 1)
+	set(st, "body", CF(0, 0.05 * s * draw, 0.1 * s * draw - 0.15 * s * blast))
+	for _, n in ipairs(LEVI_NECK) do
+		set(st, n, A(R(-10) * draw + R(8) * blast, 0, 0))
+	end
+	set(st, "head", A(R(-15) * draw + R(12) * blast, 0, 0))
+	set(st, "jaw", A(-R(15) * draw - R(50) * blast, 0, 0))
+	attackBurst(st, blast > 0.8, 20)
+end
+
+--------------------------------------------------------------------
+-- Critical moves: every monster has its own, bigger move (0.8s) that
+-- plays instead of the normal attack when the hit is a critical.
+--------------------------------------------------------------------
+local CRIT_TIME = 0.8
+local CRITS = {}
+
+-- Cave Bat: Bat Swarm - flies up, spins with the wings wide, dives in
+CRITS.bat = function(st, k, s)
+	local up = bump(k, 0, 0.6)
+	local dive = bump(k, 0.55, 1)
+	local flap = math.sin(k * math.pi * 10) * R(60)
+	set(st, "body", CF(0, 0.6 * s * up - 0.3 * s * dive, -0.4 * s * dive) * A(R(35) * dive, ease(k / 0.6) * math.pi * 2, 0))
+	set(st, "wingL", A(0, 0, -R(40) - flap))
+	set(st, "wingR", A(0, 0, R(40) + flap))
+	set(st, "jaw", A(R(45) * math.max(up, dive), 0, 0))
+	set(st, "earL", A(R(-45), 0, 0))
+	set(st, "earR", A(R(-45), 0, 0))
+	attackBurst(st, dive > 0.7, 30)
+end
+
+-- Moss Slime: Big Slam - squashes, jumps high, crashes down flat
+CRITS.slime = function(st, k, s)
+	local squat = bump(k, 0, 0.25)
+	local air = bump(k, 0.2, 0.75)
+	local crash = bump(k, 0.7, 1)
+	set(st, "body", CF(0, -0.15 * s * squat + 1.1 * s * air - 0.1 * s * crash, -0.2 * s * air) * A(R(15) * air, 0, 0))
+	for i = 1, 8 do
+		-- layers: pressed together (squash) or pulled apart (stretch)
+		set(st, "sl" .. i, CF(0, (-0.06 * squat + 0.05 * air - 0.08 * crash) * s * i, 0))
+	end
+	set(st, "jaw", A(R(-40) * air, 0, 0))
+	attackBurst(st, crash > 0.6, 40)
+end
+
+-- Glowcap Mushroom: Spore Burst - crouches, jumps and spins twice with the
+-- cap puffed up and arms thrown out
+CRITS.mushroom = function(st, k, s)
+	local squat = bump(k, 0, 0.3)
+	local up = bump(k, 0.25, 1)
+	set(st, "body", CF(0, -0.1 * s * squat + 0.5 * s * up, 0) * A(0, ease((k - 0.25) / 0.75) * math.pi * 4, 0))
+	set(st, "cap", CF(0, 0.2 * s * up, 0) * A(R(10) * math.sin(k * 20) * up, 0, 0))
+	set(st, "armL", A(0, 0, R(-110) * up))
+	set(st, "armR", A(0, 0, R(110) * up))
+	attackBurst(st, up > 0.8, 40)
+end
+
+-- Ironclaw Crab: Double Claw - left claw, then right claw, one-two
+CRITS.crab = function(st, k, s)
+	local left = bump(k, 0, 0.5)
+	local right = bump(k, 0.4, 0.95)
+	set(st, "body", CF(0, 0, -0.12 * s * math.max(left, right)) * A(0, R(18) * left - R(18) * right, 0))
+	set(st, "clawL", A(R(-85) * left, R(-20) * left, 0))
+	set(st, "clawR", A(R(-85) * right, R(20) * right, 0))
+	set(st, "pinchL", A(R(45) * math.abs(math.sin(k * 30)) * left, 0, 0))
+	set(st, "pinchR", A(R(45) * math.abs(math.sin(k * 30)) * right, 0, 0))
+	attackBurst(st, left > 0.9 or right > 0.9, 16)
+end
+
+-- Frostfang Wolf: Ice Howl - rears up on its hind legs and howls at the
+-- sky, front paws up, then lands
+CRITS.wolf = function(st, k, s)
+	local rear = bump(k, 0, 1)
+	local howl = bump(k, 0.15, 0.85)
+	set(st, "body", CF(0, 0.25 * s * rear, 0.1 * s * rear) * A(R(35) * rear, 0, 0))
+	set(st, "head", A(R(35) * howl, 0, 0))
+	set(st, "jaw", A(-R(40) * howl, 0, 0))
+	set(st, "fl", A(R(-60) * rear, 0, 0))
+	set(st, "fr", A(R(-60) * rear, 0, 0))
+	set(st, "flLow", A(R(50) * rear, 0, 0))
+	set(st, "frLow", A(R(50) * rear, 0, 0))
+	set(st, "hl", A(R(-30) * rear, 0, 0))
+	set(st, "hr", A(R(-30) * rear, 0, 0))
+	set(st, "earL", A(R(-70), 0, 0))
+	set(st, "earR", A(R(-70), 0, 0))
+	set(st, "tail", A(R(-35) * rear, 0, 0))
+	attackBurst(st, howl > 0.9, 30)
+end
+
+-- Runestone Golem: Rock Fall - both fists raised overhead, jumps and
+-- smashes the ground
+local function heavySmash(st, k, s)
+	local raise = bump(k, 0, 0.6)
+	local jump = bump(k, 0.25, 0.7)
+	local smash = bump(k, 0.6, 1)
+	set(st, "body", CF(0, 0.5 * s * jump - 0.12 * s * smash, -0.2 * s * smash) * A(R(-10) * raise + R(25) * smash, 0, 0))
+	set(st, "armL", A(R(-170) * raise + R(-70) * smash, 0, R(-15) * raise))
+	set(st, "armR", A(R(-170) * raise + R(-70) * smash, 0, R(15) * raise))
+	set(st, "armLLow", A(R(-30) * raise, 0, 0))
+	set(st, "armRLow", A(R(-30) * raise, 0, 0))
+	set(st, "legL", A(R(-30) * jump, 0, 0))
+	set(st, "legR", A(R(-30) * jump, 0, 0))
+	set(st, "legLLow", A(R(40) * jump, 0, 0))
+	set(st, "legRLow", A(R(40) * jump, 0, 0))
+	set(st, "head", A(R(-15) * raise + R(10) * smash, 0, 0))
+	set(st, "jaw", A(-R(25) * raise, 0, 0))
+	attackBurst(st, smash > 0.8, 40)
+end
+CRITS.golem = heavySmash
+
+-- Ember Phoenix: Fire Tornado - rises and spins twice, wings stretched out
+CRITS.phoenix = function(st, k, s)
+	local up = bump(k, 0, 1)
+	set(st, "body", CF(0, 0.5 * s * up, 0) * A(R(-10) * up, ease(k) * math.pi * 4, 0))
+	set(st, "head", A(R(-20) * up, 0, 0))
+	set(st, "jaw", A(-R(35) * up, 0, 0))
+	phoenixWings(st, R(5), R(85), R(10), 0)
+	set(st, "tail", A(R(-20) * up, 0, 0))
+	set(st, "tail2", A(R(-20) * up, 0, 0))
+	set(st, "legL", A(R(30) * up, 0, 0))
+	set(st, "legR", A(R(30) * up, 0, 0))
+	attackBurst(st, up > 0.8, 40)
+end
+
+-- Storm Leviathan: Lightning Storm - rises tall, roars at the sky while
+-- lightning strikes, then crashes forward
+CRITS.leviathan = function(st, k, s)
+	local rise = bump(k, 0, 0.75)
+	local crash = bump(k, 0.65, 1)
+	set(st, "body", CF(0, 0.35 * s * rise, 0.2 * s * rise - 0.3 * s * crash) * A(R(-20) * rise + R(15) * crash, 0, 0))
+	for i, n in ipairs(LEVI_NECK) do
+		set(st, n, A(R(-18) * rise + R(12) * crash, math.sin(k * 12 + i) * R(6) * rise, 0))
+	end
+	set(st, "head", A(R(-40) * rise + R(15) * crash, 0, 0))
+	set(st, "jaw", A(-R(60) * rise - R(30) * crash, 0, 0))
+	for j = 1, 9 do
+		set(st, "t" .. j, A(0, R(25) * rise * math.sin(j * 0.8 + k * 14), 0))
+	end
+	if rise > 0.8 and st.boltFor ~= st.attackAt and boltsAllowed() then
+		st.boltFor = st.attackAt
+		local head = st.motors.head and st.motors.head.Part1
+		if head then
+			for _ = 1, 3 do
+				lightningBolt(head.Position, head.Position + Vector3.new((math.random() - 0.5) * s, s * 3, (math.random() - 0.5) * s), 0.08 * s, Color3.fromRGB(200, 245, 255))
+			end
+		end
+	end
+	attackBurst(st, crash > 0.7, 40)
+end
+
+-- Void Dragon: Void Blast - rears up with wings wide, charges with the
+-- head pulled back, then thrusts the head forward in one big blast
+CRITS["void-dragon"] = function(st, k, s)
+	local charge = bump(k, 0, 0.7)
+	local blast = bump(k, 0.6, 1)
+	set(st, "body", CF(0, 0.25 * s * charge, 0.2 * s * charge - 0.3 * s * blast) * A(R(-20) * charge + R(15) * blast, 0, 0))
+	set(st, "neck", A(R(-35) * charge + R(30) * blast, 0, 0))
+	set(st, "head", A(R(-25) * charge + R(20) * blast, 0, 0))
+	set(st, "jaw", A(-R(25) * charge - R(60) * blast, 0, 0))
+	dragonWings(st, R(45) * charge - R(15) * blast, R(-15) * charge + R(20) * blast, R(80) - R(20) * charge, 0)
+	set(st, "tail", A(R(15) * charge, 0, 0))
+	set(st, "tail2", A(R(10) * charge, math.sin(k * 12) * R(20), 0))
+	attackBurst(st, blast > 0.7, 50)
+end
+
+-- Shadow Wraith: Soul Reap - spins around once with the scythe held out,
+-- cape flaring, rising a little
+CRITS.wraith = function(st, k, s)
+	local spin = ease(k / 0.8)
+	local up = bump(k, 0, 1)
+	set(st, "body", CF(0, 0.3 * s * up, 0) * A(R(-10) * up, spin * math.pi * 2, 0))
+	set(st, "armR", A(R(-10), 0, R(80) * up))
+	set(st, "armRLow", A(R(-10) * up, 0, 0))
+	set(st, "scythe", A(R(20) * up, 0, R(20) * up))
+	set(st, "armL", A(0, 0, R(-50) * up))
+	set(st, "cape", A(R(45) * up, 0, 0))
+	set(st, "head", A(R(-15) * up, 0, 0))
+	attackBurst(st, k > 0.8, 40)
+end
+
+-- Star Seraph: Star Rain - rises high, wings and arms wide, halo spinning
+-- fast, then brings the wand down
+CRITS.seraph = function(st, k, s)
+	local up = bump(k, 0, 1)
+	local down = bump(k, 0.6, 1)
+	set(st, "body", CF(0, 0.8 * s * up, 0) * A(R(-15) * up, ease(k) * math.pi * 2, 0))
+	set(st, "armR", A(R(-170) * up + R(120) * down, 0, 0))
+	set(st, "armL", A(0, 0, R(-100) * up))
+	set(st, "halo", A(0, k * math.pi * 16, 0))
+	set(st, "wingL", A(0, 0, -R(70) * up))
+	set(st, "wingR", A(0, 0, R(70) * up))
+	attackBurst(st, down > 0.7, 40)
+end
+
+-- Sun Titan: Solar Blast - pulls both fists back to the chest, then
+-- throws both palms forward in a big blast
+CRITS.titan = function(st, k, s)
+	local charge = bump(k, 0, 0.6)
+	local blast = bump(k, 0.5, 1)
+	set(st, "body", CF(0, 0.1 * s * charge, 0.1 * s * charge - 0.25 * s * blast) * A(R(12) * charge - R(12) * blast, 0, 0))
+	set(st, "armL", A(R(40) * charge - R(90) * blast, 0, R(-30) * charge))
+	set(st, "armR", A(R(40) * charge - R(90) * blast, 0, R(30) * charge))
+	set(st, "armLLow", A(R(-100) * charge, 0, 0))
+	set(st, "armRLow", A(R(-100) * charge, 0, 0))
+	set(st, "legL", A(R(-20) * blast, 0, 0))
+	set(st, "legR", A(R(15) * blast, 0, 0))
+	set(st, "head", A(R(-15) * charge, 0, 0))
+	set(st, "jaw", A(-R(30) * blast, 0, 0))
+	attackBurst(st, blast > 0.8, 40)
+end
+
+-- Cosmic Emperor: Cosmic Explosion - curls in with arms crossed, then
+-- bursts open, arms wide, rising while the planets whirl
+CRITS.emperor = function(st, k, s)
+	local curl = bump(k, 0, 0.55)
+	local burst = bump(k, 0.45, 1)
+	set(st, "body", CF(0, -0.1 * s * curl + 0.6 * s * burst, 0) * A(R(15) * curl - R(15) * burst, 0, 0))
+	set(st, "armL", A(R(-60) * curl + R(80) * burst, R(40) * curl, R(-20) * curl - R(110) * burst))
+	set(st, "armR", A(R(-60) * curl + R(80) * burst, R(-40) * curl, R(20) * curl + R(110) * burst))
+	set(st, "armLLow", A(R(-60) * curl, 0, 0))
+	set(st, "armRLow", A(R(-60) * curl, 0, 0))
+	set(st, "orbit", A(0, k * math.pi * 20, R(20) * burst))
+	set(st, "cape", A(R(50) * burst, 0, 0))
+	set(st, "head", A(R(15) * curl - R(20) * burst, 0, 0))
+	attackBurst(st, burst > 0.8, 60)
+end
+
 local function animate(st, now, dt)
 	local root, s, style = st.root, st.s, st.style
 
@@ -1678,12 +1969,16 @@ local function animate(st, now, dt)
 	local speed = Vector2.new(st.vel.X, st.vel.Z).Magnitude
 	local vy = st.vel.Y
 
+	-- a critical hit plays the monster's longer critical move instead
+	local critMove = st.critClock and math.abs(st.critClock - st.attackAt) < 0.15 and CRITS[st.rigId]
+	local attackTime = critMove and CRIT_TIME or 0.4
+
 	local state
 	-- only enemies that were killed play the dead pose; defeated pets just
 	-- rest in the pen (grey) with their normal animations
 	if st.model:GetAttribute("Dead") or st.model:GetAttribute("Dying") then
 		state = "dead"
-	elseif now - st.attackAt < 0.4 then
+	elseif now - st.attackAt < attackTime then
 		state = "fight"
 	elseif vy > 4 then
 		state = "jump"
@@ -1705,10 +2000,16 @@ local function animate(st, now, dt)
 
 	local custom = ANIMS[st.rigId]
 	if custom then
-		custom(st, state, t, dt, now, fightK, speed)
-		local attack = ATTACKS[st.rigId]
-		if attack and state == "fight" then
-			attack(st, math.clamp((now - st.attackAt) / 0.4, 0, 1), st.s, t)
+		if critMove and state == "fight" then
+			-- the critical move drives the body; the rest idles underneath
+			custom(st, "idle", t, dt, now, 0, speed)
+			critMove(st, math.clamp((now - st.attackAt) / CRIT_TIME, 0, 1), st.s, t)
+		else
+			custom(st, state, t, dt, now, fightK, speed)
+			local attack = ATTACKS[st.rigId]
+			if attack and state == "fight" then
+				attack(st, math.clamp((now - st.attackAt) / 0.4, 0, 1), st.s, t)
+			end
 		end
 		doFlash(st, now)
 		doBlink(st, now, state == "dead")

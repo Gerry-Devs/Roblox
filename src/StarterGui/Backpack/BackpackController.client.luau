@@ -734,7 +734,20 @@ local function sizeCells()
 		return
 	end
 	local tall = activeTab == "Potion" or activeTab == "Item"
-	local w = grid.AbsoluteSize.X > 0 and (grid.AbsoluteSize.X - 30) / 4 - 9 or 120
+	-- AbsoluteSize is in screen pixels, but offsets inside the window are
+	-- multiplied by its UIScale (phones shrink the window): undo that, or
+	-- the rows come out shorter than the cards and they overlap
+	local scale = 1
+	local a = grid.Parent
+	while a do
+		local s = a:FindFirstChildOfClass("UIScale")
+		if s then
+			scale *= s.Scale
+		end
+		a = a.Parent
+	end
+	local width = grid.AbsoluteSize.X / math.max(scale, 0.05)
+	local w = width > 0 and (width - 30) / 4 - 9 or 120
 	gridLayout.CellSize = UDim2.new(0.25, -9, 0, tall and 162 or math.floor(w))
 end
 grid:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeCells)

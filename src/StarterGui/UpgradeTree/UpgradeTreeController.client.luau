@@ -106,7 +106,7 @@ mk("UICorner", { CornerRadius = UDim.new(0, 14) }, top)
 mk("UIStroke", { Color = OUTLINE, Thickness = 3 }, top)
 local cashText = label(top, "", UDim2.new(0.5, -20, 0.7, 0), UDim2.new(0, 14, 0.15, 0), { TextColor3 = Color3.fromRGB(140, 255, 150), ZIndex = 21, TextXAlignment = Enum.TextXAlignment.Left })
 local shardText = label(top, "", UDim2.new(0.5, -20, 0.7, 0), UDim2.new(0.5, 6, 0.15, 0), { TextColor3 = Color3.fromRGB(150, 210, 255), ZIndex = 21, TextXAlignment = Enum.TextXAlignment.Right })
-label(dim, "UPGRADES", UDim2.fromOffset(260, 34), UDim2.new(0.5, -130, 0, 66), { ZIndex = 20, TextColor3 = Color3.fromRGB(255, 220, 110) })
+local pageTitle = label(dim, "UPGRADES", UDim2.fromOffset(260, 34), UDim2.new(0.5, -130, 0, 66), { ZIndex = 20, TextColor3 = Color3.fromRGB(255, 220, 110) })
 
 -- zoom buttons
 local function roundButton(text, pos, color)
@@ -593,10 +593,9 @@ openBranch = function(bi)
 				if panMoved then
 					return -- that was a drag, not a click
 				end
-				local touch = input and input.UserInputType == Enum.UserInputType.Touch
-				if not touch and statusOf(node) == "available" then
+				if statusOf(node) == "available" then
 					selected = node
-					buyNode(node) -- PC: click buys right away
+					buyNode(node) -- click / tap buys right away (PC and phone)
 				elseif info.Visible and selected == node then
 					info.Visible = false -- tap the same upgrade again: close the info
 					selected = nil
@@ -860,6 +859,32 @@ local function unlockCamera()
 	end
 end
 
+-- phones: smaller hexes and smaller bars / buttons / popups, so it all
+-- fits a short landscape screen
+local fitScreen
+local chromeScales = {}
+for _, o in ipairs({ top, pageTitle, closeBtn, info, tip, msg }) do
+	chromeScales[o] = mk("UIScale", {}, o)
+end
+fitScreen = function()
+	local v = workspace.CurrentCamera.ViewportSize
+	local small = math.clamp(math.min(v.Y / 760, v.X / 1100), 0.5, 1)
+	zoom.Scale = math.clamp(v.Y / 820, 0.42, 1)
+	for _, sc in pairs(chromeScales) do
+		sc.Scale = small
+	end
+	top.Position = UDim2.new(0.5, 0, 0, math.floor(12 * small))
+	pageTitle.AnchorPoint = Vector2.new(0.5, 0)
+	pageTitle.Position = UDim2.new(0.5, 0, 0, math.floor((12 + 54) * small))
+	closeBtn.Position = UDim2.new(0.5, 0, 1, -math.floor(18 * small))
+end
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+	if dim.Visible then
+		fitScreen()
+		applyOffset()
+	end
+end)
+
 local function open()
 	closeAllBridge:Fire("upgrades")
 	lockCamera()
@@ -869,8 +894,7 @@ local function open()
 	if ok and p then
 		profile = p
 	end
-	local v = workspace.CurrentCamera.ViewportSize
-	zoom.Scale = (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and 0.72 or 1
+	fitScreen()
 	offset = Vector2.new(0, 0)
 	dragging = false
 	applyOffset()

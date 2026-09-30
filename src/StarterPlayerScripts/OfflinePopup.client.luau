@@ -43,12 +43,19 @@ remote.OnClientEvent:Connect(function(data)
 	round(panel, 20, 4)
 	-- fits any screen (phones too)
 	local scale = mk("UIScale", {}, panel)
+	-- fits any screen (phones too): uses the panel's real size (the studded
+	-- header makes it taller) and keeps clear of Roblox's top bar
+	local fitScale = 1
 	local function fit()
 		local cam = workspace.CurrentCamera
 		local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
-		scale.Scale = math.clamp(math.min((vp.X - 24) / 420, (vp.Y - 24) / 300), 0.5, 1.4)
+		local inset = game:GetService("GuiService"):GetGuiInset().Y
+		local w, h = panel.Size.X.Offset, panel.Size.Y.Offset
+		fitScale = math.clamp(math.min((vp.X - 40) / w, (vp.Y - inset * 2 - 30) / h), 0.3, 1)
+		scale.Scale = fitScale
 	end
 	fit()
+	panel:GetPropertyChangedSignal("Size"):Connect(fit)
 	local conn = workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
 
 	mk("TextLabel", { Size = UDim2.new(1, -24, 0, 44), Position = UDim2.fromOffset(12, 14), BackgroundTransparency = 1, Text = "WELCOME BACK!", Font = FONT, TextScaled = true, TextColor3 = GOLD }, panel)
@@ -82,8 +89,9 @@ remote.OnClientEvent:Connect(function(data)
 			task.wait()
 		end
 	end)
-	scale.Scale *= 0.6
-	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = scale.Scale / 0.6 }):Play()
+	fit() -- again: the studded header made the panel taller
+	scale.Scale = fitScale * 0.6
+	TweenService:Create(scale, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Scale = fitScale }):Play()
 	ok.Activated:Connect(function()
 		conn:Disconnect()
 		gui:Destroy()

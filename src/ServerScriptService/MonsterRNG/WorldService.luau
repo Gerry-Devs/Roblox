@@ -2639,7 +2639,7 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 
 	-- info over the monster's head (4 lines):
 	--   Name              (white)
-	--   Rarity            (white)
+	--   Rarity            (rarity color, Common = white)
 	--   $cash/s  -  odds  (yellow)
 	--   kg  -  Lv         (green)
 	local billboard = Instance.new("BillboardGui")
@@ -2665,7 +2665,8 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 	local odds = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg))
 	local infoLines = {
 		{ Config.BuildDisplayName(monster.name, entry.size, entry.finish), Color3.fromRGB(245, 245, 245), 0.28 },
-		{ rarity.name, Color3.fromRGB(235, 235, 235), 0.24 },
+		-- rarity in its own color (Common is plain white)
+		{ rarity.name, rarity.key == "Common" and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(rarity.color[1], rarity.color[2], rarity.color[3]), 0.24 },
 		{ "$" .. Config.FormatNumber(WorldService.GetEntryIncome(entry)) .. "/s" .. DOT .. odds, Color3.fromRGB(255, 222, 60), 0.24 },
 		{ Config.FormatKg(entry.kg) .. DOT .. "Lv. " .. (entry.level or 1), Color3.fromRGB(95, 225, 85), 0.24 },
 	}

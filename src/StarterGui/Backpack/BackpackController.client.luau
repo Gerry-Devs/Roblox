@@ -360,14 +360,16 @@ local function createCard(kind, item, order)
 	hit.Text = ""
 	hit.ZIndex = 5
 	hit.Parent = card
+	local heldFavorite = false -- a long-press just favorited: that release isn't a tap
 	hit.Activated:Connect(function()
+		if heldFavorite then
+			heldFavorite = false
+			return
+		end
 		showPopup(kind, item, card, rarity, rarityColor, odds)
 	end)
-	hit.MouseButton2Click:Connect(function()
-		toggleFavorite()
-	end)
 
-	-- Favorites: right-click (PC) or press and hold (mobile). Favorites
+	-- Favorites: right-click (PC) or press and hold (mobile, taps never favorite). Favorites
 	-- are never sold by the Sell stall's sell-all options.
 	local favBadge = card:FindFirstChild("Favorite")
 	if favBadge then
@@ -391,14 +393,18 @@ local function createCard(kind, item, order)
 
 	local pressToken, pressStart
 	hit.InputBegan:Connect(function(input)
-		if false then
+		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+			-- right-click only with a real mouse (phones never favorite on taps)
+			toggleFavorite()
 		elseif input.UserInputType == Enum.UserInputType.Touch then
+			heldFavorite = false
 			local token = {}
 			pressToken = token
 			pressStart = input.Position
 			task.delay(0.5, function()
 				if pressToken == token then
 					pressToken = nil
+					heldFavorite = true
 					toggleFavorite()
 				end
 			end)

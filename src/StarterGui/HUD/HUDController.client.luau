@@ -311,6 +311,118 @@ end
 local indexPanel = panels:WaitForChild("IndexPanel")
 local indexBody = indexPanel.Body
 local indexTab = "pets"
+local indexRarity = "all" -- rarity filter ("all" or a rarity key)
+
+-- left column (like the Backpack): PETS / ENEMIES, then a rarity filter
+local SIDE_W = 140
+local rarityTabs = {}
+local filterTitle
+do
+	local ok, err = pcall(function()
+		if not indexPanel:GetAttribute("SideFilters") then
+			indexPanel:SetAttribute("SideFilters", true)
+			indexPanel.Size = UDim2.new(indexPanel.Size.X.Scale, indexPanel.Size.X.Offset + SIDE_W + 10, indexPanel.Size.Y.Scale, indexPanel.Size.Y.Offset)
+		end
+		local tabs = indexBody.Tabs
+		tabs.Position = UDim2.new()
+		tabs.Size = UDim2.new(0, SIDE_W, 1, 0)
+		local layout = tabs:FindFirstChildOfClass("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Vertical
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Padding = UDim.new(0, 8)
+		for i, name in ipairs({ "PetsTab", "EnemiesTab" }) do
+			local b = tabs[name]
+			b.LayoutOrder = i
+			b.Size = UDim2.new(1, 0, 0, 40)
+			b:SetAttribute("NoStuds", true)
+			local lbl = b:FindFirstChild("Label")
+			if lbl then
+				lbl.ZIndex = b.ZIndex + 2
+			end
+		end
+		local head = Instance.new("TextLabel")
+		head.Name = "RarityHeader"
+		head.LayoutOrder = 3
+		head.Size = UDim2.new(1, 0, 0, 22)
+		head.BackgroundTransparency = 1
+		head.Text = "RARITY"
+		head.Font = Enum.Font.LuckiestGuy
+		head.TextScaled = true
+		head.TextXAlignment = Enum.TextXAlignment.Left
+		head.TextColor3 = GOLD
+		head.TextStrokeTransparency = 0
+		head.Parent = tabs
+		local list = Instance.new("ScrollingFrame")
+		list.Name = "RarityList"
+		list.LayoutOrder = 4
+		list.Size = UDim2.new(1, 0, 1, -(40 * 2 + 22 + 8 * 3))
+		list.BackgroundTransparency = 1
+		list.BorderSizePixel = 0
+		list.ScrollBarThickness = 4
+		list.CanvasSize = UDim2.new()
+		list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		list.Parent = tabs
+		local ll = Instance.new("UIListLayout")
+		ll.Padding = UDim.new(0, 7)
+		ll.SortOrder = Enum.SortOrder.LayoutOrder
+		ll.Parent = list
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop, pad.PaddingBottom, pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 4), UDim.new(0, 8), UDim.new(0, 4), UDim.new(0, 8)
+		pad.Parent = list
+		local entries = { { key = "all", name = "All", color = Color3.fromRGB(255, 205, 60) } }
+		for _, r in ipairs(Config.Rarities) do
+			table.insert(entries, { key = r.key, name = r.name, color = Color3.fromRGB(r.color[1], r.color[2], r.color[3]) })
+		end
+		for i, e in ipairs(entries) do
+			local b = Instance.new("TextButton")
+			b.Name = "Rarity_" .. e.key
+			b.LayoutOrder = i
+			b.Size = UDim2.new(1, 0, 0, 32)
+			b.Text = ""
+			b.AutoButtonColor = false
+			b:SetAttribute("NoStuds", true)
+			b.Parent = list
+			local lbl = Instance.new("TextLabel")
+			lbl.Name = "Label"
+			lbl.Size = UDim2.new(1, -30, 0.62, 0)
+			lbl.AnchorPoint = Vector2.new(0, 0.5)
+			lbl.Position = UDim2.new(0, 22, 0.5, 0)
+			lbl.BackgroundTransparency = 1
+			lbl.Text = e.name:upper()
+			lbl.Font = Enum.Font.LuckiestGuy
+			lbl.TextScaled = true
+			lbl.TextXAlignment = Enum.TextXAlignment.Left
+			lbl.TextColor3 = e.color
+			lbl.TextStrokeTransparency = 0
+			lbl.ZIndex = b.ZIndex + 2
+			lbl.Parent = b
+			rarityTabs[e.key] = { button = b, color = e.color }
+			bounce(b)
+			b.Activated:Connect(function()
+				indexRarity = e.key
+				refreshers.IndexPanel()
+			end)
+		end
+		-- the grid moves right; above it: what you're looking at + the counter
+		indexBody.Well.Position = UDim2.fromOffset(SIDE_W + 12, 44)
+		indexBody.Well.Size = UDim2.new(1, -(SIDE_W + 12), 1, -44)
+		filterTitle = Instance.new("TextLabel")
+		filterTitle.Name = "FilterTitle"
+		filterTitle.Size = UDim2.new(1, -(SIDE_W + 12 + 230), 0, 30)
+		filterTitle.Position = UDim2.fromOffset(SIDE_W + 14, 6)
+		filterTitle.BackgroundTransparency = 1
+		filterTitle.Font = Enum.Font.LuckiestGuy
+		filterTitle.TextScaled = true
+		filterTitle.TextXAlignment = Enum.TextXAlignment.Left
+		filterTitle.TextColor3 = GOLD
+		filterTitle.TextStrokeTransparency = 0
+		filterTitle.Parent = indexBody
+	end)
+	if not ok then
+		warn("Index filters failed (the Index still works): " .. tostring(err))
+	end
+end
 
 local function getMonsterIcon(monsterId)
 	local bp = playerGui:FindFirstChild("Backpack")
@@ -328,8 +440,11 @@ refreshers.IndexPanel = function()
 	end
 	indexBody.Tabs.PetsTab.BackgroundColor3 = indexTab == "pets" and GOLD or BLUE
 	indexBody.Tabs.EnemiesTab.BackgroundColor3 = indexTab == "enemies" and GOLD or BLUE
-	styled("tab", indexBody.Tabs.PetsTab, indexTab == "pets")
-	styled("tab", indexBody.Tabs.EnemiesTab, indexTab == "enemies")
+	styled("sideTab", indexBody.Tabs.PetsTab, indexTab == "pets", Color3.fromRGB(255, 205, 60))
+	styled("sideTab", indexBody.Tabs.EnemiesTab, indexTab == "enemies", Color3.fromRGB(235, 70, 70))
+	for key, t in pairs(rarityTabs) do
+		styled("sideTab", t.button, key == indexRarity, t.color)
+	end
 
 	local list = table.clone(Config.Monsters)
 	table.sort(list, function(a, b)
@@ -339,6 +454,20 @@ refreshers.IndexPanel = function()
 		end
 		return a.name < b.name
 	end)
+	if indexRarity ~= "all" then
+		local only = {}
+		for _, monster in ipairs(list) do
+			if Config.GetRarity(monster.rarity).key == indexRarity then
+				table.insert(only, monster)
+			end
+		end
+		list = only
+	end
+	if filterTitle then
+		local r = indexRarity ~= "all" and Config.GetRarity(indexRarity)
+		filterTitle.Text = (r and r.name:upper() or "ALL") .. (indexTab == "pets" and " PETS" or " ENEMIES")
+		filterTitle.TextColor3 = r and Color3.fromRGB(r.color[1], r.color[2], r.color[3]) or GOLD
+	end
 	local found = 0
 	for i, monster in ipairs(list) do
 		local count

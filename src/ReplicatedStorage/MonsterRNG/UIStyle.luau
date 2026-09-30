@@ -182,6 +182,23 @@ function UIStyle.tab(button, on)
 	return button
 end
 
+-- a tab in a window's left column (Backpack style) with a colored bar on
+-- its left edge; the open one is lighter with a white rim
+function UIStyle.sideTab(button, on, accent)
+	button:SetAttribute("NoStuds", true) -- styled here, not by studInside
+	UIStyle.tab(button, on)
+	local bar = child(button, "Frame", "Accent")
+	bar:SetAttribute("NoStuds", true)
+	bar.Size = UDim2.new(0, 6, 1, -14)
+	bar.AnchorPoint = Vector2.new(0, 0.5)
+	bar.Position = UDim2.new(0, 7, 0.5, 0)
+	bar.BackgroundColor3 = accent or Color3.fromRGB(255, 205, 60)
+	bar.BorderSizePixel = 0
+	bar.ZIndex = button.ZIndex + 1
+	child(bar, "UICorner", "UICorner").CornerRadius = UDim.new(1, 0)
+	return button
+end
+
 -- the red studded X (like the reference): red square with studs, a
 -- darker red edge on the left and a white X with a thick dark outline.
 -- header = true: sits at the right end of a header bar, so only its

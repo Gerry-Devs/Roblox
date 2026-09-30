@@ -45,15 +45,32 @@ local confirmBridge = monsterFolder:WaitForChild("ClientBridge"):WaitForChild("C
 local GOLD = Color3.fromRGB(255, 225, 120)
 local TweenService = game:GetService("TweenService")
 
--- category buttons (they only scroll the list, nothing disappears)
-local tabs = mk("Frame", { Name = "Categories", Size = UDim2.new(1, -20, 0, 44), Position = UDim2.fromOffset(10, 8), BackgroundTransparency = 1 }, body)
-mk("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, tabs)
+-- the studded tab look (optional: without it the tabs keep their colors)
+local UIStyle
+do
+	local mod = monsterFolder:WaitForChild("UIStyle", 5)
+	local ok, res = pcall(function()
+		return mod and require(mod)
+	end)
+	UIStyle = ok and res or nil
+end
 
-local list = mk("ScrollingFrame", { Name = "PassList", Size = UDim2.new(1, -20, 1, -66), Position = UDim2.fromOffset(10, 58), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 8, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y }, body)
+-- category buttons in a column on the left, like the Backpack (they only
+-- scroll the list, nothing disappears; the one you're looking at lights up)
+local SIDE_W = 150
+if not panel:GetAttribute("SideFilters") then
+	panel:SetAttribute("SideFilters", true)
+	panel.Size = UDim2.new(panel.Size.X.Scale, panel.Size.X.Offset + 60, panel.Size.Y.Scale, panel.Size.Y.Offset)
+end
+local tabs = mk("Frame", { Name = "Categories", Size = UDim2.new(0, SIDE_W, 1, -8), Position = UDim2.fromOffset(0, 8), BackgroundTransparency = 1 }, body)
+mk("UIListLayout", { FillDirection = Enum.FillDirection.Vertical, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, tabs)
+
+local list = mk("ScrollingFrame", { Name = "PassList", Size = UDim2.new(1, -(SIDE_W + 10), 1, -8), Position = UDim2.fromOffset(SIDE_W + 10, 8), BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 8, CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y }, body)
 mk("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }, list)
 mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10) }, list)
 
 local order = 0
+local sectionTabs = {}
 local function section(titleText, tabColor)
 	order += 1
 	local header = label(list, titleText, UDim2.new(1, 0, 0, 34), UDim2.new(), { LayoutOrder = order, TextColor3 = GOLD, TextXAlignment = Enum.TextXAlignment.Left })
@@ -61,10 +78,12 @@ local function section(titleText, tabColor)
 	local grid = mk("Frame", { Name = titleText, LayoutOrder = order, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }, list)
 	mk("UIGridLayout", { CellSize = UDim2.new(1 / 3, -8, 0, 240), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder }, grid)
 	-- its category button
-	local tab = mk("TextButton", { LayoutOrder = order, Size = UDim2.new(0, 170, 1, 0), BackgroundColor3 = tabColor, Text = titleText, TextScaled = true, Font = FONT, TextColor3 = WHITE, TextStrokeTransparency = 0, TextStrokeColor3 = OUTLINE }, tabs)
+	local tab = mk("TextButton", { LayoutOrder = order, Size = UDim2.new(1, 0, 0, 48), BackgroundColor3 = tabColor, Text = "", AutoButtonColor = false }, tabs)
+	tab:SetAttribute("NoStuds", true)
 	mk("UICorner", { CornerRadius = UDim.new(0, 10) }, tab)
 	mk("UIStroke", { Color = OUTLINE, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, tab)
-	mk("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7) }, tab)
+	label(tab, titleText, UDim2.new(1, -32, 0.5, 0), UDim2.new(0, 22, 0.25, 0), { Name = "Label", TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = tabColor:Lerp(WHITE, 0.35), ZIndex = tab.ZIndex + 2 })
+	table.insert(sectionTabs, { tab = tab, header = header, color = tabColor })
 	tab.Activated:Connect(function()
 		local y = header.AbsolutePosition.Y - list.AbsolutePosition.Y + list.CanvasPosition.Y - 4
 		local maxY = math.max(0, list.AbsoluteCanvasSize.Y - list.AbsoluteWindowSize.Y)
@@ -244,6 +263,38 @@ task.spawn(function()
 	player:GetAttributeChangedSignal("TagChoices"):Connect(update)
 	update()
 end)
+
+-- light up the category you're looking at
+local activeTab
+local function updateTabs()
+	local current = sectionTabs[1]
+	for _, t in ipairs(sectionTabs) do
+		if t.header.AbsolutePosition.Y - list.AbsolutePosition.Y <= 60 then
+			current = t
+		end
+	end
+	if current == activeTab then
+		return
+	end
+	activeTab = current
+	for _, t in ipairs(sectionTabs) do
+		if UIStyle and UIStyle.sideTab then
+			pcall(UIStyle.sideTab, t.tab, t == current, t.color)
+		else
+			t.tab.BackgroundTransparency = t == current and 0 or 0.35
+		end
+	end
+end
+list:GetPropertyChangedSignal("CanvasPosition"):Connect(updateTabs)
+panel:GetPropertyChangedSignal("Visible"):Connect(function()
+	if panel.Visible then
+		task.defer(function()
+			activeTab = nil
+			updateTabs()
+		end)
+	end
+end)
+task.defer(updateTabs)
 
 profileUpdated.OnClientEvent:Connect(function(p)
 	profile = p

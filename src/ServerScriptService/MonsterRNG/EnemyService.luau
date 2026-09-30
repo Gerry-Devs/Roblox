@@ -17,6 +17,7 @@ local GROUND_Y = 1
 local deps
 local folder
 local enemies = {}
+local onHitSkills -- (defined below, used in the combat tick)
 local enemyById = {} -- EnemyId attribute -> enemy (players pick enemies by this id)
 local nextEnemyId = 0
 local attackOrders = {} -- player -> { [pet uid] = enemy }: pets only fight enemies they're sent to
@@ -476,7 +477,7 @@ end
 --------------------------------------------------------------------
 local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 	local now = os.time()
-	local xpMult = (Config.IsBoostActive(profile, "level", now) and 2 or 1) * Config.GlobalBoost("exp", now)
+	local xpMult = (Config.IsBoostActive(profile, "level", now) and 2 or 1) * Config.GlobalBoost("exp", now) * (1 + Config.Skill(profile, "xp") / 100)
 	local leveled = {}
 	for uid, dmg in pairs(rec.pets) do
 		local share = dmg / math.max(1, rec.total)
@@ -501,9 +502,10 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 	bonus *= Config.GlobalBoost("drops", now) -- admin panel: server-wide Drops effect
 	local C = Config.Combat
 	-- upgrades: Drops (+shard chance), Potion Drop (+potion chance), Rift Shards (+amount)
-	local shardChanceBonus = 1 + Config.GetUpgradeBonus(profile.upgrades, "drops") / 100
-	local potionChanceBonus = 1 + Config.GetUpgradeBonus(profile.upgrades, "potionDrop") / 100
-	local shardAmountBonus = 1 + Config.GetUpgradeBonus(profile.upgrades, "crystal") / 100
+	-- (+ skills: Fetch, Jade Fortune, Void Rift)
+	local shardChanceBonus = 1 + (Config.GetUpgradeBonus(profile.upgrades, "drops") + Config.Skill(profile, "shardChance")) / 100
+	local potionChanceBonus = 1 + (Config.GetUpgradeBonus(profile.upgrades, "potionDrop") + Config.Skill(profile, "potionDrop")) / 100
+	local shardAmountBonus = 1 + (Config.GetUpgradeBonus(profile.upgrades, "crystal") + Config.Skill(profile, "shardAmount")) / 100
 	bonus = bonus * Config.PassDropMultiplier(profile) -- More Drops / Supporter gamepasses
 		if rng:NextNumber() < math.min(1, C.shardChance * bonus * shardChanceBonus) then
 		local n = math.floor((1 + math.floor(e.level / 5)) * math.max(1, math.floor(e.mult)) * shardAmountBonus + 0.5)
@@ -527,6 +529,19 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 	if (profile.rebirths or 0) >= (C.giftCardMinRebirth or 3) and rng:NextNumber() < C.giftCardChance * bonus then
 		profile.items.giftCard = (profile.items.giftCard or 0) + 1
 		table.insert(drops, { kind = "item", key = "giftCard" })
+	end
+	-- Soul Harvest skill: chance every drop comes twice
+	if #drops > 0 and rng:NextNumber() * 100 < Config.Skill(profile, "doubleLoot") then
+		for _, dr in ipairs(table.clone(drops)) do
+			if dr.kind == "shards" then
+				profile.riftShards += dr.amount
+			elseif dr.kind == "potion" then
+				profile.potions[dr.key] = (profile.potions[dr.key] or 0) + 1
+			elseif dr.kind == "item" then
+				profile.items[dr.key] = (profile.items[dr.key] or 0) + 1
+			end
+			table.insert(drops, dr)
+		end
 	end
 	profile.enemyKills[e.monsterId] = (profile.enemyKills[e.monsterId] or 0) + 1
 	require(script.Parent:WaitForChild("QuestService")).Add(profile, "kills", 1)
@@ -580,9 +595,58 @@ local function damageEnemy(e, player, uid, dmg, now)
 end
 
 --------------------------------------------------------------------
+-- skills that trigger when a pet hits (Double Wave, Burn, Venom Bite,
+-- Freeze). Burn / poison tick every second for 3 seconds.
+--------------------------------------------------------------------
+onHitSkills = function(e, player, profile, uid, dmg)
+	local now = os.clock()
+	if rng:NextNumber() * 100 < Config.Skill(profile, "doubleHit") then
+		task.delay(0.2, function()
+			if not e.dead then
+				damageEnemy(e, player, uid, dmg, os.clock())
+			end
+		end)
+	end
+	local burn = Config.Skill(profile, "burn")
+	if burn > 0 then
+		e.burn = { dps = dmg * burn / 100, untilAt = now + 3, player = player, uid = uid }
+	end
+	local venom = Config.Skill(profile, "venom")
+	if venom > 0 then
+		-- a % of the enemy's max HP per second, but never more than 2 hits' worth
+		e.venom = { dps = math.min(e.maxHp * venom / 100, dmg * 2), untilAt = now + 3, player = player, uid = uid }
+	end
+	if not (e.frozenUntil and now < e.frozenUntil) and rng:NextNumber() * 100 < Config.Skill(profile, "freeze") then
+		e.frozenUntil = now + 2
+		e.model:SetAttribute("FrozenUntil", workspace:GetServerTimeNow() + 2)
+	end
+end
+
+local lastDotAt = 0
+local function tickDots(now)
+	if now - lastDotAt < 1 then
+		return
+	end
+	lastDotAt = now
+	for _, e in ipairs(enemies) do
+		for _, key in ipairs({ "burn", "venom" }) do
+			local d = e[key]
+			if d and not e.dead then
+				if now > d.untilAt or not d.player.Parent then
+					e[key] = nil
+				else
+					damageEnemy(e, d.player, d.uid, d.dps, now)
+				end
+			end
+		end
+	end
+end
+
+--------------------------------------------------------------------
 -- combat tick (every 0.2s)
 --------------------------------------------------------------------
 local function combatTick(now)
+	tickDots(now)
 	local t = os.time()
 	local C = Config.Combat
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -677,6 +741,7 @@ local function combatTick(now)
 						task.delay(0.22, function()
 							if not target.dead then
 								damageEnemy(target, player, uid, dmg, now + 0.22)
+								onHitSkills(target, player, profile, uid, dmg)
 							end
 						end)
 					end
@@ -690,7 +755,7 @@ local function combatTick(now)
 					p.st.hp = math.min(p.st.max, p.st.hp + p.st.max * 0.15 * 0.2)
 				end
 				if now - p.st.lastHit > C.regenDelay and p.st.hp < p.st.max then
-					p.st.hp = math.min(p.st.max, p.st.hp + p.st.max * C.regenPerSecond * 0.2)
+					p.st.hp = math.min(p.st.max, p.st.hp + p.st.max * C.regenPerSecond * (1 + Config.Skill(profile, "regen") / 100) * 0.2)
 				end
 				local model = pen.pets:FindFirstChild(p.entry.uid)
 				if model then
@@ -731,8 +796,11 @@ local function combatTick(now)
 				if Config.RangedPets[body:GetAttribute("RigId")] then
 					reach += C.rangedExtra
 				end
-				if flatDistance(body.Position, e.root.Position) <= reach then
-					e.nextAttack = now + C.enemyAttackInterval
+				if e.frozenUntil and now < e.frozenUntil then
+					e.nextAttack = e.frozenUntil -- frozen (Freeze skill)
+				elseif flatDistance(body.Position, e.root.Position) <= reach then
+					-- Chill skill: the enemy you fight attacks slower
+					e.nextAttack = now + C.enemyAttackInterval * (1 + Config.Skill(profile, "chill") / 100)
 					local victim
 					for _, entry in ipairs(profile.base) do
 						if entry.uid == e.targetPet then
@@ -741,8 +809,21 @@ local function combatTick(now)
 					end
 					local st = victim and petHealth[victim.uid]
 					if st and not victim.defeated then
-						st.hp -= e.dmg
+						local hit = e.dmg * (1 - Config.Skill(profile, "armor") / 100) -- Unbreakable skill
+						if rng:NextNumber() * 100 < Config.Skill(profile, "block") then
+							hit = 0 -- Guardian skill: blocked
+						end
+						st.hp -= hit
 						st.lastHit = now
+						-- Thorns skill: part of the hit goes back to the enemy
+						local thorns = Config.Skill(profile, "thorns")
+						if thorns > 0 and hit > 0 then
+							damageEnemy(e, player, victim.uid, e.dmg * thorns / 100, now)
+						end
+						-- Rebirth Flame skill: chance a pet that would fall gets back up
+						if st.hp <= 0 and rng:NextNumber() * 100 < Config.Skill(profile, "revive") then
+							st.hp = st.max * 0.5
+						end
 						e.model:SetAttribute("Attacks", (e.model:GetAttribute("Attacks") or 0) + 1)
 						if st.hp <= 0 then
 							-- defeated: plays its death where it fell for 2s, then goes
@@ -856,7 +937,7 @@ function EnemyService.Start(d)
 						for _, e in ipairs(list) do
 							if e.defeated then
 								e.defeatedAt = e.defeatedAt or now
-								if now - e.defeatedAt >= Config.GetReviveTime(e.level) * (Config.IsBoostActive(profile, "campfire", now) and 0.5 or 1) then
+								if now - e.defeatedAt >= Config.GetReviveTime(e.level) * (Config.IsBoostActive(profile, "campfire", now) and 0.5 or 1) * (1 - Config.Skill(profile, "undying") / 100) then
 									e.defeated = nil
 									e.defeatedAt = nil
 									petHealth[e.uid] = nil

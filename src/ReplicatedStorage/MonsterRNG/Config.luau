@@ -498,16 +498,17 @@ function Config.CashPackAmount(profile, pct)
 	return math.floor(cost * pct / 100)
 end
 function Config.PassCashMultiplier(p)
-	return (Config.HasPass(p, "doubleCash") and 2 or 1) * (Config.HasPass(p, "vip") and 1.2 or 1)
+	-- (also the Cash skills of your equipped monsters)
+	return (Config.HasPass(p, "doubleCash") and 2 or 1) * (Config.HasPass(p, "vip") and 1.2 or 1) * Config.SkillCashMultiplier(p)
 end
-function Config.PassRollTimeMultiplier(p) -- lower = faster
-	return (Config.HasPass(p, "fastRoll") and 0.7 or 1) * (Config.HasPass(p, "vip") and 0.9 or 1)
+function Config.PassRollTimeMultiplier(p) -- lower = faster (+ Roll Speed skills)
+	return (Config.HasPass(p, "fastRoll") and 0.7 or 1) * (Config.HasPass(p, "vip") and 0.9 or 1) * (1 - Config.Skill(p, "rollSpeed") / 100)
 end
 function Config.PassDropMultiplier(p)
 	return (Config.HasPass(p, "moreDrops") and 1.25 or 1) * (Config.HasPass(p, "supporter") and 1.1 or 1)
 end
-function Config.PassHatchMultiplier(p) -- lower = faster
-	return Config.HasPass(p, "fastGrowth") and 0.5 or 1
+function Config.PassHatchMultiplier(p) -- lower = faster (+ Hatch Speed skills)
+	return (Config.HasPass(p, "fastGrowth") and 0.5 or 1) * (1 - Config.Skill(p, "hatch") / 100)
 end
 function Config.PassExtraMonsters(p)
 	return Config.HasPass(p, "plusMonster") and 1 or 0
@@ -515,8 +516,8 @@ end
 -- Critical hits: chance (0-1) and damage multiplier with upgrades
 function Config.CritStats(profile)
 	local C = Config.Combat
-	local chance = (C.critChance + Config.GetUpgradeBonus(profile and profile.upgrades, "critChance")) / 100
-	local mult = C.critMultiplier + Config.GetUpgradeBonus(profile and profile.upgrades, "critDamage") / 100
+	local chance = (C.critChance + Config.GetUpgradeBonus(profile and profile.upgrades, "critChance") + Config.Skill(profile, "critChance")) / 100
+	local mult = C.critMultiplier + (Config.GetUpgradeBonus(profile and profile.upgrades, "critDamage") + Config.Skill(profile, "critDamage")) / 100
 	return math.clamp(chance, 0, 1), mult
 end
 
@@ -526,10 +527,10 @@ function Config.OfflineHours(profile)
 	return Config.Offline.baseHours + Config.GetUpgradeBonus(profile and profile.upgrades, "offlineTime")
 end
 function Config.OfflineRate(profile)
-	return Config.Offline.rate + (Config.HasPass(profile, "vip") and Config.Offline.vipBonus or 0)
+	return (Config.Offline.rate + (Config.HasPass(profile, "vip") and Config.Offline.vipBonus or 0)) * (1 + Config.Skill(profile, "offline") / 100)
 end
-function Config.PassWalkMultiplier(p)
-	return Config.HasPass(p, "vip") and 1.15 or 1
+function Config.PassWalkMultiplier(p) -- VIP + Walk Speed skills
+	return (Config.HasPass(p, "vip") and 1.15 or 1) * (1 + Config.Skill(p, "walk") / 100)
 end
 function Config.PassDailyMultiplier(p)
 	return Config.HasPass(p, "vip") and 2 or 1
@@ -1203,9 +1204,9 @@ Config.Combat = {
 	petHealthPerLevel = 0.15, -- +15% per level
 	petBaseDamage = 10,
 	petDamagePerLevel = 0.12, -- +12% per level
-	enemyHealthMin = 2.2,
-	enemyHealthMax = 2.6,
-	enemyDamage = 1.1,
+	enemyHealthMin = 2.5, -- (buffed a little: was 2.2 - 2.6 HP, 1.1 damage)
+	enemyHealthMax = 2.95,
+	enemyDamage = 1.25,
 	enemyLevelScaling = 0.08, -- extra enemy HP per level (half of it for damage)
 	reviveBase = 60, -- defeated pets recover on their own: 60s + 30s per pet level (max 30 min)
 	revivePerLevel = 30,
@@ -1319,8 +1320,8 @@ function Config.GetPetStats(entry, profile, now)
 	local power = (Config.RarityPower[tier] or 1) * (Config.PetSizePower[entry.size] or 1) * (Config.PetFinishPower[entry.finish] or 1)
 	local hp, dmg = Config.BaseCombatStats(entry.level)
 	local upgrades = profile and profile.upgrades
-	hp *= power * (1 + Config.GetUpgradeBonus(upgrades, "health") / 100)
-	dmg *= power * (1 + Config.GetUpgradeBonus(upgrades, "damage") / 100)
+	hp *= power * (1 + (Config.GetUpgradeBonus(upgrades, "health") + Config.Skill(profile, "health")) / 100)
+	dmg *= power * (1 + Config.GetUpgradeBonus(upgrades, "damage") / 100) * Config.SkillDamageMultiplier(profile, now)
 	if Config.IsBoostActive(profile, "health", now) then
 		hp *= 1.5
 	end
@@ -1498,6 +1499,200 @@ Config.Graphics = {
 }
 function Config.GraphicsTier(name)
 	return Config.Graphics.tiers[name or "High"] or Config.Graphics.tiers.High
+end
+
+--------------------------------------------------------------------
+-- MONSTER SKILLS: every monster equipped in your pen gives its skill.
+-- A skill grows from lv1 (at level 1) to lv100 (at level 100), and is
+-- boosted by the monster's size and finish. The same stat from several
+-- monsters adds up, up to the stat's max (cap).
+--------------------------------------------------------------------
+Config.SkillsIconImage = "" -- picture for the SKILLS button (right side); "" = a star
+Config.SkillSizeBoost = { Normal = 1, Huge = 1.2, Titan = 1.5 }
+Config.SkillFinishBoost = { Normal = 1, Gold = 1.1, Silver = 1.2, Rainbow = 1.35 }
+
+-- stat -> how it shows + its max. text = what it does (for the list)
+Config.SkillStats = {
+	jump = { name = "Jump Height", unit = "%", cap = 30 },
+	walk = { name = "Walk Speed", unit = "%", cap = 40 },
+	shardChance = { name = "Shard Drop Chance", unit = "%", cap = 20 },
+	rollSpeed = { name = "Roll Speed", unit = "%", cap = 35 },
+	regen = { name = "Pet Healing", unit = "%", cap = 40 },
+	luck = { name = "Luck", unit = "", cap = 15 },
+	health = { name = "Pet Health", unit = "%", cap = 60 },
+	thorns = { name = "Thorns", unit = "%", cap = 30 },
+	damage = { name = "Pet Damage", unit = "%", cap = 60 },
+	cash = { name = "Cash", unit = "%", cap = 80 },
+	critChance = { name = "Crit Chance", unit = "%", cap = 5 },
+	critDamage = { name = "Crit Damage", unit = "%", cap = 40 },
+	chill = { name = "Enemy Attack Slow", unit = "%", cap = 35 },
+	potionDrop = { name = "Potion Drops", unit = "%", cap = 40 },
+	revive = { name = "Instant Revive", unit = "%", cap = 30 },
+	offline = { name = "Offline Earnings", unit = "%", cap = 50 },
+	burn = { name = "Burn Damage", unit = "%", cap = 25 },
+	xp = { name = "Pet XP", unit = "%", cap = 60 },
+	doubleHit = { name = "Double Hit", unit = "%", cap = 25 },
+	armor = { name = "Less Damage Taken", unit = "%", cap = 35 },
+	freeze = { name = "Freeze Chance", unit = "%", cap = 20 },
+	hatch = { name = "Hatch Speed", unit = "%", cap = 50 },
+	shardAmount = { name = "Shards Per Drop", unit = "%", cap = 60 },
+	chaos = { name = "Chaos Buff", unit = "s", cap = 90 },
+	venom = { name = "Poison", unit = "%/s", cap = 6 },
+	doubleLoot = { name = "Double Loot", unit = "%", cap = 30 },
+	sell = { name = "Sell Price", unit = "%", cap = 75 },
+	glitch = { name = "Double Egg", unit = "%", cap = 10 },
+	undying = { name = "Faster Revive", unit = "%", cap = 60 },
+	luckMult = { name = "Luck Multiplier", unit = "%", cap = 60 },
+	wild = { name = "WILD Chance", unit = "%", cap = 60 },
+	mutation = { name = "Mutation + Size", unit = "%", cap = 60 },
+	aura = { name = "All Skills", unit = "%", cap = 40 },
+	infinity = { name = "Cash, Luck + Damage", unit = "%", cap = 80 },
+}
+
+-- monster -> its skill (name, stat, value at level 1 and at level 100)
+Config.MonsterSkills = {
+	slime = { name = "Bouncy", stat = "jump", lv1 = 2, lv100 = 5, text = "Jump higher" },
+	bat = { name = "Night Wings", stat = "walk", lv1 = 2, lv100 = 5, text = "Walk faster" },
+	["pebble-pup"] = { name = "Fetch", stat = "shardChance", lv1 = 1, lv100 = 3, text = "More Rift Shard drops" },
+	sparkfly = { name = "Static", stat = "rollSpeed", lv1 = 2, lv100 = 5, text = "Roll faster" },
+	["leaf-bug"] = { name = "Photosynthesis", stat = "regen", lv1 = 2, lv100 = 6, text = "Pets heal faster" },
+	mushroom = { name = "Spore Luck", stat = "luck", lv1 = 1, lv100 = 3, text = "More luck" },
+	crab = { name = "Hard Shell", stat = "health", lv1 = 3, lv100 = 8, text = "Pets have more health" },
+	["thorn-hog"] = { name = "Thorns", stat = "thorns", lv1 = 3, lv100 = 8, text = "Hits your pets take are hit back" },
+	["cinder-imp"] = { name = "Kindling", stat = "damage", lv1 = 3, lv100 = 8, text = "Pets deal more damage" },
+	["candy-puff"] = { name = "Sugar Rush", stat = "cash", lv1 = 3, lv100 = 8, text = "More cash per second" },
+	wolf = { name = "Swift Paws", stat = "walk", lv1 = 5, lv100 = 10, text = "Walk faster" },
+	golem = { name = "Rune Armor", stat = "health", lv1 = 5, lv100 = 12, text = "Pets have more health" },
+	["flame-fox"] = { name = "Fox Fire", stat = "critChance", lv1 = 0.5, lv100 = 1.5, text = "More critical hits" },
+	["frost-yeti"] = { name = "Chill", stat = "chill", lv1 = 5, lv100 = 12, text = "The enemy you fight attacks slower" },
+	["jade-serpent"] = { name = "Jade Fortune", stat = "potionDrop", lv1 = 4, lv100 = 10, text = "More potion drops" },
+	phoenix = { name = "Rebirth Flame", stat = "revive", lv1 = 5, lv100 = 12, text = "Chance a defeated pet revives right away" },
+	["thunder-lion"] = { name = "Roar", stat = "critDamage", lv1 = 5, lv100 = 12, text = "Critical hits hit harder" },
+	["abyss-eel"] = { name = "Deep Pockets", stat = "offline", lv1 = 5, lv100 = 15, text = "More offline earnings" },
+	["inferno-bat"] = { name = "Burn", stat = "burn", lv1 = 3, lv100 = 8, text = "Your hits make the enemy burn" },
+	["ghost-lantern"] = { name = "Spirit Light", stat = "xp", lv1 = 5, lv100 = 15, text = "Pets get more XP" },
+	leviathan = { name = "Double Wave", stat = "doubleHit", lv1 = 3, lv100 = 8, text = "Chance an attack hits twice" },
+	["solar-griffin"] = { name = "Sky Luck", stat = "luck", lv1 = 3, lv100 = 8, text = "More luck" },
+	["obsidian-behemoth"] = { name = "Unbreakable", stat = "armor", lv1 = 5, lv100 = 12, text = "Pets take less damage" },
+	["frost-wyrm"] = { name = "Freeze", stat = "freeze", lv1 = 3, lv100 = 7, text = "Chance to freeze the enemy for 2s" },
+	["thunder-djinn"] = { name = "Wish", stat = "hatch", lv1 = 5, lv100 = 15, text = "Eggs hatch faster" },
+	["void-dragon"] = { name = "Void Rift", stat = "shardAmount", lv1 = 8, lv100 = 20, text = "More Rift Shards per drop" },
+	["chaos-chimera"] = { name = "Chaos", stat = "chaos", lv1 = 30, lv100 = 60, text = "Every 5 min: x2 cash, luck or damage for a while" },
+	["iron-colossus"] = { name = "Overdrive", stat = "damage", lv1 = 8, lv100 = 20, text = "Pets deal more damage" },
+	["plague-wyvern"] = { name = "Venom Bite", stat = "venom", lv1 = 1, lv100 = 3, text = "Hits poison the enemy (max HP per second, 3s)" },
+	wraith = { name = "Soul Harvest", stat = "doubleLoot", lv1 = 5, lv100 = 12, text = "Chance a kill drops double loot" },
+	["hollow-king"] = { name = "Royal Tax", stat = "sell", lv1 = 10, lv100 = 25, text = "Sell for more" },
+	["glitch-beast"] = { name = "Glitch", stat = "glitch", lv1 = 1, lv100 = 3, text = "Chance a roll gives 2 eggs" },
+	["bone-dragon"] = { name = "Undying", stat = "undying", lv1 = 15, lv100 = 35, text = "Defeated pets come back faster" },
+	seraph = { name = "Blessing", stat = "luckMult", lv1 = 10, lv100 = 25, text = "Multiplies your luck" },
+	["astral-whale"] = { name = "Star Tide", stat = "wild", lv1 = 10, lv100 = 25, text = "More WILD rolls" },
+	["comet-pegasus"] = { name = "Comet Speed", stat = "rollSpeed", lv1 = 10, lv100 = 20, text = "Roll faster" },
+	titan = { name = "Solar Core", stat = "cash", lv1 = 15, lv100 = 35, text = "More cash per second" },
+	["radiant-archangel"] = { name = "Guardian", stat = "block", lv1 = 10, lv100 = 20, text = "Chance a pet blocks a hit" },
+	["gaia-colossus"] = { name = "Nature's Gift", stat = "mutation", lv1 = 10, lv100 = 25, text = "More mutations and bigger sizes" },
+	emperor = { name = "Emperor's Aura", stat = "aura", lv1 = 10, lv100 = 25, text = "All your other skills are stronger" },
+	["infinity-dragon"] = { name = "Infinity", stat = "infinity", lv1 = 20, lv100 = 40, text = "More cash, luck and pet damage" },
+}
+Config.SkillStats.block = { name = "Block Chance", unit = "%", cap = 30 }
+
+-- this monster's skill and how strong it is right now
+function Config.GetEntrySkill(entry)
+	local sk = entry and Config.MonsterSkills[entry.monsterId]
+	if not sk then
+		return nil, 0
+	end
+	local lvl = math.clamp(entry.level or 1, 1, 100)
+	local v = sk.lv1 + (sk.lv100 - sk.lv1) * (lvl - 1) / 99
+	v *= (Config.SkillSizeBoost[entry.size] or 1) * (Config.SkillFinishBoost[entry.finish] or 1)
+	return sk, v
+end
+
+-- "+3.2% Jump Height" style text
+function Config.FormatSkill(stat, v)
+	local info = Config.SkillStats[stat] or { name = stat, unit = "" }
+	local num = v >= 10 and string.format("%.0f", v) or string.format("%.1f", v)
+	num = num:gsub("%.0$", "")
+	if info.unit == "s" then
+		return num .. "s " .. info.name
+	end
+	return "+" .. num .. info.unit .. " " .. info.name
+end
+
+-- totals of every equipped (pen) monster's skill, each capped at its max.
+-- returns totals (capped), raw (before the cap). Cached for a moment.
+local skillCache = setmetatable({}, { __mode = "k" })
+function Config.GetSkillTotals(profile)
+	if type(profile) ~= "table" then
+		return {}, {}
+	end
+	local c = skillCache[profile]
+	local now = os.clock()
+	if c and now - c.at < 0.5 then
+		return c.totals, c.raw
+	end
+	local raw = {}
+	for _, entry in ipairs(profile.base or {}) do
+		if entry.kind == "monster" then
+			local sk, v = Config.GetEntrySkill(entry)
+			if sk then
+				raw[sk.stat] = (raw[sk.stat] or 0) + v
+			end
+		end
+	end
+	local auraCap = Config.SkillStats.aura.cap
+	local aura = math.min(auraCap, raw.aura or 0)
+	local totals = {}
+	for stat, v in pairs(raw) do
+		local cap = (Config.SkillStats[stat] or {}).cap or math.huge
+		local boosted = stat == "aura" and v or v * (1 + aura / 100)
+		raw[stat] = boosted
+		totals[stat] = math.min(cap, boosted)
+	end
+	skillCache[profile] = { at = now, totals = totals, raw = raw }
+	return totals, raw
+end
+
+-- one stat's total (0 if none)
+function Config.Skill(profile, stat)
+	local totals = Config.GetSkillTotals(profile)
+	return totals[stat] or 0
+end
+
+-- Chaos: every 5 minutes, x2 cash, luck or damage for its seconds
+Config.ChaosKinds = { "cash", "luck", "damage" }
+function Config.ChaosBuff(profile, now)
+	local secs = Config.Skill(profile, "chaos")
+	if secs <= 0 then
+		return nil
+	end
+	now = now or os.time()
+	if now % 300 >= secs then
+		return nil
+	end
+	return Config.ChaosKinds[(math.floor(now / 300) % #Config.ChaosKinds) + 1]
+end
+
+-- multipliers used around the game
+function Config.SkillCashMultiplier(profile, now)
+	local m = 1 + (Config.Skill(profile, "cash") + Config.Skill(profile, "infinity")) / 100
+	if Config.ChaosBuff(profile, now) == "cash" then
+		m *= 2
+	end
+	return m
+end
+function Config.SkillDamageMultiplier(profile, now)
+	local m = 1 + (Config.Skill(profile, "damage") + Config.Skill(profile, "infinity")) / 100
+	if Config.ChaosBuff(profile, now) == "damage" then
+		m *= 2
+	end
+	return m
+end
+function Config.SkillLuckMultiplier(profile, now)
+	local m = 1 + (Config.Skill(profile, "luckMult") + Config.Skill(profile, "infinity")) / 100
+	if Config.ChaosBuff(profile, now) == "luck" then
+		m *= 2
+	end
+	return m
 end
 
 return Config

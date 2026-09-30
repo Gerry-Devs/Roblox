@@ -274,6 +274,14 @@ local function showPopup(kind, item, card, rarity, rarityColor, odds)
 		end
 		popDivider(nxt())
 		popLine(nxt(), "\240\159\146\181 $" .. Config.FormatNumber(Config.GetEntryIncome(item)) .. "/s", 18, Color3.fromRGB(150, 255, 150), nil, nil, true)
+		-- its skill (works while it's equipped in your pen)
+		local sk, v = Config.GetEntrySkill(item)
+		if sk then
+			popDivider(nxt())
+			popLine(nxt(), "\u{2B50} " .. sk.name, 17, Color3.fromRGB(255, 215, 90), Enum.Font.GothamBlack, Enum.TextXAlignment.Left)
+			popLine(nxt(), Config.FormatSkill(sk.stat, v), 16, Color3.fromRGB(255, 240, 190), nil, nil, true)
+			popLine(nxt(), sk.text .. " (when equipped)", 13, Color3.fromRGB(190, 195, 215), nil, nil, true)
+		end
 	end
 	popDivider(nxt())
 	popLine(nxt(), Config.FormatOdds(odds), 18, Color3.new(1, 1, 1), nil, nil, true)

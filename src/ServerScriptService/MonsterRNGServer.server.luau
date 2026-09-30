@@ -61,6 +61,12 @@ local sellQuoteRemote = getRemote("SellQuote", "RemoteFunction")
 local profileUpdated = getRemote("ProfileUpdated", "RemoteEvent")
 
 local BASE_WALK_SPEED = 16
+local BASE_JUMP_POWER, BASE_JUMP_HEIGHT = 50, 7.2
+
+-- Royal Tax skill (Hollow King): sell for more
+local function sellBoost(profile)
+	return 1 + Config.Skill(profile, "sell") / 100
+end
 
 local function applyWalkSpeed(player, profile)
 	local character = player.Character
@@ -77,7 +83,27 @@ local function applyWalkSpeed(player, profile)
 	if humanoid.WalkSpeed ~= target then
 		humanoid.WalkSpeed = target
 	end
+	-- Bouncy skill (Moss Slime): jump higher
+	local jump = 1 + Config.Skill(profile, "jump") / 100
+	if humanoid.UseJumpPower then
+		humanoid.JumpPower = BASE_JUMP_POWER * jump
+	else
+		humanoid.JumpHeight = BASE_JUMP_HEIGHT * jump
+	end
 end
+
+-- walk / jump skills change when monsters are equipped or level up
+task.spawn(function()
+	while true do
+		task.wait(2)
+		for _, player in ipairs(Players:GetPlayers()) do
+			local profile = DataService.Get(player)
+			if profile then
+				pcall(applyWalkSpeed, player, profile)
+			end
+		end
+	end
+end)
 
 local lastRollAt = {}
 local lastBossAt = {}
@@ -328,6 +354,13 @@ rollRemote.OnServerInvoke = function(player)
 	local rarity, egg, wilds, wheelIndex = RollService.Roll(profile)
 	local second
 	if rarity and Config.HasPass(profile, "doubleRoll") then
+		local ok, r2, e2 = pcall(RollService.Roll, profile)
+		if ok and r2 and e2 then
+			second = { rarity = r2, egg = e2 }
+		end
+	end
+	-- Glitch skill (Glitch Beast): chance the roll gives a 2nd egg
+	if rarity and not second and math.random() * 100 < Config.Skill(profile, "glitch") and #profile.eggs + #profile.monsters < backpackCap then
 		local ok, r2, e2 = pcall(RollService.Roll, profile)
 		if ok and r2 and e2 then
 			second = { rarity = r2, egg = e2 }
@@ -606,7 +639,7 @@ sellEggRemote.OnServerInvoke = function(player, eggUid)
 	end
 
 	local rarity = Config.GetRarity(egg.rarity)
-	local saleValue = math.max(15, rarity.tier * 20)
+	local saleValue = math.floor(math.max(15, rarity.tier * 20) * sellBoost(profile))
 	profile.cash += saleValue
 	QuestService.Add(profile, "sells", 1)
 	updateLeaderstats(player)
@@ -641,7 +674,7 @@ sellAllEggsRemote.OnServerInvoke = function(player)
 	local total = 0
 	for _, egg in ipairs(profile.eggs) do
 		local rarity = Config.GetRarity(egg.rarity)
-		total += math.max(15, rarity.tier * 20)
+		total += math.floor(math.max(15, rarity.tier * 20) * sellBoost(profile))
 	end
 	QuestService.Add(profile, "sells", #profile.eggs)
 	profile.eggs = {}
@@ -673,7 +706,7 @@ sellMonsterRemote.OnServerInvoke = function(player, monsterUid)
 	end
 
 	local monster = Config.GetMonster(entry.monsterId)
-	local saleValue = math.max(25, WorldService.GetEntryIncome(entry) * 10)
+	local saleValue = math.floor(math.max(25, WorldService.GetEntryIncome(entry) * 10) * sellBoost(profile))
 	profile.cash += saleValue
 	QuestService.Add(profile, "sells", 1)
 	profile.owned[entry.monsterId] = math.max(0, (profile.owned[entry.monsterId] or 1) - 1)
@@ -695,12 +728,12 @@ local function monsterSaleValue(monster)
 	return math.max(25, WorldService.GetEntryIncome(monster) * 10)
 end
 
-local function quoteList(list, valueFn)
+local function quoteList(list, valueFn, boost)
 	local count, value = 0, 0
 	for _, item in ipairs(list) do
 		if not item.favorite then
 			count += 1
-			value += valueFn(item)
+			value += math.floor(valueFn(item) * (boost or 1))
 		end
 	end
 	return count, value
@@ -732,15 +765,16 @@ sellQuoteRemote.OnServerInvoke = function(player, heldUid)
 	if not profile then
 		return nil
 	end
-	local eggCount, eggValue = quoteList(profile.eggs, eggSaleValue)
-	local monsterCount, monsterValue = quoteList(profile.monsters, monsterSaleValue)
+	local boost = sellBoost(profile)
+	local eggCount, eggValue = quoteList(profile.eggs, eggSaleValue, boost)
+	local monsterCount, monsterValue = quoteList(profile.monsters, monsterSaleValue, boost)
 
 	-- the item the player is currently holding (equipped from the backpack)
 	local held
 	if type(heldUid) == "string" then
 		for _, e in ipairs(profile.eggs) do
 			if e.uid == heldUid then
-				held = { kind = "egg", name = Config.GetRarity(e.rarity).name .. " Egg", value = eggSaleValue(e), favorite = e.favorite == true }
+				held = { kind = "egg", name = Config.GetRarity(e.rarity).name .. " Egg", value = math.floor(eggSaleValue(e) * boost), favorite = e.favorite == true }
 			end
 		end
 		for _, m in ipairs(profile.monsters) do
@@ -749,7 +783,7 @@ sellQuoteRemote.OnServerInvoke = function(player, heldUid)
 				held = {
 					kind = "monster",
 					name = Config.BuildDisplayName(monster and monster.name or "Monster", m.size, m.finish),
-					value = monsterSaleValue(m),
+					value = math.floor(monsterSaleValue(m) * boost),
 					favorite = m.favorite == true,
 				}
 			end
@@ -786,7 +820,7 @@ sellBulkRemote.OnServerInvoke = function(player, mode)
 			if item.favorite then
 				table.insert(kept, item)
 			else
-				total += valueFn(item)
+				total += math.floor(valueFn(item) * sellBoost(profile))
 				sold += 1
 				if onSold then
 					onSold(item)
@@ -917,7 +951,7 @@ task.spawn(function()
 					local kept = {}
 					for _, item in ipairs(list) do
 						if item.uid ~= heldUid and autoSellMatches(s, item) then
-							total += valueFn(item)
+							total += math.floor(valueFn(item) * sellBoost(profile))
 							sold += 1
 							if onSold then
 								onSold(item)

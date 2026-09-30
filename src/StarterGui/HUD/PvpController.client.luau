@@ -146,6 +146,7 @@ local cFight = button(cbox, "FIGHT", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.04, 
 local cDecline = button(cbox, "DECLINE", UDim2.new(0.44, 0, 0, 52), UDim2.new(0.52, 0, 1, -66), GRAY)
 z(cbox)
 local pendingFight
+local data -- the PvP info from the server (filled in below)
 local function askFight(post, onYes)
 	local mine = (data and data.myPower) or 0
 	local theirs = post.power or 0
@@ -190,7 +191,7 @@ end)
 -- data
 --------------------------------------------------------------------
 local tab = "c"
-local data
+-- (data is declared above, next to askFight)
 local seasonLeftAt = 0
 local busy = false
 

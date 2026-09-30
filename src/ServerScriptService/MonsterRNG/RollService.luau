@@ -101,7 +101,8 @@ end
 
 function RollService.Roll(profile)
 	-- (pity system removed)
-	local effectiveLuck = profile.luck + Config.GetUpgradeBonus(profile.upgrades, "luck")
+	-- (+ Luck skills of your equipped monsters)
+	local effectiveLuck = profile.luck + Config.GetUpgradeBonus(profile.upgrades, "luck") + Config.Skill(profile, "luck")
 	local diceLuck = Config.GetDice(profile.equippedDice).luck
 	-- rebirths: +10% luck each
 	diceLuck = ((1 + diceLuck / 100) * (1 + (profile.rebirths or 0) * Config.Rebirth.luckBonus / 100) - 1) * 100
@@ -116,6 +117,11 @@ function RollService.Roll(profile)
 	if globalLuck > 1 then
 		diceLuck = ((1 + diceLuck / 100) * globalLuck - 1) * 100
 	end
+	-- Blessing / Infinity / Chaos skills: luck multiplier
+	local skillLuck = Config.SkillLuckMultiplier(profile)
+	if skillLuck > 1 then
+		diceLuck = ((1 + diceLuck / 100) * skillLuck - 1) * 100
+	end
 	-- hidden pity: every 25th roll is a 2x luck roll
 	if (profile.rolls + 1) % Config.PityEvery == 0 then
 		diceLuck = ((1 + diceLuck / 100) * Config.PityLuckMultiplier - 1) * 100
@@ -123,7 +129,7 @@ function RollService.Roll(profile)
 	-- WILD chain: each WILD rolls again; all 3 in a row spins the egg wheel
 	local wilds = 0
 	-- Wild Chance upgrade: makes the 1st WILD more likely
-	local wildBoost = 1 + Config.GetUpgradeBonus(profile.upgrades, "wildChance") / 100
+	local wildBoost = 1 + (Config.GetUpgradeBonus(profile.upgrades, "wildChance") + Config.Skill(profile, "wild")) / 100
 	for i, chance in ipairs(Config.Wild.chances) do
 		if i == 1 then
 			chance = math.min(1, chance * wildBoost)
@@ -143,8 +149,10 @@ function RollService.Roll(profile)
 	end
 	local monster = chooseMonster(rarity.key)
 	local monsterTier = getTier(monster.rarity)
-	local size = chooseVariant(Config.SizeVariants, Config.GetUpgradeBonus(profile.upgrades, "size"))
-	local finish = chooseVariant(Config.FinishVariants, Config.GetUpgradeBonus(profile.upgrades, "mutation"))
+	-- (+ Nature's Gift skill: more mutations and bigger sizes)
+	local gift = Config.Skill(profile, "mutation")
+	local size = chooseVariant(Config.SizeVariants, Config.GetUpgradeBonus(profile.upgrades, "size") + gift)
+	local finish = chooseVariant(Config.FinishVariants, Config.GetUpgradeBonus(profile.upgrades, "mutation") + gift)
 
 	local egg = {
 		uid = HttpService:GenerateGUID(false),

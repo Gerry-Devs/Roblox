@@ -307,6 +307,12 @@ local function renderMonsters()
 		end
 		row.Line2.Text = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg))
 			.. "  \u{2022}  " .. Config.FormatKg(entry.kg)
+		-- its skill (active while it's in the pen)
+		local sk, v = Config.GetEntrySkill(entry)
+		if sk then
+			row.Line2.Text = "\u{2B50} " .. Config.FormatSkill(sk.stat, v)
+			row.Line2.TextColor3 = Color3.fromRGB(255, 215, 90)
+		end
 		iconOrFallback(row)
 		local unequip = row.UnequipButton
 		bounce(unequip)

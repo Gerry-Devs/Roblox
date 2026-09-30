@@ -342,6 +342,11 @@ function UIStyle.skinWindow(window, closeBtn)
 		if c:IsA("GuiObject") and c ~= oldTitle and c ~= closeBtn and c ~= titleText and c.Name ~= "Studs" and c.Name ~= "Rim" then
 			if c.Position.Y.Scale < 0.5 and c.AnchorPoint.Y < 0.5 then
 				c.Position += UDim2.fromOffset(0, shift)
+				-- parts that stretch with the window's height would grow by
+				-- the same amount: shrink them back so their bottom stays put
+				if c.Size.Y.Scale > 0 then
+					c.Size -= UDim2.fromOffset(0, math.floor(shift * c.Size.Y.Scale + 0.5))
+				end
 			end
 		end
 	end

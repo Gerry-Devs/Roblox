@@ -17,6 +17,9 @@ local GROUND_Y = 1
 local deps
 local folder
 local enemies = {}
+local enemyById = {} -- EnemyId attribute -> enemy (players pick enemies by this id)
+local nextEnemyId = 0
+local attackOrders = {} -- player -> { [pet uid] = enemy }: pets only fight enemies they're sent to
 local petHealth = {} -- pet uid -> { hp, max, lastHit }
 local petNextAttack = {}
 local dyingPets = {} -- pet uid -> true while it lies there for 2s before going to the pen
@@ -244,12 +247,15 @@ local function createEnemy(biome, def)
 	model:SetAttribute("Hits", 0)
 	model:SetAttribute("Attacks", 0)
 	model:SetAttribute("Moving", false)
+	nextEnemyId += 1
+	model:SetAttribute("EnemyId", nextEnemyId)
 	model.PrimaryPart = root
 	-- with StreamingEnabled, send the whole enemy at once (never half-loaded)
 	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
 	model.Parent = folder
 
 	return {
+		id = nextEnemyId,
 		model = model, root = root, biome = biome, def = def, monsterId = monsterId, name = name,
 		level = level, hp = maxHp, maxHp = maxHp, dmg = dmg, mult = mult, size = s, y = y,
 		home = pos, wanderTarget = pos, nextWander = 0, nextAttack = 0, lastHitAt = 0,
@@ -258,7 +264,9 @@ local function createEnemy(biome, def)
 end
 
 local function spawnEnemy(biome, def)
-	table.insert(enemies, createEnemy(biome, def))
+	local e = createEnemy(biome, def)
+	enemyById[e.id] = e
+	table.insert(enemies, e)
 end
 
 --------------------------------------------------------------------
@@ -534,6 +542,7 @@ local function killEnemy(e)
 		return
 	end
 	e.dead = true
+	enemyById[e.id] = nil
 	e.model:SetAttribute("Dead", true)
 	local pos = e.root.Position
 	local xpTotal = Config.EnemyXp(e.level, e.mult)
@@ -581,32 +590,11 @@ local function combatTick(now)
 		local char = player.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if profile and pen and hrp then
-			-- living enemies near you, nearest first (pets only fight while following you)
-			local nearby = {}
-			if not pen.state.nearby then
-				local here = Config.GetBiomeAt(hrp.Position.X, hrp.Position.Z)
-				for _, e in ipairs(enemies) do
-					-- only enemies of the biome you're standing in
-					if not e.dead and here and e.biome.key == here.key then
-						local dist = (e.root.Position - hrp.Position).Magnitude
-						if dist < C.aggroRange then
-							table.insert(nearby, { e = e, d = dist })
-						end
-					end
-				end
-				table.sort(nearby, function(a, b)
-					return a.d < b.d
-				end)
-				-- the nearest enemy always counts; extra enemies only if they're
-				-- close to you (so pets don't run off to far-away fights)
-				local close = {}
-				for i, n in ipairs(nearby) do
-					if i == 1 or n.d <= (C.splitRange or 20) then
-						table.insert(close, n)
-					end
-				end
-				nearby = close
-			end
+			-- pets only fight enemies the player sent them to (tap an enemy ->
+			-- attack menu), and only while they're out following the player
+			local orders = attackOrders[player] or {}
+			attackOrders[player] = orders
+			local here = Config.GetBiomeAt(hrp.Position.X, hrp.Position.Z)
 
 			local pets = {}
 			for _, entry in ipairs(profile.base) do
@@ -626,13 +614,33 @@ local function combatTick(now)
 				end
 			end
 
-			-- split the pets between the nearby enemies (nearest enemy first)
+			-- each pet goes for the enemy it was sent to; the order ends when the
+			-- enemy dies, you leave its biome, walk far away or go back to the pen
 			local assigned, targets = {}, {}
-			for i, p in ipairs(pets) do
-				local pick = #nearby > 0 and nearby[((i - 1) % #nearby) + 1].e or nil
-				assigned[p.entry.uid] = pick
+			local living = {}
+			for _, p in ipairs(pets) do
+				local uid = p.entry.uid
+				living[uid] = true
+				local pick = orders[uid]
+				if pick and (pick.dead or pen.state.nearby or not here or pick.biome.key ~= here.key
+					or flatDistance(pick.root.Position, hrp.Position) > (C.leashRange or 120)) then
+					orders[uid] = nil
+					pick = nil
+				end
+				assigned[uid] = pick
 				if pick then
-					targets[p.entry.uid] = { Vector3.new(pick.root.Position.X, 0, pick.root.Position.Z), pick.size * 0.5 }
+					targets[uid] = { Vector3.new(pick.root.Position.X, 0, pick.root.Position.Z), pick.size * 0.5 }
+				end
+				local model = pen.pets:FindFirstChild(uid)
+				local targetId = pick and pick.id or 0
+				if model and model:GetAttribute("AttackTarget") ~= targetId then
+					model:SetAttribute("AttackTarget", targetId)
+				end
+			end
+			-- defeated / removed pets forget their orders
+			for uid in pairs(orders) do
+				if not living[uid] then
+					orders[uid] = nil
 				end
 			end
 			WorldService.SetPetTargets(player, targets)
@@ -859,7 +867,90 @@ function EnemyService.Start(d)
 		end
 	end)
 
+	-- Attack menu: tap an enemy, then send ALL your pets, ONE pet, or call
+	-- them back. mode = "all" | "one" (uid) | "stop" (this enemy) | "recall"
+	local remotes = ReplicatedStorage:WaitForChild("MonsterRNG"):WaitForChild("Remotes")
+	local attackRemote = remotes:FindFirstChild("AttackEnemy") or Instance.new("RemoteFunction")
+	attackRemote.Name = "AttackEnemy"
+	attackRemote.Parent = remotes
+	local lastOrderAt = {}
+	attackRemote.OnServerInvoke = function(player, enemyId, mode, uid)
+		local now = os.clock()
+		if now - (lastOrderAt[player] or 0) < 0.15 then
+			return { success = false, message = "" }
+		end
+		lastOrderAt[player] = now
+		if type(mode) ~= "string" then
+			return { success = false, message = "" }
+		end
+		local profile = DataService.Get(player)
+		local pen = WorldService.GetPen(player)
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if not profile or not pen or not hrp then
+			return { success = false, message = "" }
+		end
+		local orders = attackOrders[player] or {}
+		attackOrders[player] = orders
+
+		if mode == "recall" then
+			table.clear(orders)
+			return { success = true, message = "Your pets are coming back." }
+		end
+
+		local e = type(enemyId) == "number" and enemyById[enemyId] or nil
+		if not e or e.dead then
+			return { success = false, message = "That enemy is already gone." }
+		end
+		if mode == "stop" then
+			for petUid, target in pairs(orders) do
+				if target == e then
+					orders[petUid] = nil
+				end
+			end
+			return { success = true, message = "Your pets stopped attacking." }
+		end
+		if pen.state.nearby then
+			return { success = false, message = "Your pets are resting in your pen. Walk away from it so they follow you!" }
+		end
+		local here = Config.GetBiomeAt(hrp.Position.X, hrp.Position.Z)
+		if not here or here.key ~= e.biome.key then
+			return { success = false, message = "Walk into that enemy's area first." }
+		end
+		if flatDistance(e.root.Position, hrp.Position) > (Config.Combat.orderRange or 90) then
+			return { success = false, message = "Get closer to that enemy first." }
+		end
+
+		local ready = {}
+		for _, entry in ipairs(profile.base) do
+			if entry.kind == "monster" and not entry.defeated and not dyingPets[entry.uid] then
+				ready[entry.uid] = true
+			end
+		end
+		if next(ready) == nil then
+			return { success = false, message = "You have no pets that can fight right now." }
+		end
+
+		local sent = 0
+		if mode == "all" then
+			for petUid in pairs(ready) do
+				orders[petUid] = e
+				sent += 1
+			end
+		elseif mode == "one" then
+			if type(uid) ~= "string" or not ready[uid] then
+				return { success = false, message = "That pet can't fight right now." }
+			end
+			orders[uid] = e
+			sent = 1
+		else
+			return { success = false, message = "" }
+		end
+		return { success = true, message = sent == 1 and "1 pet is attacking!" or (sent .. " pets are attacking!") }
+	end
+
 	Players.PlayerRemoving:Connect(function(player)
+		attackOrders[player] = nil
+		lastOrderAt[player] = nil
 		for _, e in ipairs(enemies) do
 			if e.engaged == player then
 				e.engaged = nil

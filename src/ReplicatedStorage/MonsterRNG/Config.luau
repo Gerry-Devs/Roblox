@@ -988,7 +988,7 @@ Config.RiftShardImage = "rbxassetid://75633089538163"
 Config.UIStudsImage = "rbxassetid://139993005514116"
 -- Hexagon of studs for the Upgrade tree tiles (assets/ui/studs_hex.png
 -- uploaded to Roblox). Leave "" until it's uploaded.
-Config.UIHexStudsImage = ""
+Config.UIHexStudsImage = "rbxassetid://98151350777131"
 
 -- duration in seconds (0 = instant)
 Config.Potions = {

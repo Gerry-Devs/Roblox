@@ -644,6 +644,146 @@ FX.emperor = {
 -- hook up every pet
 --------------------------------------------------------------------
 
+--------------------------------------------------------------------
+-- Simple-part monsters (Config look): effects made from their element
+-- color and their attack / critical move.
+--------------------------------------------------------------------
+local ELEMENT_COLORS = {
+	fire = { rgb(255, 120, 40), rgb(255, 220, 90) },
+	ice = { rgb(150, 220, 255), rgb(240, 250, 255) },
+	nature = { rgb(110, 220, 90), rgb(230, 255, 150) },
+	water = { rgb(70, 160, 255), rgb(190, 235, 255) },
+	shadow = { rgb(140, 70, 220), rgb(60, 30, 90) },
+	light = { rgb(255, 235, 140), rgb(255, 255, 230) },
+	storm = { rgb(255, 230, 80), rgb(140, 220, 255) },
+	poison = { rgb(160, 230, 60), rgb(120, 60, 160) },
+	cosmic = { rgb(190, 110, 255), rgb(110, 220, 255) },
+	earth = { rgb(190, 140, 90), rgb(120, 95, 70) },
+	candy = { rgb(255, 140, 210), rgb(150, 230, 255) },
+}
+
+local function elementFx(m)
+	local cols = ELEMENT_COLORS[m.element] or ELEMENT_COLORS.light
+	local c1, c2 = cols[1], cols[2]
+	local attacks = {
+		beam = function(c)
+			local p = part(Vector3.one * 1.1, CFrame.new(c.mouth), c1, { Shape = Enum.PartType.Ball, Transparency = 0.05 })
+			trail(p, c2, SPARK, 40, 0.7)
+			shoot(p, c.mouth, c.to, 0.25, {}, function(at)
+				ball(at, 1.3, c1, 0.25, 2.4, 0.2)
+				emit(at, c2, 10, { speed = 12, size = 0.6, life = 0.35 })
+			end)
+		end,
+		bite = function(c)
+			fangs(c.to, -c.dir, c.s * 0.35, rgb(245, 245, 255))
+			task.delay(0.1, function()
+				emit(c.to, c1, 10, { speed = 10, size = 0.6, life = 0.35 })
+			end)
+		end,
+		slash = function(c)
+			task.delay(0.15, function()
+				slash(c.to, -c.dir, c1, c.s * 0.7, math.random(-30, 30), 0.25)
+				emit(c.to, c2, 8, { speed = 10, size = 0.5, life = 0.3 })
+			end)
+		end,
+		slam = function(c)
+			task.delay(0.25, function()
+				ring(c.ground, c1, c.s * 1.3, 0.35)
+				emit(c.ground + Vector3.new(0, 0.5, 0), c2, 12, { speed = 14, size = 0.8, life = 0.4, gravity = Vector3.new(0, -40, 0) })
+			end)
+		end,
+		hit = function(c) -- charge / spin / tail whip: an impact burst
+			task.delay(0.12, function()
+				ball(c.to - c.dir * c.s * 0.3, c.s * 0.35, c1, 0.25, 2.2, 0.2)
+				emit(c.to, c2, 12, { speed = 14, size = 0.7, life = 0.35 })
+			end)
+		end,
+	}
+	local crits = {
+		pounce = function(c)
+			ring(c.ground, c1, c.s * 2.2, 0.45, 0.5)
+			ball(c.to, c.s * 0.7, c1, 0.4, 2.6, 0.3)
+			emit(c.to, c2, 26, { speed = 22, size = 0.9, life = 0.5 })
+		end,
+		quake = function(c)
+			for i = 0, 1 do
+				task.delay(i * 0.35, function()
+					ring(c.ground, c1, c.s * (2 + i), 0.5, 0.6)
+					emit(c.ground + Vector3.new(0, 0.5, 0), c2, 18, { speed = 18, size = 1, life = 0.5, gravity = Vector3.new(0, -50, 0), light = 0.3 })
+				end)
+			end
+		end,
+		tornado = function(c)
+			for i = 0, 3 do
+				task.delay(i * 0.06, function()
+					ring(c.ground + Vector3.new(0, i * c.s * 0.35, 0), i % 2 == 0 and c1 or c2, c.s * (0.8 + i * 0.25), 0.45, 0.35)
+				end)
+			end
+			emit(c.to, c1, 24, { speed = 18, size = 0.8, life = 0.6 })
+		end,
+		frenzy = function(c)
+			for i = 0, 2 do
+				task.delay(i * 0.12, function()
+					fangs(c.to + Vector3.new(0, (i - 1) * c.s * 0.25, 0), -c.dir, c.s * 0.35, rgb(245, 245, 255))
+					emit(c.to, c1, 8, { speed = 12, size = 0.6, life = 0.3 })
+				end)
+			end
+		end,
+		barrage = function(c)
+			for i = 0, 3 do
+				task.delay(i * 0.09, function()
+					slash(c.to, -c.dir, i % 2 == 0 and c1 or c2, c.s * 0.75, i % 2 == 0 and 35 or -35, 0.22)
+				end)
+			end
+			task.delay(0.36, function()
+				emit(c.to, c1, 18, { speed = 16, size = 0.7, life = 0.4 })
+			end)
+		end,
+		nova = function(c)
+			local core = ball(c.to, c.s * 0.5, rgb(255, 255, 255), 0.25, 1.5, 0)
+			core.Parent = fxFolder
+			task.delay(0.12, function()
+				for i = 1, 3 do
+					task.delay(i * 0.07, function()
+						ring(c.ground + Vector3.new(0, i * 0.4, 0), i % 2 == 0 and c2 or c1, c.s * (1.4 + i * 0.6), 0.5, 0.4)
+					end)
+				end
+				ball(c.to, c.s * 0.9, c1, 0.55, 3, 0.4)
+				emit(c.to, c1, 36, { speed = 26, size = 1, life = 0.6 })
+			end)
+		end,
+		skybeam = function(c)
+			local sky = c.to + Vector3.new(0, 30, 0)
+			local beam = part(Vector3.new(30, c.s * 0.6, c.s * 0.6), CFrame.new((sky + c.ground) / 2) * CFrame.Angles(0, 0, math.rad(90)), c1, {
+				Shape = Enum.PartType.Cylinder,
+				Transparency = 0.15,
+			})
+			fade(beam, 0.4, Vector3.new(30, c.s * 0.1, c.s * 0.1), 0.25)
+			task.delay(0.15, function()
+				ball(c.to, c.s * 0.8, c2, 0.5, 3, 0.2)
+				ring(c.ground, c1, c.s * 2.8, 0.5, 0.5)
+				emit(c.to, c1, 28, { speed = 24, size = 1, life = 0.5 })
+			end)
+		end,
+	}
+	local a = m.attack
+	local attackFn = attacks[a] or attacks.hit
+	return { attack = attackFn, crit = crits[m.crit] or crits.pounce }
+end
+
+do
+	local ok, Config = pcall(function()
+		return require(game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("Config"))
+	end)
+	if ok and Config then
+		for _, m in ipairs(Config.Monsters) do
+			if m.look and not FX[m.id] then
+				FX[m.id] = elementFx(m)
+			end
+		end
+	end
+end
+
 -- when each critical effect starts (seconds into the 0.8s critical move)
 local CRIT_DELAY = {
 	bat = 0.4, slime = 0.5, mushroom = 0.3, crab = 0, wolf = 0.2, golem = 0.35,

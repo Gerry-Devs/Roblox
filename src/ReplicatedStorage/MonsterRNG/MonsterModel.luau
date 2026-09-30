@@ -605,6 +605,428 @@ BUILDERS.emperor = function(b)
 end
 
 --------------------------------------------------------------------
+-- SIMPLE-PART MONSTERS: built from a body "shape" + colors + extras
+-- (Config.Monsters entries with a `look`). Same helpers as the
+-- sculpted ones (blob / tube / spike / round), few parts each.
+--------------------------------------------------------------------
+local function col(t, fallback)
+	return t and C(t[1], t[2], t[3]) or fallback
+end
+local function light(c, a)
+	return c:Lerp(WHITE, a or 0.3)
+end
+local function has(list, name)
+	for _, v in ipairs(list or {}) do
+		if v == name then
+			return true
+		end
+	end
+	return false
+end
+
+-- extras on the head / body. at = anchor points of this shape:
+--   head = head group, top = top of the head, front = face front (z),
+--   hw = head half-width, back = back of the body (for wings / spikes),
+--   tailBase, tailDir, bodyLen, isBig
+local function addExtras(b, d, at)
+	local main, dark, acc = d.main, d.dark, d.accent
+	local ex = d.extras
+	local top, hw = at.top, at.hw
+	if has(ex, "ears") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local g = sd < 0 and "earL" or "earR"
+			local base = top + V(sd * hw * 0.6, -0.04, 0.02)
+			b.group(g, base, at.head)
+			b.spike(g, base, base + V(sd * 0.08, 0.2, 0.03), 0.13, main)
+			b.add(g, V(0.07, 0.1, 0.03), base + V(sd * 0.03, 0.07, -0.05), light(acc, 0.5), nil, nil, nil, nil, true)
+		end
+	end
+	if has(ex, "horns") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local base = top + V(sd * hw * 0.45, -0.02, 0)
+			b.spike(at.head, base, base + V(sd * 0.14, 0.22, 0.06), 0.09, light(acc, 0.35))
+		end
+	end
+	if has(ex, "antlers") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local base = top + V(sd * hw * 0.4, -0.02, 0)
+			local mid = base + V(sd * 0.12, 0.2, 0.02)
+			b.link(at.head, base, mid, 0.05, dark)
+			b.link(at.head, mid, mid + V(sd * 0.12, 0.12, 0), 0.04, dark)
+			b.link(at.head, mid, mid + V(0, 0.16, -0.02), 0.04, dark)
+		end
+	end
+	if has(ex, "crown") then
+		local gold = C(255, 205, 70)
+		b.round(at.head, V(hw * 1.3, 0.06, hw * 1.3), top + V(0, 0.02, 0), gold)
+		for i = 0, 4 do
+			local ang = (i - 2) * R(32)
+			local base = top + V(math.sin(ang) * hw * 0.6, 0.04, -math.cos(ang) * hw * 0.6)
+			b.spike(at.head, base, base + V(0, 0.13, 0), 0.06, gold)
+		end
+		b.add(at.head, V(0.06, 0.06, 0.03), top + V(0, 0.06, -hw * 0.66), acc, NEON, nil, nil, nil, true)
+	end
+	if has(ex, "halo") then
+		b.group("halo", top + V(0, 0.16, 0), at.head)
+		for i = 0, 11 do
+			local ang = i / 12 * math.pi * 2
+			b.add("halo", V(0.07, 0.035, 0.045), top + V(math.sin(ang) * 0.17, 0.16, math.cos(ang) * 0.17), C(255, 225, 110), NEON, A(0, ang, 0), nil, nil, true)
+		end
+	end
+	if has(ex, "mane") then
+		for i = 0, 6 do
+			local ang = (i - 3) * R(28)
+			local p = at.headCenter + V(math.sin(ang) * hw * 1.05, math.cos(ang) * hw * 0.7, hw * 0.35)
+			b.round(at.head, V(0.18, 0.18, 0.16), p, dark)
+		end
+	end
+	if has(ex, "tusks") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local base = V(sd * hw * 0.35, at.mouthY, at.front - 0.02)
+			b.spike(at.head, base, base + V(sd * 0.03, 0.12, -0.06), 0.05, C(250, 245, 230))
+		end
+	end
+	if has(ex, "gem") then
+		b.add(at.head, V(0.08, 0.08, 0.03), V(0, at.eyeY + 0.12, at.front - 0.01), acc, NEON, A(0, 0, R(45)), nil, nil, true)
+	end
+	if has(ex, "leaf") then
+		for _, sd in ipairs({ -1, 1 }) do
+			b.add(at.head, V(0.2, 0.03, 0.1), top + V(sd * 0.08, 0.05, 0), C(110, 210, 90), nil, A(0, 0, R(sd * 30)))
+		end
+	end
+	if has(ex, "antenna") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local g = sd < 0 and "antL" or "antR"
+			local base = top + V(sd * hw * 0.35, -0.02, -0.02)
+			b.group(g, base, at.head)
+			local tip = base + V(sd * 0.1, 0.24, -0.06)
+			b.link(g, base, tip, 0.03, dark)
+			b.round(g, V(0.07, 0.07, 0.07), tip, acc, nil, NEON, nil, true)
+		end
+	end
+	if has(ex, "flame") then
+		b.spike(at.head, top + V(0, -0.02, 0.02), top + V(0, 0.22, 0.08), 0.12, C(255, 150, 40))
+		b.spike(at.head, top + V(0, 0.02, 0.02), top + V(0, 0.18, 0.06), 0.06, C(255, 240, 120))
+	end
+	if has(ex, "spikes") then
+		for i = 0, 3 do
+			local p = at.back + V(0, 0, (i - 1.5) * at.bodyLen * 0.22)
+			b.spike("body", p, p + V(0, 0.16 - math.abs(i - 1.5) * 0.03, 0.05), 0.1, light(acc, 0.1))
+		end
+	end
+	if has(ex, "crystal") then
+		for i, o in ipairs({ { -0.1, 0.2, 0 }, { 0.12, 0.26, 0.08 }, { 0, 0.16, 0.16 } }) do
+			local p = at.back + V(o[1], -0.02, o[3] * at.bodyLen)
+			b.spike("body", p, p + V(o[1] * 0.6, o[2], 0.02), 0.1, acc)
+			local _ = i
+		end
+	end
+	if has(ex, "shell") then
+		b.blob("body", at.back + V(0, -0.02, 0), V(at.hw * 2.4, 0.3, at.bodyLen * 0.9), dark, nil, { layers = 3 })
+	end
+	if has(ex, "fins") then
+		for _, sd in ipairs({ -1, 1 }) do
+			local g = sd < 0 and "finL" or "finR"
+			local base = at.side + V(sd * 0.02, 0, 0)
+			b.group(g, V(sd * math.abs(base.X), base.Y, base.Z), "body")
+			b.add(g, V(0.26, 0.04, 0.2), V(sd * (math.abs(base.X) + 0.12), base.Y, base.Z + 0.04), light(acc, 0.2), nil, A(0, 0, R(sd * -20)), nil, 0.1)
+		end
+	end
+	if has(ex, "wings") or has(ex, "wings4") then
+		local pairs2 = has(ex, "wings4") and 2 or 1
+		-- flyers already have their main wings: only the extra pair
+		for k = at.hasWings and 2 or 1, pairs2 do
+			for _, sd in ipairs({ -1, 1 }) do
+				local g = (k == 1 and "wing" or "wing2") .. (sd < 0 and "L" or "R")
+				local base = at.back + V(sd * 0.1, (k - 1) * -0.14, 0.04)
+				b.group(g, base, "body")
+				local span = (k == 1 and 0.55 or 0.4) * (at.isBig and 1.2 or 1)
+				for i = 0, 2 do
+					local tip = base + V(sd * span * (0.6 + i * 0.2), 0.12 - i * 0.12, 0.12 + i * 0.1)
+					local dir = tip - base
+					b.add(g, V(0.09, 0.035, dir.Magnitude), (base + tip) / 2, i == 1 and light(acc, 0.4) or light(main, 0.25), nil, CFrame.lookAt(Vector3.zero, dir.Unit), nil, 0.05)
+				end
+			end
+		end
+	end
+	if has(ex, "cape") then
+		b.group("cape", at.back + V(0, 0.08, 0.04), "body")
+		for k = -1, 1 do
+			local s0 = at.back + V(k * 0.12, 0.08, 0.06)
+			b.tube("cape", b.curve(s0, s0 + V(k * 0.03, -0.35, 0.12), s0 + V(k * 0.06, -0.7, 0.16), 2), 0.14, 0.12, k == 0 and dark or light(dark, 0.15))
+		end
+	end
+	if has(ex, "orbs") then
+		b.group("orbit", at.orbitCenter, "body")
+		for i = 0, 2 do
+			local ang = i / 3 * math.pi * 2
+			local p = b.add("orbit", V(0.12, 0.12, 0.12), at.orbitCenter + V(math.sin(ang) * 0.55, (i - 1) * 0.06, math.cos(ang) * 0.55), acc, NEON, nil, nil, nil, true)
+			p.Shape = Enum.PartType.Ball
+		end
+	end
+	if has(ex, "tail") and not at.hasTail then
+		b.group("tail", at.tailBase, "body")
+		local tb = at.tailBase
+		b.tube("tail", b.curve(tb, tb + V(0, 0.08, 0.22), tb + V(0, 0.26, 0.34), 2), 0.12, 0.05, main)
+		b.round("tail", V(0.1, 0.1, 0.1), tb + V(0, 0.28, 0.36), acc)
+	end
+end
+
+local SHAPES = {}
+
+-- round jelly body, face on the front, little feet
+SHAPES.blob = function(b, d)
+	b.group("body", V(0, 0.4, 0))
+	b.blob("body", V(0, 0.42, 0), V(0.9, 0.78, 0.84), d.main, nil, { name = "Body", layers = 5 })
+	b.blob("body", V(0, 0.34, -0.2), V(0.56, 0.44, 0.44), light(d.main, 0.35), nil, { layers = 3 })
+	b.group("head", V(0, 0.7, 0), "body")
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("body", V(sd * 0.17, 0.52, -0.43), 0.15, d.eye, nil, sd)
+		b.add("body", V(0.1, 0.045, 0.03), V(sd * 0.28, 0.42, -0.41), C(255, 150, 180), nil, nil, nil, 0.25, true)
+		local g = sd < 0 and "legL" or "legR"
+		b.group(g, V(sd * 0.2, 0.12, 0), "body")
+		b.round(g, V(0.2, 0.12, 0.24), V(sd * 0.22, 0.06, -0.06), d.dark)
+	end
+	b.group("jaw", V(0, 0.38, -0.4), "body")
+	b.add("jaw", V(0.12, 0.04, 0.03), V(0, 0.38, -0.425), C(40, 20, 30), nil, nil, nil, nil, true)
+	return { style = "hop" }, {
+		head = "head", top = V(0, 0.8, 0), headCenter = V(0, 0.5, 0), hw = 0.36, front = -0.43, eyeY = 0.52, mouthY = 0.38,
+		back = V(0, 0.72, 0.18), side = V(0.42, 0.42, 0.05), bodyLen = 0.8, tailBase = V(0, 0.3, 0.4), orbitCenter = V(0, 0.5, 0),
+	}
+end
+
+-- standing on two legs, two arms, a big head
+SHAPES.biped = function(b, d)
+	b.group("body", V(0, 0.9, 0))
+	b.blob("body", V(0, 0.92, 0), V(0.62, 0.7, 0.48), d.main, nil, { name = "Body", layers = 4 })
+	b.blob("body", V(0, 0.86, -0.12), V(0.4, 0.46, 0.3), light(d.main, 0.3), nil, { layers = 3 })
+	b.group("head", V(0, 1.28, 0), "body")
+	b.blob("head", V(0, 1.52, -0.02), V(0.56, 0.52, 0.5), d.main, nil, { layers = 4 })
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.12, 1.55, -0.265), 0.12, d.eye, nil, sd)
+	end
+	b.group("jaw", V(0, 1.4, -0.22), "head")
+	b.add("jaw", V(0.14, 0.04, 0.03), V(0, 1.4, -0.255), C(40, 20, 30), nil, nil, nil, nil, true)
+	for _, sd in ipairs({ { "armL", -1 }, { "armR", 1 } }) do
+		local g, sgn = sd[1], sd[2]
+		b.group(g, V(sgn * 0.3, 1.14, 0), "body")
+		b.tube(g, { V(sgn * 0.3, 1.14, 0), V(sgn * 0.42, 0.9, -0.04), V(sgn * 0.44, 0.74, -0.06) }, 0.14, 0.12, d.main)
+		b.round(g, V(0.16, 0.16, 0.16), V(sgn * 0.45, 0.68, -0.07), d.dark)
+	end
+	for _, sd in ipairs({ { "legL", -1 }, { "legR", 1 } }) do
+		local g, sgn = sd[1], sd[2]
+		b.group(g, V(sgn * 0.16, 0.6, 0), "body")
+		b.tube(g, { V(sgn * 0.16, 0.62, 0), V(sgn * 0.17, 0.14, 0) }, 0.18, 0.16, d.dark)
+		b.round(g, V(0.2, 0.1, 0.28), V(sgn * 0.17, 0.05, -0.05), d.dark)
+	end
+	return { style = "walk" }, {
+		head = "head", top = V(0, 1.76, 0), headCenter = V(0, 1.52, 0), hw = 0.28, front = -0.27, eyeY = 1.55, mouthY = 1.4,
+		back = V(0, 1.12, 0.22), side = V(0.3, 0.95, 0.05), bodyLen = 0.5, tailBase = V(0, 0.7, 0.22), orbitCenter = V(0, 1.1, 0),
+		isBig = true,
+	}
+end
+
+-- four legs, long body, head in front, tail behind
+SHAPES.beast = function(b, d)
+	b.group("body", V(0, 0.6, 0))
+	b.blob("body", V(0, 0.62, 0.04), V(0.56, 0.95, 0.48), d.main, A(R(90), 0, 0), { name = "Body", layers = 4 })
+	b.blob("body", V(0, 0.54, 0.02), V(0.36, 0.7, 0.3), light(d.main, 0.3), A(R(90), 0, 0), { layers = 3 })
+	b.group("head", V(0, 0.78, -0.4), "body")
+	b.blob("head", V(0, 0.9, -0.58), V(0.48, 0.44, 0.44), d.main, nil, { layers = 4 })
+	b.round("head", V(0.26, 0.18, 0.2), V(0, 0.82, -0.8), light(d.main, 0.35))
+	b.add("head", V(0.08, 0.06, 0.04), V(0, 0.88, -0.9), C(40, 25, 30), nil, nil, nil, nil, true)
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.12, 0.96, -0.795), 0.11, d.eye, nil, sd)
+	end
+	b.group("jaw", V(0, 0.76, -0.76), "head")
+	b.add("jaw", V(0.2, 0.05, 0.14), V(0, 0.74, -0.8), light(d.main, 0.2))
+	for _, leg in ipairs({ { "fl", -1, -0.28 }, { "fr", 1, -0.28 }, { "hl", -1, 0.32 }, { "hr", 1, 0.32 } }) do
+		local g, sgn, z = leg[1], leg[2], leg[3]
+		b.group(g, V(sgn * 0.18, 0.46, z), "body")
+		b.tube(g, { V(sgn * 0.18, 0.5, z), V(sgn * 0.19, 0.1, z) }, 0.15, 0.13, d.dark)
+		b.round(g, V(0.16, 0.08, 0.2), V(sgn * 0.19, 0.04, z - 0.03), d.dark)
+	end
+	local hasTail = has(d.extras, "tail")
+	if hasTail then
+		b.group("tail", V(0, 0.7, 0.48), "body")
+		b.tube("tail", b.curve(V(0, 0.7, 0.48), V(0, 0.82, 0.72), V(0, 1.02, 0.82), 3), 0.12, 0.06, d.main)
+		b.round("tail", V(0.14, 0.14, 0.14), V(0, 1.04, 0.84), d.accent)
+	end
+	return { style = "walk" }, {
+		head = "head", top = V(0, 1.1, -0.58), headCenter = V(0, 0.9, -0.58), hw = 0.24, front = -0.8, eyeY = 0.96, mouthY = 0.78,
+		back = V(0, 0.86, 0.04), side = V(0.28, 0.62, 0), bodyLen = 0.9, tailBase = V(0, 0.7, 0.48), orbitCenter = V(0, 0.8, 0),
+		hasTail = hasTail,
+	}
+end
+
+-- hovering body with big wings (bat-style joints)
+SHAPES.flyer = function(b, d)
+	b.group("body", V(0, 1.15, 0))
+	b.blob("body", V(0, 1.15, 0.04), V(0.48, 0.56, 0.5), d.main, nil, { name = "Body", layers = 4 })
+	b.blob("body", V(0, 1.1, -0.1), V(0.3, 0.36, 0.3), light(d.main, 0.3), nil, { layers = 3 })
+	b.group("head", V(0, 1.4, -0.06), "body")
+	b.blob("head", V(0, 1.58, -0.08), V(0.46, 0.42, 0.42), d.main, nil, { layers = 4 })
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.1, 1.6, -0.285), 0.11, d.eye, nil, sd)
+	end
+	b.group("jaw", V(0, 1.47, -0.26), "head")
+	b.add("jaw", V(0.12, 0.05, 0.12), V(0, 1.47, -0.33), light(d.accent, 0.2))
+	for _, sd in ipairs({ { "wingL", "wingLTip", -1 }, { "wingR", "wingRTip", 1 } }) do
+		local g, tg, sgn = sd[1], sd[2], sd[3]
+		b.group(g, V(sgn * 0.2, 1.24, 0.06), "body")
+		b.link(g, V(sgn * 0.2, 1.24, 0.06), V(sgn * 0.6, 1.3, 0.1), 0.06, d.dark)
+		b.add(g, V(0.42, 0.04, 0.34), V(sgn * 0.42, 1.22, 0.22), light(d.main, 0.15), nil, nil, nil, 0.05)
+		b.group(tg, V(sgn * 0.6, 1.3, 0.1), g)
+		b.link(tg, V(sgn * 0.6, 1.3, 0.1), V(sgn * 1.0, 1.26, 0.16), 0.05, d.dark)
+		b.add(tg, V(0.4, 0.04, 0.3), V(sgn * 0.8, 1.22, 0.26), light(d.accent, 0.25), nil, A(0, R(sgn * -10), 0), nil, 0.05)
+	end
+	for _, sd in ipairs({ { "legL", -1 }, { "legR", 1 } }) do
+		b.group(sd[1], V(sd[2] * 0.1, 0.92, 0.04), "body")
+		b.tube(sd[1], { V(sd[2] * 0.1, 0.92, 0.04), V(sd[2] * 0.11, 0.72, 0.02) }, 0.08, 0.07, d.dark)
+	end
+	return { style = "fly" }, {
+		hasWings = true,
+		head = "head", top = V(0, 1.79, -0.08), headCenter = V(0, 1.58, -0.08), hw = 0.23, front = -0.29, eyeY = 1.6, mouthY = 1.47,
+		back = V(0, 1.36, 0.24), side = V(0.24, 1.15, 0.04), bodyLen = 0.5, tailBase = V(0, 1.0, 0.28), orbitCenter = V(0, 1.2, 0),
+	}
+end
+
+-- a long body in segments that waves like a snake / eel
+SHAPES.serpent = function(b, d)
+	b.group("body", V(0, 0.9, 0))
+	b.blob("body", V(0, 0.9, 0), V(0.42, 0.42, 0.44), d.main, nil, { name = "Body", layers = 4 })
+	b.group("head", V(0, 1.0, -0.16), "body")
+	b.blob("head", V(0, 1.1, -0.32), V(0.44, 0.38, 0.5), d.main, A(R(-10), 0, 0), { layers = 4 })
+	b.round("head", V(0.3, 0.16, 0.2), V(0, 1.04, -0.58), light(d.main, 0.3))
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.12, 1.18, -0.555), 0.1, d.eye, nil, sd)
+	end
+	b.group("jaw", V(0, 0.98, -0.5), "head")
+	b.add("jaw", V(0.24, 0.05, 0.18), V(0, 0.96, -0.58), light(d.main, 0.4))
+	local prev = "body"
+	for i = 1, 5 do
+		local g = "seg" .. i
+		local z, y = i * 0.3, 0.9 - i * 0.08
+		b.group(g, V(0, y + 0.04, z - 0.15), prev)
+		local w = 0.4 - i * 0.05
+		b.blob(g, V(0, y, z), V(w, w, 0.34), i % 2 == 0 and d.main or light(d.main, 0.12), A(R(90), 0, 0), { layers = 3 })
+		b.add(g, V(w * 0.5, 0.04, 0.18), V(0, y + w * 0.48, z), d.accent)
+		prev = g
+	end
+	b.spike("seg5", V(0, 0.5, 1.6), V(0, 0.62, 1.86), 0.12, d.accent)
+	return { style = "serpent" }, {
+		head = "head", top = V(0, 1.3, -0.32), headCenter = V(0, 1.1, -0.32), hw = 0.22, front = -0.57, eyeY = 1.18, mouthY = 0.98,
+		back = V(0, 1.1, 0.05), side = V(0.2, 0.9, 0), bodyLen = 0.4, tailBase = V(0, 0.5, 1.6), orbitCenter = V(0, 1.0, 0.3),
+		hasTail = true,
+	}
+end
+
+-- floats above the ground: body narrows into a wisp, arms, big head
+SHAPES.floater = function(b, d)
+	b.group("body", V(0, 1.25, 0))
+	b.blob("body", V(0, 1.22, 0), V(0.54, 0.64, 0.46), d.main, nil, { name = "Body", layers = 4, bulge = -0.3 })
+	b.tube("body", b.curve(V(0, 0.94, 0.02), V(0.05, 0.72, 0.06), V(-0.03, 0.52, 0.14), 3), 0.34, 0.05, d.dark)
+	b.group("head", V(0, 1.52, 0), "body")
+	b.blob("head", V(0, 1.72, 0), V(0.46, 0.44, 0.44), light(d.main, 0.1), nil, { layers = 4 })
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.1, 1.74, -0.225), 0.12, d.eye, d.accent, sd)
+	end
+	b.group("jaw", V(0, 1.6, -0.2), "head")
+	b.add("jaw", V(0.12, 0.035, 0.03), V(0, 1.6, -0.225), C(40, 20, 40), nil, nil, nil, nil, true)
+	for _, sd in ipairs({ { "armL", -1 }, { "armR", 1 } }) do
+		local g, low, sgn = sd[1], sd[1] .. "Low", sd[2]
+		b.group(g, V(sgn * 0.28, 1.4, 0), "body")
+		b.tube(g, { V(sgn * 0.28, 1.4, 0), V(sgn * 0.4, 1.22, -0.06) }, 0.12, 0.1, d.main)
+		b.group(low, V(sgn * 0.4, 1.22, -0.06), g)
+		b.tube(low, { V(sgn * 0.4, 1.22, -0.06), V(sgn * 0.44, 1.08, -0.12) }, 0.1, 0.09, d.main)
+		b.round(low, V(0.12, 0.12, 0.12), V(sgn * 0.45, 1.04, -0.14), d.accent, nil, NEON, nil, true)
+	end
+	return { style = "float" }, {
+		head = "head", top = V(0, 1.94, 0), headCenter = V(0, 1.72, 0), hw = 0.22, front = -0.23, eyeY = 1.74, mouthY = 1.6,
+		back = V(0, 1.44, 0.2), side = V(0.26, 1.22, 0), bodyLen = 0.5, tailBase = V(0, 0.9, 0.22), orbitCenter = V(0, 1.25, 0),
+	}
+end
+
+-- six legs, round back, antennae
+SHAPES.bug = function(b, d)
+	b.group("body", V(0, 0.45, 0))
+	b.blob("body", V(0, 0.46, 0.22), V(0.56, 0.7, 0.42), d.main, A(R(80), 0, 0), { name = "Body", layers = 4 })
+	b.round("body", V(0.36, 0.3, 0.32), V(0, 0.46, -0.14), d.dark)
+	b.add("body", V(0.03, 0.36, 0.6), V(0, 0.64, 0.22), d.dark) -- shell line
+	b.group("head", V(0, 0.5, -0.3), "body")
+	b.blob("head", V(0, 0.54, -0.42), V(0.4, 0.34, 0.34), light(d.main, 0.1), nil, { layers = 3 })
+	for _, sd in ipairs({ -1, 1 }) do
+		b.cuteEye("head", V(sd * 0.1, 0.58, -0.585), 0.12, d.eye, nil, sd)
+	end
+	b.group("jaw", V(0, 0.46, -0.56), "head")
+	for _, sd in ipairs({ -1, 1 }) do
+		b.spike("jaw", V(sd * 0.08, 0.44, -0.56), V(sd * 0.03, 0.42, -0.68), 0.05, d.dark)
+	end
+	for i, z in ipairs({ -0.16, 0.08, 0.3 }) do
+		for _, sd in ipairs({ -1, 1 }) do
+			local g = (i == 1 and "legX" or (i == 2 and "legY" or "legZ")) .. (sd < 0 and "L" or "R")
+			local name = i == 1 and (sd < 0 and "legL1" or "legR1") or (i == 3 and (sd < 0 and "legL2" or "legR2") or g)
+			b.group(name, V(sd * 0.16, 0.4, z), "body")
+			b.link(name, V(sd * 0.16, 0.42, z), V(sd * 0.36, 0.28, z - 0.02), 0.06, d.dark)
+			b.link(name, V(sd * 0.36, 0.28, z - 0.02), V(sd * 0.42, 0.02, z - 0.04), 0.05, d.dark)
+		end
+	end
+	return { style = "walk" }, {
+		head = "head", top = V(0, 0.72, -0.42), headCenter = V(0, 0.54, -0.42), hw = 0.2, front = -0.59, eyeY = 0.58, mouthY = 0.46,
+		back = V(0, 0.72, 0.2), side = V(0.28, 0.46, 0.2), bodyLen = 0.6, tailBase = V(0, 0.44, 0.56), orbitCenter = V(0, 0.6, 0.1),
+	}
+end
+
+-- effects that make the rarer ones feel special
+local ELEMENT_GLOW = {
+	fire = C(255, 140, 40), ice = C(170, 230, 255), nature = C(140, 240, 110), water = C(90, 200, 255),
+	shadow = C(160, 90, 255), light = C(255, 235, 150), storm = C(255, 235, 90), poison = C(170, 255, 80),
+	cosmic = C(210, 130, 255), earth = C(230, 180, 110), candy = C(255, 160, 220),
+}
+
+local MonsterConfig
+local function lookFor(id)
+	if not MonsterConfig then
+		local ok, cfg = pcall(function()
+			return require(script.Parent:WaitForChild("Config"))
+		end)
+		MonsterConfig = ok and cfg or false
+	end
+	return MonsterConfig and MonsterConfig.GetMonster(id)
+end
+
+-- builder for every monster with a `look` (called by Build)
+local function buildShaped(b, m)
+	local look = m.look
+	local d = {
+		main = col(look.main, C(200, 200, 200)),
+		dark = col(look.dark, C(120, 120, 120)),
+		accent = col(look.accent, C(255, 220, 90)),
+		eye = look.eye or "round",
+		extras = look.extras or {},
+	}
+	local shape = SHAPES[look.shape] or SHAPES.blob
+	local flags, at = shape(b, d)
+	addExtras(b, d, at)
+	local tier = 1
+	if MonsterConfig then
+		tier = MonsterConfig.GetRarity(m.rarity).tier or 1
+	end
+	local glow = ELEMENT_GLOW[m.element] or d.accent
+	if tier >= 4 then
+		b.particles(glow, math.min(6, tier - 2))
+	end
+	if tier >= 5 then
+		b.light(glow, 0.6 + tier * 0.08, 6 + tier)
+	end
+	b.root:SetAttribute("RigArch", look.shape)
+	b.root:SetAttribute("RigAttack", m.attack or "bite")
+	b.root:SetAttribute("RigCrit", m.crit or "pounce")
+	b.root:SetAttribute("RigElement", m.element or "")
+	return flags
+end
+
+--------------------------------------------------------------------
 -- build
 --------------------------------------------------------------------
 -- root: invisible part the game moves; s = size in studs.
@@ -1085,7 +1507,17 @@ function MonsterModel.Build(root, s, opts)
 	if template then
 		return buildFromMesh(root, s, opts, template)
 	end
-	local builder = BUILDERS[opts.monsterId] or BUILDERS.slime
+	local builder = BUILDERS[opts.monsterId]
+	if not builder then
+		-- a simple-part monster from its Config look
+		local m = opts.monsterId and lookFor(opts.monsterId)
+		if m and m.look then
+			builder = function(bb)
+				return buildShaped(bb, m)
+			end
+		end
+	end
+	builder = builder or BUILDERS.slime
 	local gOff = opts.groundOffset or s * 0.5
 	local tint, amount
 	if opts.defeated then

@@ -39,13 +39,22 @@ local function chooseRarity(luck, minimumTier, diceLuck)
 end
 
 local function chooseMonster(rarityName)
-	local matches = {}
+	-- weighted: monster.weight (1 = normal, lower = rarer inside its rarity)
+	local matches, total = {}, 0
 	for _, monster in ipairs(Config.Monsters) do
 		if monster.rarity == rarityName then
 			table.insert(matches, monster)
+			total += monster.weight or 1
 		end
 	end
-	return matches[random:NextInteger(1, #matches)]
+	local pick = random:NextNumber() * total
+	for _, monster in ipairs(matches) do
+		pick -= monster.weight or 1
+		if pick <= 0 then
+			return monster
+		end
+	end
+	return matches[#matches]
 end
 
 local function chooseVariant(variants, bonusPercent)

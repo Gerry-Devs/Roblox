@@ -63,6 +63,9 @@ local function register(model, root)
 		s = root:GetAttribute("RigScale") or 4,
 		style = root:GetAttribute("RigStyle") or "walk",
 		rigId = root:GetAttribute("RigId"),
+		arch = root:GetAttribute("RigArch"),
+		atkMove = root:GetAttribute("RigAttack"),
+		critMoveKey = root:GetAttribute("RigCrit"),
 		mesh = root:GetAttribute("RigMesh") == true,
 		phase = math.random() * 10,
 		samplePos = root.Position,
@@ -1952,6 +1955,311 @@ CRITS.emperor = function(st, k, s)
 	attackBurst(st, burst > 0.8, 60)
 end
 
+--------------------------------------------------------------------
+-- Simple-part monsters (Config look.shape): one animation per body
+-- shape, plus shared attack / critical moves picked per monster
+-- (RigAttack / RigCrit). Joints that a monster doesn't have are skipped.
+--------------------------------------------------------------------
+local ARCH_ANIMS = {}
+
+-- little bits every shape shares: halo, orbs, antennae, fins, cape, tail
+local function archExtras(st, state, t, dt)
+	local smooth = math.clamp(dt * 8, 0, 1)
+	set(st, "halo", CF(0, math.sin(t * 2) * 0.02 * st.s, 0) * A(0, (t * 1.2) % (math.pi * 2), 0))
+	set(st, "orbit", A(0, (t * 1.3) % (math.pi * 2), R(10)))
+	local dead = state == "dead"
+	blend(st, "antL", A(dead and R(40) or math.sin(t * 3) * R(12), 0, math.sin(t * 2.2) * R(8)), smooth)
+	blend(st, "antR", A(dead and R(40) or math.sin(t * 3 + 1) * R(12), 0, -math.sin(t * 2.2 + 1) * R(8)), smooth)
+	blend(st, "finL", A(0, 0, dead and 0 or math.sin(t * 4) * R(20)), smooth)
+	blend(st, "finR", A(0, 0, dead and 0 or -math.sin(t * 4) * R(20)), smooth)
+	local moving = state == "walk" or state == "run"
+	blend(st, "cape", A((moving and R(25) or R(5)) + math.sin(t * 3) * R(6), 0, math.sin(t * 2.3) * R(4)), smooth)
+	local wag = dead and 0 or math.sin(t * (state == "run" and 12 or 4)) * R(state == "idle" and 14 or 24)
+	blend(st, "tail", A(dead and R(20) or math.sin(t * 2) * R(6), wag, 0), smooth)
+	local up = dead and R(-40) or (R(10) + math.sin(t * 9) * R(30))
+	blend(st, "wing2L", A(0, 0, -up), math.clamp(dt * 20, 0, 1))
+	blend(st, "wing2R", A(0, 0, up), math.clamp(dt * 20, 0, 1))
+	if st.arch ~= "flyer" then
+		-- small back wings on walkers / floaters: slow flaps
+		local w = dead and R(-30) or (R(8) + math.sin(t * 5) * R(22))
+		blend(st, "wingL", A(0, 0, -w), smooth)
+		blend(st, "wingR", A(0, 0, w), smooth)
+	end
+	blend(st, "earL", A(math.sin(t * 1.7) * R(6), 0, 0), smooth)
+	blend(st, "earR", A(math.sin(t * 1.7 + 0.7) * R(6), 0, 0), smooth)
+end
+
+-- blob: squishy bobbing, hops to move, flattens when dead
+ARCH_ANIMS.blob = function(st, state, t, dt, now, fightK, speed)
+	local s = st.s
+	local smooth = math.clamp(dt * 10, 0, 1)
+	local body
+	if state == "dead" then
+		body = CF(0, -0.25 * s, 0) * A(R(-15), 0, R(70))
+	elseif state == "fight" then
+		body = CF(0, 0.1 * s * fightK, -0.3 * s * fightK) * A(R(-20) * fightK, 0, 0)
+	elseif state == "walk" or state == "run" then
+		local hop = math.abs(math.sin(t * (state == "run" and 9 or 6)))
+		body = CF(0, hop * 0.35 * s, 0) * A(R(-8) * hop, 0, math.sin(t * 3) * R(4))
+	elseif state == "jump" then
+		body = CF(0, 0.1 * s, 0) * A(R(-10), 0, 0)
+	else
+		body = CF(0, math.abs(math.sin(t * 2)) * 0.05 * s, 0) * A(0, math.sin(t * 0.6) * R(10), math.sin(t * 1.5) * R(3))
+	end
+	blend(st, "body", body, smooth)
+	blend(st, "jaw", A(state == "fight" and R(30) * fightK or 0, 0, 0), smooth)
+	local foot = (state == "walk" or state == "run") and math.sin(t * 12) * R(25) or 0
+	blend(st, "legL", A(foot, 0, 0), smooth)
+	blend(st, "legR", A(-foot, 0, 0), smooth)
+	archExtras(st, state, t, dt)
+end
+
+-- biped: heavy walk (the golem's), plus the shared extras
+ARCH_ANIMS.biped = function(st, state, t, dt, now, fightK, speed)
+	ANIMS.golem(st, state, t, dt, now, fightK, speed)
+	archExtras(st, state, t, dt)
+end
+
+-- beast: four legs trotting (diagonal pairs), head looks around, tail wags
+ARCH_ANIMS.beast = function(st, state, t, dt, now, fightK, speed)
+	local s = st.s
+	local smooth = math.clamp(dt * 10, 0, 1)
+	local moving = state == "walk" or state == "run"
+	local run = state == "run"
+	if moving then
+		st.stepP = (st.stepP or 0) + dt * (run and 2.2 or 1.4) * math.pi * 2
+	end
+	local p = st.stepP or 0
+	local body
+	if state == "dead" then
+		body = CF(0, -0.3 * s, 0) * A(0, 0, R(85))
+	elseif state == "fight" then
+		body = CF(0, 0, -0.35 * s * fightK) * A(R(-10) * fightK, 0, 0)
+	elseif state == "jump" then
+		body = CF(0, 0.05 * s, 0) * A(R(15), 0, 0)
+	elseif state == "fall" then
+		body = A(R(-10), 0, 0)
+	elseif moving then
+		body = CF(0, math.abs(math.sin(p)) * (run and 0.08 or 0.04) * s, 0) * A(run and R(-4) or 0, 0, math.sin(p) * R(3))
+	else
+		body = CF(0, math.sin(t * 1.8) * 0.015 * s, 0)
+	end
+	blend(st, "body", body, smooth)
+	blend(st, "head", state == "dead" and A(R(20), 0, 0) or state == "fight" and A(R(10) * fightK, 0, 0) or A(math.sin(t * 0.8) * R(5), math.sin(t * 0.5) * R(20), 0), smooth)
+	blend(st, "jaw", A(state == "fight" and R(35) * fightK or math.max(0, math.sin(t * 0.9)) * R(4), 0, 0), smooth)
+	local amp = run and R(45) or R(28)
+	for name, off in pairs({ fl = 0, hr = 0, fr = math.pi, hl = math.pi }) do
+		local a = 0
+		if moving then
+			a = math.sin(p + off) * amp
+		elseif state == "jump" then
+			a = name:sub(1, 1) == "f" and R(-40) or R(40)
+		elseif state == "dead" then
+			a = R(20)
+		end
+		blend(st, name, A(a, 0, 0), smooth)
+	end
+	archExtras(st, state, t, dt)
+end
+
+-- flyer: the bat's wingbeats, plus extras
+ARCH_ANIMS.flyer = function(st, state, t, dt, now, fightK, speed)
+	ANIMS.bat(st, state, t, dt, now, fightK, speed)
+	archExtras(st, state, t, dt)
+end
+
+-- serpent: a wave runs down the segments, the head sways
+ARCH_ANIMS.serpent = function(st, state, t, dt, now, fightK, speed)
+	local s = st.s
+	local smooth = math.clamp(dt * 8, 0, 1)
+	local moving = state == "walk" or state == "run"
+	local body
+	if state == "dead" then
+		body = CF(0, -0.6 * s, 0) * A(0, 0, R(80))
+	elseif state == "fight" then
+		body = CF(0, 0.15 * s * fightK, -0.35 * s * fightK) * A(R(-15) * fightK, 0, 0)
+	else
+		body = CF(0, math.sin(t * 1.6) * 0.08 * s, 0) * A(0, math.sin(t * 1.2) * R(8), 0)
+	end
+	blend(st, "body", body, smooth)
+	blend(st, "head", state == "dead" and A(R(30), 0, 0) or A(math.sin(t * 1.1) * R(8), math.sin(t * 0.8) * R(15), 0), smooth)
+	blend(st, "jaw", A(state == "fight" and R(40) * fightK or math.max(0, math.sin(t * 0.7)) * R(6), 0, 0), smooth)
+	local speedK = moving and (state == "run" and 7 or 5) or 3
+	for i = 1, 5 do
+		local a = state == "dead" and 0 or math.sin(t * speedK - i * 0.9) * R(moving and 22 or 14)
+		blend(st, "seg" .. i, A(math.sin(t * 2 - i) * R(4), a, 0), smooth)
+	end
+	archExtras(st, state, t, dt)
+end
+
+-- floater: the wraith / emperor float, plus extras
+ARCH_ANIMS.floater = function(st, state, t, dt, now, fightK, speed)
+	ANIMS.floater(st, state, t, dt, now, fightK, speed)
+	archExtras(st, state, t, dt)
+end
+
+-- bug: legs scuttle in two tripods, antennae twitch
+ARCH_ANIMS.bug = function(st, state, t, dt, now, fightK, speed)
+	local s = st.s
+	local smooth = math.clamp(dt * 12, 0, 1)
+	local moving = state == "walk" or state == "run"
+	local f = state == "run" and 22 or 14
+	local body
+	if state == "dead" then
+		body = CF(0, -0.1 * s, 0) * A(0, 0, R(170)) -- on its back
+	elseif state == "fight" then
+		body = CF(0, 0, -0.3 * s * fightK) * A(R(-12) * fightK, 0, 0)
+	elseif moving then
+		body = CF(0, math.abs(math.sin(t * f)) * 0.02 * s, 0)
+	else
+		body = CF(0, math.sin(t * 2) * 0.01 * s, 0)
+	end
+	blend(st, "body", body, smooth)
+	blend(st, "head", A(math.sin(t * 1.3) * R(5), math.sin(t * 0.7) * R(12), 0), smooth)
+	blend(st, "jaw", A(0, 0, 0), smooth)
+	local sw = moving and math.sin(t * f) * R(30) or (state == "dead" and math.sin(t * 20) * R(15) or 0)
+	for name, sgn in pairs({ legL1 = 1, legR2 = 1, legYR = 1, legR1 = -1, legL2 = -1, legYL = -1 }) do
+		blend(st, name, A(0, sw * sgn, 0), smooth)
+	end
+	archExtras(st, state, t, dt)
+end
+
+-- the shared NORMAL attacks (k = 0..1 through the 0.4 s attack)
+local MOVES = {}
+-- Bite: lunges forward, head dips in, jaws snap
+MOVES.bite = function(st, k, s)
+	local hit = math.sin(k * math.pi)
+	set(st, "body", CF(0, 0, -0.4 * s * hit) * A(R(-10) * hit, 0, 0))
+	set(st, "head", A(R(20) * hit, 0, 0))
+	set(st, "jaw", A(R(45) * math.abs(math.sin(k * math.pi * 2)), 0, 0))
+end
+-- Slam: jumps up, arms up, crashes down
+MOVES.slam = function(st, k, s)
+	local up = k < 0.5 and math.sin(k / 0.5 * math.pi / 2) or math.cos((k - 0.5) / 0.5 * math.pi / 2)
+	local down = k > 0.6 and math.sin((k - 0.6) / 0.4 * math.pi) or 0
+	set(st, "body", CF(0, 0.35 * s * up - 0.08 * s * down, -0.15 * s * down) * A(R(-10) * up + R(20) * down, 0, 0))
+	set(st, "armL", A(R(-150) * up, 0, 0))
+	set(st, "armR", A(R(-150) * up, 0, 0))
+end
+-- Spin: whirls around once with a little hop
+MOVES.spin = function(st, k, s)
+	set(st, "body", CF(0, 0.2 * s * math.sin(k * math.pi), 0) * A(0, ease(k) * math.pi * 2, 0))
+end
+-- Charge: dashes forward head-first
+MOVES.charge = function(st, k, s)
+	local hit = math.sin(k * math.pi)
+	set(st, "body", CF(0, 0, -0.65 * s * hit) * A(R(-18) * hit, 0, 0))
+	set(st, "head", A(R(25) * hit, 0, 0))
+end
+-- Slash: swipes across with the arm (or the head)
+MOVES.slash = function(st, k, s)
+	local wind = k < 0.4 and k / 0.4 or 0
+	local cut = k >= 0.4 and math.sin((k - 0.4) / 0.6 * math.pi) or 0
+	set(st, "body", CF(0, 0, -0.2 * s * cut) * A(0, R(30) * wind - R(35) * cut, 0))
+	set(st, "armR", A(R(-100) * wind + R(-40) * cut, 0, R(40) * wind - R(60) * cut))
+	set(st, "armL", A(R(-30) * cut, 0, 0))
+	set(st, "head", A(0, R(-20) * cut, 0))
+end
+-- Beam: rears back, then throws the head forward with the mouth wide
+MOVES.beam = function(st, k, s)
+	local back = k < 0.45 and math.sin(k / 0.45 * math.pi / 2) or 0
+	local fire = k >= 0.45 and math.sin((k - 0.45) / 0.55 * math.pi) or 0
+	set(st, "body", CF(0, 0.1 * s * back, 0.12 * s * back - 0.12 * s * fire) * A(R(15) * back - R(10) * fire, 0, 0))
+	set(st, "head", A(R(-25) * back + R(15) * fire, 0, 0))
+	set(st, "jaw", A(R(55) * fire, 0, 0))
+	set(st, "armL", A(R(-70) * fire, 0, 0))
+	set(st, "armR", A(R(-70) * fire, 0, 0))
+end
+-- Tail Whip: turns and whips the tail through the target
+MOVES.tailwhip = function(st, k, s)
+	local turn = math.sin(k * math.pi)
+	set(st, "body", A(0, R(160) * turn, 0))
+	set(st, "tail", A(0, R(60) * math.sin(k * math.pi * 2), 0))
+end
+
+-- the shared CRITICAL moves (k = 0..1 through the 0.8 s critical)
+local CRIT_MOVES = {}
+-- Pounce: crouches, leaps high, crashes down on the target
+CRIT_MOVES.pounce = function(st, k, s)
+	local squat = bump(k, 0, 0.25)
+	local air = bump(k, 0.2, 0.75)
+	local crash = bump(k, 0.7, 1)
+	set(st, "body", CF(0, -0.12 * s * squat + 0.9 * s * air - 0.1 * s * crash, -0.6 * s * ease((k - 0.2) / 0.6)) * A(R(20) * air - R(10) * crash, 0, 0))
+	set(st, "head", A(R(-20) * air + R(20) * crash, 0, 0))
+	set(st, "jaw", A(R(50) * math.max(air, crash), 0, 0))
+	for _, n in ipairs({ "fl", "fr", "armL", "armR" }) do
+		set(st, n, A(R(-70) * air, 0, 0))
+	end
+	attackBurst(st, crash > 0.6, 36)
+end
+-- Tornado: rises and spins twice
+CRIT_MOVES.tornado = function(st, k, s)
+	local up = bump(k, 0, 1)
+	set(st, "body", CF(0, 0.6 * s * up, 0) * A(0, ease(k) * math.pi * 4, 0))
+	set(st, "wingL", A(0, 0, -R(70) * up))
+	set(st, "wingR", A(0, 0, R(70) * up))
+	set(st, "armL", A(0, 0, R(-100) * up))
+	set(st, "armR", A(0, 0, R(100) * up))
+	attackBurst(st, k > 0.85, 40)
+end
+-- Frenzy: three fast bites / strikes in a row
+CRIT_MOVES.frenzy = function(st, k, s)
+	local hit = math.abs(math.sin(k * math.pi * 3))
+	set(st, "body", CF(0, 0, -0.45 * s * hit) * A(R(-12) * hit, R(15) * math.sin(k * math.pi * 3), 0))
+	set(st, "head", A(R(25) * hit, 0, 0))
+	set(st, "jaw", A(R(55) * hit, 0, 0))
+	set(st, "armR", A(R(-110) * hit, 0, 0))
+	set(st, "armL", A(R(-110) * (1 - hit), 0, 0))
+	attackBurst(st, k > 0.8, 30)
+end
+-- Nova: curls in, then bursts open rising, arms wide
+CRIT_MOVES.nova = function(st, k, s)
+	local curl = bump(k, 0, 0.55)
+	local burst = bump(k, 0.45, 1)
+	set(st, "body", CF(0, -0.1 * s * curl + 0.55 * s * burst, 0) * A(R(18) * curl - R(15) * burst, 0, 0))
+	set(st, "armL", A(R(-60) * curl, 0, R(-110) * burst))
+	set(st, "armR", A(R(-60) * curl, 0, R(110) * burst))
+	set(st, "head", A(R(20) * curl - R(25) * burst, 0, 0))
+	set(st, "orbit", A(0, k * math.pi * 16, 0))
+	set(st, "wingL", A(0, 0, -R(80) * burst))
+	set(st, "wingR", A(0, 0, R(80) * burst))
+	attackBurst(st, burst > 0.8, 50)
+end
+-- Quake: two big body slams that shake the ground
+CRIT_MOVES.quake = function(st, k, s)
+	local a = bump(k, 0, 0.5)
+	local b2 = bump(k, 0.45, 1)
+	local up = math.max(a, b2)
+	local phase = (k % 0.5) / 0.5
+	local slam = phase > 0.6 and 1 or 0
+	set(st, "body", CF(0, 0.4 * s * up * (1 - slam) - 0.12 * s * slam * up, -0.15 * s * up) * A(R(-12) * up + R(25) * slam * up, 0, 0))
+	set(st, "armL", A(R(-160) * up * (1 - slam), 0, 0))
+	set(st, "armR", A(R(-160) * up * (1 - slam), 0, 0))
+	attackBurst(st, b2 > 0.7, 45)
+end
+-- Barrage: four fast slashes left, right, left, right
+CRIT_MOVES.barrage = function(st, k, s)
+	local w = math.sin(k * math.pi * 4)
+	set(st, "body", CF(0, 0, -0.25 * s * math.abs(w)) * A(0, R(35) * w, 0))
+	set(st, "armR", A(R(-110) * math.max(0, w), 0, R(-40) * math.max(0, w)))
+	set(st, "armL", A(R(-110) * math.max(0, -w), 0, R(40) * math.max(0, -w)))
+	set(st, "head", A(0, R(-15) * w, 0))
+	attackBurst(st, k > 0.85, 30)
+end
+-- Sky Beam: rises high looking up, then points down at the target
+CRIT_MOVES.skybeam = function(st, k, s)
+	local up = bump(k, 0, 1)
+	local aim = bump(k, 0.55, 1)
+	set(st, "body", CF(0, 0.9 * s * up, 0) * A(R(-25) * up + R(40) * aim, 0, 0))
+	set(st, "head", A(R(-40) * up + R(50) * aim, 0, 0))
+	set(st, "jaw", A(R(50) * aim, 0, 0))
+	set(st, "armL", A(R(-170) * up, 0, 0))
+	set(st, "armR", A(R(-170) * up, 0, 0))
+	set(st, "wingL", A(0, 0, -R(70) * up))
+	set(st, "wingR", A(0, 0, R(70) * up))
+	attackBurst(st, aim > 0.7, 45)
+end
+
 local function animate(st, now, dt)
 	local root, s, style = st.root, st.s, st.style
 
@@ -1970,7 +2278,7 @@ local function animate(st, now, dt)
 	local vy = st.vel.Y
 
 	-- a critical hit plays the monster's longer critical move instead
-	local critMove = st.critClock and math.abs(st.critClock - st.attackAt) < 0.15 and CRITS[st.rigId]
+	local critMove = st.critClock and math.abs(st.critClock - st.attackAt) < 0.15 and (CRITS[st.rigId] or CRIT_MOVES[st.critMoveKey])
 	local attackTime = critMove and CRIT_TIME or 0.4
 
 	local state
@@ -1998,7 +2306,7 @@ local function animate(st, now, dt)
 	local flying = style == "fly" or style == "serpent"
 	local fightK = state == "fight" and math.sin(math.clamp((now - st.attackAt) / 0.4, 0, 1) * math.pi) or 0
 
-	local custom = ANIMS[st.rigId]
+	local custom = ANIMS[st.rigId] or ARCH_ANIMS[st.arch]
 	if custom then
 		if critMove and state == "fight" then
 			-- the critical move drives the body; the rest idles underneath
@@ -2006,7 +2314,7 @@ local function animate(st, now, dt)
 			critMove(st, math.clamp((now - st.attackAt) / CRIT_TIME, 0, 1), st.s, t)
 		else
 			custom(st, state, t, dt, now, fightK, speed)
-			local attack = ATTACKS[st.rigId]
+			local attack = ATTACKS[st.rigId] or MOVES[st.atkMove]
 			if attack and state == "fight" then
 				attack(st, math.clamp((now - st.attackAt) / 0.4, 0, 1), st.s, t)
 			end

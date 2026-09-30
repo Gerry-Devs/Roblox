@@ -279,6 +279,91 @@ Config.Monsters = {
 }
 
 --------------------------------------------------------------------
+-- More monsters, built from simple parts (MonsterModel "shapes"):
+--   look.shape  blob / biped / beast / flyer / serpent / floater / bug
+--   look.main / dark / accent = colors, look.eye = eye style,
+--   look.extras = horns, ears, crown, halo, wings, tail, spikes, mane,
+--                 orbs, cape, fins, antenna, shell, flame, crystal, gem,
+--                 tusks, leaf, antlers, wings4
+--   attack  = normal move:   bite, slam, spin, charge, slash, beam, tailwhip
+--   crit    = critical move: pounce, tornado, frenzy, nova, quake, barrage, skybeam
+--   element = attack effect colors: fire, ice, nature, water, shadow,
+--             light, storm, poison, cosmic, earth, candy
+--   weight  = how often it rolls inside its rarity (1 = normal,
+--             2 = twice as common, 0.5 = twice as rare)
+--------------------------------------------------------------------
+for _, m in ipairs({
+	-- Common (with Moss Slime + Cave Bat = 5)
+	{ id = "pebble-pup", name = "Pebble Pup", rarity = "Common", power = 6, weight = 1.4, description = "It fetches shiny rocks and never gives them back.", element = "earth", attack = "bite", crit = "pounce",
+		look = { shape = "beast", main = { 150, 142, 132 }, dark = { 104, 98, 92 }, accent = { 255, 200, 90 }, eye = "round", extras = { "ears", "tail" } } },
+	{ id = "sparkfly", name = "Sparkfly", rarity = "Common", power = 7, weight = 1, description = "A tiny glowing bug that buzzes with static.", element = "storm", attack = "charge", crit = "tornado",
+		look = { shape = "flyer", main = { 255, 222, 90 }, dark = { 210, 160, 40 }, accent = { 120, 230, 255 }, eye = "googly", extras = { "antenna" } } },
+	{ id = "leaf-bug", name = "Leaf Bug", rarity = "Common", power = 9, weight = 0.6, description = "It hides in plain sight on any bush.", element = "nature", attack = "bite", crit = "frenzy",
+		look = { shape = "bug", main = { 120, 200, 90 }, dark = { 70, 140, 60 }, accent = { 255, 230, 110 }, eye = "fish", extras = { "antenna", "leaf" } } },
+	-- Uncommon (+ Glowcap, Ironclaw Crab = 5)
+	{ id = "thorn-hog", name = "Thorn Hog", rarity = "Uncommon", power = 19, weight = 1.3, description = "Its back is a hedge of sharp thorns.", element = "nature", attack = "charge", crit = "pounce",
+		look = { shape = "beast", main = { 150, 110, 80 }, dark = { 100, 70, 50 }, accent = { 120, 200, 80 }, eye = "brave", extras = { "spikes", "tusks", "ears" } } },
+	{ id = "cinder-imp", name = "Cinder Imp", rarity = "Uncommon", power = 22, weight = 1, description = "A mischief-maker with a fire in its belly.", element = "fire", attack = "slash", crit = "barrage",
+		look = { shape = "biped", main = { 230, 80, 60 }, dark = { 150, 40, 40 }, accent = { 255, 190, 60 }, eye = "slit", extras = { "horns", "tail", "flame" } } },
+	{ id = "candy-puff", name = "Candy Puff", rarity = "Uncommon", power = 26, weight = 0.55, description = "Sweet, fluffy and surprisingly bouncy.", element = "candy", attack = "slam", crit = "quake",
+		look = { shape = "blob", main = { 255, 170, 215 }, dark = { 220, 110, 170 }, accent = { 150, 230, 255 }, eye = "lash", extras = { "ears", "gem" } } },
+	-- Rare (+ Frostfang Wolf, Runestone Golem = 5)
+	{ id = "flame-fox", name = "Flame Fox", rarity = "Rare", power = 45, weight = 1.2, description = "Its tail burns brighter the happier it is.", element = "fire", attack = "bite", crit = "pounce",
+		look = { shape = "beast", main = { 255, 130, 50 }, dark = { 200, 80, 30 }, accent = { 255, 230, 120 }, eye = "almond", extras = { "ears", "tail", "flame" } } },
+	{ id = "frost-yeti", name = "Frost Yeti", rarity = "Rare", power = 52, weight = 0.8, description = "A shy giant from the snowy peaks.", element = "ice", attack = "slam", crit = "quake",
+		look = { shape = "biped", main = { 235, 245, 255 }, dark = { 170, 200, 230 }, accent = { 120, 200, 255 }, eye = "round", extras = { "horns", "mane" } } },
+	{ id = "jade-serpent", name = "Jade Serpent", rarity = "Rare", power = 58, weight = 0.5, description = "A graceful snake carved from living jade.", element = "nature", attack = "beam", crit = "tornado",
+		look = { shape = "serpent", main = { 80, 200, 140 }, dark = { 40, 130, 90 }, accent = { 255, 215, 90 }, eye = "slit", extras = { "horns", "gem" } } },
+	-- Epic (+ Ember Phoenix = 5)
+	{ id = "thunder-lion", name = "Thunder Lion", rarity = "Epic", power = 85, weight = 1.2, description = "Its roar comes with a crack of thunder.", element = "storm", attack = "bite", crit = "pounce",
+		look = { shape = "beast", main = { 255, 205, 70 }, dark = { 200, 140, 40 }, accent = { 120, 220, 255 }, eye = "brave", extras = { "mane", "tail", "ears" } } },
+	{ id = "abyss-eel", name = "Abyss Eel", rarity = "Epic", power = 92, weight = 1, description = "It glows in the deepest, darkest water.", element = "water", attack = "beam", crit = "tornado",
+		look = { shape = "serpent", main = { 40, 60, 120 }, dark = { 25, 35, 80 }, accent = { 90, 240, 255 }, eye = "glow", extras = { "fins", "crystal" } } },
+	{ id = "inferno-bat", name = "Inferno Bat", rarity = "Epic", power = 98, weight = 0.8, description = "Every flap of its wings throws sparks.", element = "fire", attack = "charge", crit = "frenzy",
+		look = { shape = "flyer", main = { 120, 40, 40 }, dark = { 70, 20, 25 }, accent = { 255, 140, 40 }, eye = "glow", extras = { "ears", "horns", "flame" } } },
+	{ id = "ghost-lantern", name = "Ghost Lantern", rarity = "Epic", power = 105, weight = 0.5, description = "It lights the way for lost souls.", element = "shadow", attack = "beam", crit = "nova",
+		look = { shape = "floater", main = { 120, 230, 220 }, dark = { 60, 140, 150 }, accent = { 200, 255, 250 }, eye = "dot", extras = { "orbs", "flame" } } },
+	-- Legendary (+ Storm Leviathan = 5)
+	{ id = "solar-griffin", name = "Solar Griffin", rarity = "Legendary", power = 145, weight = 1.2, description = "Half eagle, half lion, all sunshine.", element = "light", attack = "charge", crit = "skybeam",
+		look = { shape = "flyer", main = { 255, 215, 100 }, dark = { 200, 150, 60 }, accent = { 255, 255, 220 }, eye = "brave", extras = { "crown", "tail" } } },
+	{ id = "obsidian-behemoth", name = "Obsidian Behemoth", rarity = "Legendary", power = 160, weight = 1, description = "A walking mountain of black glass.", element = "earth", attack = "charge", crit = "quake",
+		look = { shape = "beast", main = { 50, 45, 60 }, dark = { 30, 25, 40 }, accent = { 255, 90, 60 }, eye = "glow", extras = { "horns", "spikes", "crystal" } } },
+	{ id = "frost-wyrm", name = "Frost Wyrm", rarity = "Legendary", power = 172, weight = 0.7, description = "Its breath freezes the air solid.", element = "ice", attack = "beam", crit = "skybeam",
+		look = { shape = "serpent", main = { 170, 225, 255 }, dark = { 110, 170, 220 }, accent = { 255, 255, 255 }, eye = "almond", extras = { "horns", "spikes", "fins" } } },
+	{ id = "thunder-djinn", name = "Thunder Djinn", rarity = "Legendary", power = 185, weight = 0.45, description = "A storm spirit that grants no wishes.", element = "storm", attack = "slash", crit = "nova",
+		look = { shape = "floater", main = { 80, 120, 230 }, dark = { 40, 70, 160 }, accent = { 255, 230, 80 }, eye = "glow", extras = { "orbs", "horns", "cape" } } },
+	-- Mythic (+ Void Dragon = 4)
+	{ id = "chaos-chimera", name = "Chaos Chimera", rarity = "Mythic", power = 290, weight = 1.2, description = "Three beasts in one, and none of them agree.", element = "fire", attack = "bite", crit = "frenzy",
+		look = { shape = "beast", main = { 190, 60, 50 }, dark = { 110, 30, 30 }, accent = { 255, 170, 40 }, eye = "slit", extras = { "horns", "mane", "wings", "tail" } } },
+	{ id = "iron-colossus", name = "Iron Colossus", rarity = "Mythic", power = 320, weight = 0.8, description = "Ancient machinery, still running.", element = "storm", attack = "slam", crit = "quake",
+		look = { shape = "biped", main = { 150, 160, 175 }, dark = { 90, 95, 110 }, accent = { 90, 230, 255 }, eye = "glow", extras = { "crown", "gem", "spikes" } } },
+	{ id = "plague-wyvern", name = "Plague Wyvern", rarity = "Mythic", power = 345, weight = 0.5, description = "Where it flies, the grass turns grey.", element = "poison", attack = "beam", crit = "skybeam",
+		look = { shape = "flyer", main = { 110, 150, 60 }, dark = { 60, 90, 40 }, accent = { 190, 255, 80 }, eye = "slit", extras = { "horns", "spikes", "tail" } } },
+	-- Secret (+ Shadow Wraith = 4)
+	{ id = "hollow-king", name = "Hollow King", rarity = "Secret", power = 650, weight = 1.2, description = "A crown with nobody inside it.", element = "shadow", attack = "slash", crit = "nova",
+		look = { shape = "floater", main = { 50, 40, 70 }, dark = { 25, 20, 40 }, accent = { 255, 210, 80 }, eye = "glow", extras = { "crown", "cape", "orbs" } } },
+	{ id = "glitch-beast", name = "Glitch Beast", rarity = "Secret", power = 720, weight = 0.8, description = "It should not exist. It does anyway.", element = "cosmic", attack = "charge", crit = "frenzy",
+		look = { shape = "beast", main = { 255, 60, 220 }, dark = { 60, 30, 90 }, accent = { 60, 255, 220 }, eye = "glow", extras = { "spikes", "crystal", "tail" } } },
+	{ id = "bone-dragon", name = "Bone Dragon", rarity = "Secret", power = 790, weight = 0.5, description = "Its bones rattle like thunder.", element = "shadow", attack = "beam", crit = "skybeam",
+		look = { shape = "flyer", main = { 235, 230, 215 }, dark = { 170, 160, 145 }, accent = { 150, 90, 255 }, eye = "glow", extras = { "horns", "spikes", "tail" } } },
+	-- Celestial (+ Star Seraph = 3)
+	{ id = "astral-whale", name = "Astral Whale", rarity = "Celestial", power = 1500, weight = 1.2, description = "It swims between the stars.", element = "cosmic", attack = "beam", crit = "nova",
+		look = { shape = "serpent", main = { 60, 70, 170 }, dark = { 30, 35, 100 }, accent = { 170, 230, 255 }, eye = "happy", extras = { "fins", "orbs", "halo" } } },
+	{ id = "comet-pegasus", name = "Comet Pegasus", rarity = "Celestial", power = 1750, weight = 0.7, description = "It leaves a trail of stardust behind.", element = "light", attack = "charge", crit = "skybeam",
+		look = { shape = "flyer", main = { 245, 245, 255 }, dark = { 190, 200, 235 }, accent = { 140, 220, 255 }, eye = "lash", extras = { "wings4", "horns", "mane", "tail" } } },
+	-- Divine (+ Sun Titan = 3)
+	{ id = "radiant-archangel", name = "Radiant Archangel", rarity = "Divine", power = 3600, weight = 1.1, description = "Its light can be seen from any island.", element = "light", attack = "slash", crit = "skybeam",
+		look = { shape = "floater", main = { 255, 245, 220 }, dark = { 230, 200, 140 }, accent = { 255, 215, 90 }, eye = "happy", extras = { "wings4", "halo", "cape" } } },
+	{ id = "gaia-colossus", name = "Gaia Colossus", rarity = "Divine", power = 4200, weight = 0.6, description = "Forests grow on its shoulders.", element = "nature", attack = "slam", crit = "quake",
+		look = { shape = "biped", main = { 110, 170, 80 }, dark = { 90, 70, 50 }, accent = { 255, 150, 200 }, eye = "brave", extras = { "antlers", "leaf", "crown" } } },
+	-- Supreme (+ Cosmic Emperor = 2)
+	{ id = "infinity-dragon", name = "Infinity Dragon", rarity = "Supreme", power = 10500, weight = 0.6, description = "It has no beginning and no end.", element = "cosmic", attack = "beam", crit = "nova",
+		look = { shape = "flyer", main = { 70, 30, 140 }, dark = { 30, 15, 70 }, accent = { 255, 120, 230 }, eye = "star", extras = { "wings4", "crown", "horns", "spikes", "tail" } } },
+}) do
+	table.insert(Config.Monsters, m)
+end
+
+--------------------------------------------------------------------
 -- WILD rolls: each roll can land on WILD, which rolls again. Getting 3
 -- WILDs in a row (chances multiplied together) spins the egg wheel.
 -- 0.04 x 0.4 x 0.25 = 0.004 -> about 1 in 250 rolls gets 3 WILDs.
@@ -825,12 +910,14 @@ function Config.GetOdds(monsterId, sizeKey, finishKey, kg)
 	for _, r in ipairs(Config.Rarities) do
 		totalRarity += r.weight
 	end
+	-- this monster's share of its rarity (monster.weight, 1 = normal)
 	local sameRarity = 0
 	for _, m in ipairs(Config.Monsters) do
 		if m.rarity == monster.rarity then
-			sameRarity += 1
+			sameRarity += m.weight or 1
 		end
 	end
+	sameRarity /= (monster.weight or 1)
 	local function variantChance(list, key)
 		local total, weight = 0, 0
 		for _, v in ipairs(list) do
@@ -842,7 +929,7 @@ function Config.GetOdds(monsterId, sizeKey, finishKey, kg)
 		return total > 0 and weight / total or 0
 	end
 	local rarity = Config.GetRarity(monster.rarity)
-	local p = (rarity.weight / totalRarity) / math.max(1, sameRarity)
+	local p = (rarity.weight / totalRarity) / math.max(1e-9, sameRarity)
 		* variantChance(Config.SizeVariants, sizeKey or "Normal")
 		* variantChance(Config.FinishVariants, finishKey or "Normal")
 	p = p / Config.GetKgOddsMultiplier(monsterId, sizeKey, kg)

@@ -1,9 +1,10 @@
 local Players = game:GetService("Players")
 
 --------------------------------------------------------------------
--- Every window's X (close) button sits in the same place: inside the
--- window's top-right corner, same size, never hanging off the edge
--- (so it doesn't get cut off on phones or float outside the window).
+-- Every window's X (close) button sits in the same place: centered on
+-- the window's top border at the top-right corner, half outside the
+-- window, so it never covers anything inside it. Windows that clip their
+-- children get it just inside the corner instead (it would be cut off).
 -- Works for windows made in StarterGui and ones built by scripts.
 --------------------------------------------------------------------
 local player = Players.LocalPlayer
@@ -33,9 +34,14 @@ local function fix(b)
 	fixed[b] = true
 	local w = window.Size.X.Offset
 	local size = (w > 0 and w < 420) and 42 or 50 -- small side panels get a smaller X
-	b.AnchorPoint = Vector2.new(1, 0)
 	b.Size = UDim2.fromOffset(size, size)
-	b.Position = UDim2.new(1, -MARGIN, 0, MARGIN)
+	if window.ClipsDescendants then
+		b.AnchorPoint = Vector2.new(1, 0)
+		b.Position = UDim2.new(1, -MARGIN, 0, MARGIN)
+	else
+		b.AnchorPoint = Vector2.new(0.5, 0.5)
+		b.Position = UDim2.new(1, -(size / 2 + MARGIN), 0, 0)
+	end
 	b.ZIndex = math.max(b.ZIndex, 20)
 	for _, d in ipairs(b:GetDescendants()) do
 		if d:IsA("GuiObject") then

@@ -37,6 +37,31 @@ local function child(parent, className, name)
 	return c
 end
 
+local function isLaidOutContainer(frame)
+	return frame:IsA("ScrollingFrame") or frame:FindFirstChildWhichIsA("UIGridStyleLayout") ~= nil
+end
+local function seeThrough(frame)
+	if frame.BackgroundTransparency < 0.35 then
+		frame.BackgroundTransparency = 0.35
+	end
+end
+local layoutWatched = setmetatable({}, { __mode = "k" })
+local function watchForLayout(frame)
+	if layoutWatched[frame] then
+		return
+	end
+	layoutWatched[frame] = true
+	frame.ChildAdded:Connect(function(c)
+		if c:IsA("UIGridStyleLayout") then
+			local st = frame:FindFirstChild("Studs")
+			if st then
+				st:Destroy()
+				seeThrough(frame)
+			end
+		end
+	end)
+end
+
 -- tiled studs on top of a frame's background (under its content)
 function UIStyle.studs(frame, tile, transparency, color)
 	local image = Config.UIStudsImage or ""
@@ -47,6 +72,17 @@ function UIStyle.studs(frame, tile, transparency, color)
 		end
 		return nil
 	end
+	-- a list / grid / scrolling frame would treat the studs as one of its
+	-- items (it pushes the real items down and doubles the studs). Those
+	-- go a bit see-through instead, so the window's studs show through.
+	if isLaidOutContainer(frame) then
+		if old then
+			old:Destroy()
+		end
+		seeThrough(frame)
+		return nil
+	end
+	watchForLayout(frame)
 	local studs = old or mk("ImageLabel", { Name = "Studs" }, frame)
 	studs.Size = UDim2.fromScale(1, 1)
 	studs.BackgroundTransparency = 1
@@ -266,6 +302,54 @@ function UIStyle.closeButton(button, header)
 	return button
 end
 
+-- A button's own text is drawn under its children, so the studs would
+-- cover it. This moves the text into a label on top of the studs; the
+-- button's Text (and color / font) stay the source, so the window's
+-- script keeps working exactly as before.
+local MIRROR = { "Text", "TextColor3", "Font", "FontFace", "TextScaled", "TextSize", "TextWrapped", "RichText", "TextStrokeColor3", "TextStrokeTransparency", "TextXAlignment", "TextYAlignment", "LineHeight" }
+function UIStyle.liftText(button)
+	if not button:IsA("TextButton") or button:FindFirstChild("LiftedText") or button:FindFirstChild("Label") then
+		return
+	end
+	local label = Instance.new("TextLabel")
+	label.Name = "LiftedText"
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.ZIndex = button.ZIndex + 1
+	local textAlpha = button.TextTransparency
+	for _, prop in ipairs(MIRROR) do
+		pcall(function()
+			label[prop] = button[prop]
+		end)
+		button:GetPropertyChangedSignal(prop):Connect(function()
+			pcall(function()
+				label[prop] = button[prop]
+			end)
+		end)
+	end
+	label.TextTransparency = textAlpha
+	for _, st in ipairs(button:GetChildren()) do
+		if st:IsA("UIStroke") and st.ApplyStrokeMode == Enum.ApplyStrokeMode.Contextual then
+			st:Clone().Parent = label
+		end
+	end
+	button.TextTransparency = 1
+	local busy = false
+	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
+		if busy then
+			return
+		end
+		busy = true
+		label.TextTransparency = button.TextTransparency
+		button.TextTransparency = 1
+		busy = false
+	end)
+	button:GetPropertyChangedSignal("ZIndex"):Connect(function()
+		label.ZIndex = button.ZIndex + 1
+	end)
+	label.Parent = button
+end
+
 -- studs (and dark panels) for the parts inside a window
 local SKIP_NAMES = { Studs = true, Rim = true, SkinHeader = true, Fill = true, Bar = true, Track = true, Line = true, Edge = true, RarityGlow = true, BottomFill = true, SquareLeft = true, SquareBottom = true }
 local function isNavy(c)
@@ -337,8 +421,20 @@ local function studOne(d)
 	if d.BackgroundTransparency > 0.05 then
 		return -- see-through: the studs under it already show (no double studs)
 	end
-	local hasText = d:IsA("TextButton") and d.Text ~= ""
-	UIStyle.studs(d, d:IsA("GuiButton") and 26 or 32, (d:IsA("GuiButton") and not hasText) and 0.45 or 0.75)
+	if d:IsA("TextButton") then
+		if d.Text ~= "" then
+			UIStyle.liftText(d) -- text above the studs, so they can be as clear as the Backpack's
+		else
+			local conn
+			conn = d:GetPropertyChangedSignal("Text"):Connect(function()
+				if d.Text ~= "" then
+					conn:Disconnect()
+					UIStyle.liftText(d)
+				end
+			end)
+		end
+	end
+	UIStyle.studs(d, d:IsA("GuiButton") and 26 or 32, d:IsA("GuiButton") and 0.45 or 0.75)
 end
 function UIStyle.studInside(window, skip)
 	local function skipped(d)

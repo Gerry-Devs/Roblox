@@ -1007,7 +1007,12 @@ local restyled, restyleErr = pcall(function()
 	if es then
 		es.Color = Color3.fromRGB(62, 66, 84)
 	end
-	UIStyle.studs(emptyTemplate, 22, 0.75)
+	-- (no studs of their own: the tray's studs show through them)
+	emptyTemplate.BackgroundTransparency = math.max(emptyTemplate.BackgroundTransparency, 0.4)
+	local oldStuds = emptyTemplate:FindFirstChild("Studs")
+	if oldStuds then
+		oldStuds:Destroy()
+	end
 	sizeCells()
 end)
 if not restyled then

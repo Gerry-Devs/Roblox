@@ -797,7 +797,7 @@ end
 -- tabs: dark studded tiles; the open tab is lighter with a white rim
 local function styleTab(b, on)
 	pcall(function()
-		UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.5 })
+		UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.65 })
 		local stroke = b:FindFirstChildOfClass("UIStroke")
 		if stroke then
 			stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
@@ -903,7 +903,7 @@ local restyled, restyleErr = pcall(function()
 	end
 	main:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
 	main:FindFirstChildOfClass("UIStroke").Color = UIStyle.OUTLINE
-	UIStyle.studs(main, 44, 0.65)
+	UIStyle.studs(main, 44, 0.8)
 	-- light inner rim, like a plastic tray
 	local rim = main:FindFirstChild("Rim") or Instance.new("Frame")
 	rim.Name = "Rim"
@@ -953,7 +953,7 @@ local restyled, restyleErr = pcall(function()
 	line.BackgroundColor3 = UIStyle.OUTLINE
 	line.ZIndex = 6
 	line.Parent = title
-	UIStyle.studs(title, 30, 0)
+	UIStyle.studs(title, 30, 0.15)
 	local badge = title:FindFirstChild("GoldBadge")
 	if badge then
 		badge.AnchorPoint = Vector2.new(0, 0.5)
@@ -996,9 +996,9 @@ local restyled, restyleErr = pcall(function()
 	search.TextColor3 = Color3.new(1, 1, 1)
 	search.PlaceholderColor3 = Color3.fromRGB(170, 176, 196)
 	content.BackgroundColor3 = UIStyle.BODY_DARK
-	UIStyle.studs(content, 36, 0.65)
+	UIStyle.studs(content, 36, 0.8)
 	main.Count.BackgroundColor3 = Color3.fromRGB(50, 54, 68)
-	UIStyle.studs(main.Count, 30, 0.55)
+	UIStyle.studs(main.Count, 30, 0.7)
 	UIStyle.studs(sortButton, 30, 0.15)
 
 	-- empty slots: dark sockets
@@ -1007,7 +1007,7 @@ local restyled, restyleErr = pcall(function()
 	if es then
 		es.Color = Color3.fromRGB(62, 66, 84)
 	end
-	UIStyle.studs(emptyTemplate, 22, 0.6)
+	UIStyle.studs(emptyTemplate, 22, 0.75)
 	sizeCells()
 end)
 if not restyled then

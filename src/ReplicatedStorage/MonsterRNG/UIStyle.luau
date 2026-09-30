@@ -131,7 +131,7 @@ function UIStyle.rarityCard(card, color)
 	local gg = child(glow, "UIGradient", "UIGradient")
 	gg.Rotation = 90
 	gg.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.85), NumberSequenceKeypoint.new(1, 0.2) })
-	UIStyle.studs(card, 22, 0.6)
+	UIStyle.studs(card, 22, 0.75)
 	return card
 end
 
@@ -143,7 +143,7 @@ function UIStyle.closeButton(button, header)
 	local RED = Color3.fromRGB(240, 58, 66)
 	button.BackgroundColor3 = RED
 	button.BackgroundTransparency = 0
-	button.AutoButtonColor = true
+	button.AutoButtonColor = false -- our own hover tints all its pieces together
 	if button:IsA("ImageButton") then
 		button.Image = ""
 	end
@@ -189,6 +189,30 @@ function UIStyle.closeButton(button, header)
 		edge.BorderSizePixel = 0
 		edge.BackgroundColor3 = Color3.fromRGB(150, 25, 35)
 		edge.ZIndex = z + 1
+	end
+	if not button:GetAttribute("HoverHooked") then
+		button:SetAttribute("HoverHooked", true)
+		local function tint(color)
+			button.BackgroundColor3 = color
+			for _, n in ipairs({ "SquareLeft", "SquareBottom" }) do
+				local f = button:FindFirstChild(n)
+				if f then
+					f.BackgroundColor3 = color
+				end
+			end
+		end
+		button.MouseEnter:Connect(function()
+			tint(Color3.fromRGB(255, 90, 95))
+		end)
+		button.MouseLeave:Connect(function()
+			tint(RED)
+		end)
+		button.MouseButton1Down:Connect(function()
+			tint(Color3.fromRGB(200, 40, 50))
+		end)
+		button.MouseButton1Up:Connect(function()
+			tint(RED)
+		end)
 	end
 	local studs = UIStyle.studs(button, header and 22 or 16, 0)
 	if studs then
@@ -248,14 +272,22 @@ local function studOne(d)
 	if d:IsA("ImageButton") and d.Image ~= "" then
 		return -- a picture button: leave the picture alone
 	end
-	if d.Size.Y.Scale == 0 and d.Size.Y.Offset < 20 then
-		return -- thin bars
+	local laidOut = d.Parent and (d.Parent:FindFirstChildOfClass("UIGridLayout") or d.Parent:FindFirstChildOfClass("UIListLayout"))
+	if not laidOut and d.Size.Y.Scale == 0 and d.Size.Y.Offset < 20 then
+		return -- thin bars (cards in a grid / list get their size from the layout)
 	end
 	if d:IsA("Frame") and isNavy(d.BackgroundColor3) then
 		d.BackgroundColor3 = UIStyle.BODY_DARK
+		local g = d:FindFirstChildOfClass("UIGradient")
+		if g then
+			g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 205, 215))
+		end
+	end
+	if d.BackgroundTransparency > 0.05 then
+		return -- see-through: the studs under it already show (no double studs)
 	end
 	local hasText = d:IsA("TextButton") and d.Text ~= ""
-	UIStyle.studs(d, d:IsA("GuiButton") and 26 or 32, (d:IsA("GuiButton") and not hasText) and 0.3 or 0.6)
+	UIStyle.studs(d, d:IsA("GuiButton") and 26 or 32, (d:IsA("GuiButton") and not hasText) and 0.45 or 0.75)
 end
 function UIStyle.studInside(window, skip)
 	local function skipped(d)
@@ -337,22 +369,34 @@ function UIStyle.skinWindow(window, closeBtn)
 		end
 		titleText = best
 	end
-	local shift = H - 34 -- old windows kept ~34px at the top for the title
+	-- move the content down just enough to clear the header (each window
+	-- kept a different amount of room at the top for its old title)
+	local movable = {}
+	local minTop = math.huge
 	for _, c in ipairs(window:GetChildren()) do
-		if c:IsA("GuiObject") and c ~= oldTitle and c ~= closeBtn and c ~= titleText and c.Name ~= "Studs" and c.Name ~= "Rim" then
-			if c.Position.Y.Scale < 0.5 and c.AnchorPoint.Y < 0.5 then
-				c.Position += UDim2.fromOffset(0, shift)
-				-- parts that stretch with the window's height would grow by
-				-- the same amount: shrink them back so their bottom stays put
-				if c.Size.Y.Scale > 0 then
-					c.Size -= UDim2.fromOffset(0, math.floor(shift * c.Size.Y.Scale + 0.5))
+		if c:IsA("GuiObject") and c ~= oldTitle and c ~= closeBtn and c ~= titleText and c.Name ~= "Studs" and c.Name ~= "Rim" and c.Name ~= "SkinHeader" then
+			local fromTop = c.Position.Y.Scale == 0 or (c.Position.Y.Scale < 0.5 and c.AnchorPoint.Y < 0.5)
+			if fromTop then
+				table.insert(movable, c)
+				if c.Position.Y.Scale == 0 then
+					local top = c.Position.Y.Offset - c.AnchorPoint.Y * c.Size.Y.Offset
+					minTop = math.min(minTop, top)
 				end
 			end
 		end
 	end
+	local shift = minTop < math.huge and math.max(0, H + 8 - minTop) or (H - 34)
+	for _, c in ipairs(movable) do
+		c.Position += UDim2.fromOffset(0, shift)
+		-- parts that stretch with the window's height would grow by the
+		-- same amount: shrink them back so their bottom stays put
+		if c.Size.Y.Scale > 0 then
+			c.Size -= UDim2.fromOffset(0, math.floor(shift * c.Size.Y.Scale + 0.5))
+		end
+	end
 	window.Size += UDim2.fromOffset(0, shift)
 
-	UIStyle.studs(window, 44, 0.65)
+	UIStyle.studs(window, 44, 0.8)
 	local rim = child(window, "Frame", "Rim")
 	rim.Size = UDim2.new(1, -10, 1, -10)
 	rim.Position = UDim2.fromOffset(5, 5)
@@ -387,7 +431,7 @@ function UIStyle.skinWindow(window, closeBtn)
 	line.BorderSizePixel = 0
 	line.BackgroundColor3 = UIStyle.OUTLINE
 	line.ZIndex = z + 4
-	local hs = UIStyle.studs(header, 30, 0)
+	local hs = UIStyle.studs(header, 30, 0.15)
 	if hs then
 		hs.ZIndex = z + 4
 	end
@@ -423,8 +467,14 @@ function UIStyle.skinWindow(window, closeBtn)
 	end
 	if titleText then
 		titleText.AnchorPoint = Vector2.new(0, 0.5)
-		titleText.Position = UDim2.new(0, x, 0.5, 0)
-		titleText.Size = UDim2.new(1, -(x + (oldTitle and 10 or H + 22)), 0.58, 0)
+		if titleText.Parent == window then
+			-- a title that's a text right in the window: place it by pixels
+			titleText.Position = UDim2.new(0, x, 0, H / 2)
+			titleText.Size = UDim2.new(1, -(x + H + 22), 0, math.floor(H * 0.58))
+		else
+			titleText.Position = UDim2.new(0, x, 0.5, 0)
+			titleText.Size = UDim2.new(1, -(x + 10), 0.58, 0)
+		end
 		titleText.TextXAlignment = Enum.TextXAlignment.Left
 		titleText.TextColor3 = Color3.new(1, 1, 1)
 		titleText.TextStrokeTransparency = 0

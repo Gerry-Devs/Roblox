@@ -2645,7 +2645,9 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "MonsterName"
 	billboard.Size = UDim2.fromOffset(170, 78)
-	billboard.MaxDistance = 28 -- only shows when the monster is near you
+	-- only shows when the monster is near you; big (Huge / Titan) monsters
+	-- carry it much higher, so it shows from further away too
+	billboard.MaxDistance = 28 + bodySize * 4
 	billboard.StudsOffset = Vector3.new(0, bodySize * 1.45 + 0.5, 0) -- above the model's head
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0

@@ -23,15 +23,25 @@ local OUTLINE = Color3.fromRGB(12, 14, 32)
 local WHITE = Color3.new(1, 1, 1)
 local FONT = Enum.Font.LuckiestGuy
 local GOLD = Color3.fromRGB(255, 205, 60)
-local RARITY_COLORS = {
-	Color3.fromRGB(155, 166, 180), -- common
-	Color3.fromRGB(91, 205, 143), -- uncommon
-	Color3.fromRGB(75, 160, 255), -- rare
-	Color3.fromRGB(176, 102, 255), -- epic
-	Color3.fromRGB(255, 170, 50), -- legendary
-	Color3.fromRGB(255, 80, 120), -- mythic
-	Color3.fromRGB(90, 230, 255), -- celestial
+-- egg pictures (same ids as Config.EggIcons; Config isn't loaded yet here)
+local EGG_IMAGES = {
+	"rbxassetid://89065974622258", -- common
+	"rbxassetid://127482163109698", -- uncommon
+	"rbxassetid://110319386910427", -- rare
+	"rbxassetid://128903214440900", -- epic
+	"rbxassetid://104500738290331", -- legendary
+	"rbxassetid://128239034591198", -- mythic
+	"rbxassetid://129812693239921", -- secret
+	"rbxassetid://92395625284904", -- celestial
+	"rbxassetid://76982835466807", -- divine
+	"rbxassetid://96209352033929", -- supreme
 }
+local LEGENDARY_EGG = EGG_IMAGES[5]
+task.spawn(function()
+	pcall(function()
+		ContentProvider:PreloadAsync(EGG_IMAGES)
+	end)
+end)
 local TIPS = {
 	"3 WILDs in a row spin the egg wheel!",
 	"Upgrades are forever - they stay after you rebirth.",
@@ -89,14 +99,8 @@ local function spawnFloater(startAnywhere)
 	if isDice then
 		f = mk("ImageLabel", { Size = UDim2.fromOffset(size, size), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Image = DICE_IMAGE, ImageTransparency = 0.25, ZIndex = 5 }, floatLayer)
 	else
-		local color = RARITY_COLORS[rng:NextInteger(1, #RARITY_COLORS)]
-		f = mk("Frame", { Size = UDim2.fromOffset(size * 0.78, size), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = color, BackgroundTransparency = 0.15, ZIndex = 5 }, floatLayer)
-		corner(f, UDim.new(0.5, 0))
-		stroke(f, 3).Transparency = 0.3
-		mk("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(150, 150, 170)) }, f)
-		-- shine
-		local shine = mk("Frame", { Size = UDim2.fromScale(0.25, 0.3), Position = UDim2.fromScale(0.22, 0.14), BackgroundColor3 = WHITE, BackgroundTransparency = 0.45, ZIndex = 6 }, f)
-		corner(shine)
+		local image = EGG_IMAGES[rng:NextInteger(1, #EGG_IMAGES)]
+		f = mk("ImageLabel", { Size = UDim2.fromOffset(size, size), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, Image = image, ScaleType = Enum.ScaleType.Fit, ImageTransparency = 0.1, ZIndex = 5 }, floatLayer)
 	end
 	local item = {
 		obj = f,
@@ -172,12 +176,7 @@ local percent = mk("TextLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransp
 mk("UIStroke", { Color = OUTLINE, Thickness = 3 }, percent)
 mk("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 5) }, percent)
 -- the egg that rides at the end of the fill
-local rider = mk("Frame", { Name = "Egg", Size = UDim2.fromOffset(34, 44), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 0, 0, -2), BackgroundColor3 = GOLD, ZIndex = 16 }, barBack)
-corner(rider, UDim.new(0.5, 0))
-stroke(rider, 3)
-mk("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 240, 150), Color3.fromRGB(255, 160, 40)) }, rider)
-local riderShine = mk("Frame", { Size = UDim2.fromScale(0.26, 0.28), Position = UDim2.fromScale(0.2, 0.14), BackgroundColor3 = WHITE, BackgroundTransparency = 0.35, ZIndex = 17 }, rider)
-corner(riderShine)
+local rider = mk("ImageLabel", { Name = "Egg", Size = UDim2.fromOffset(46, 50), AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0, 0, 0, -2), BackgroundTransparency = 1, Image = LEGENDARY_EGG, ScaleType = Enum.ScaleType.Fit, ZIndex = 16 }, barBack)
 
 local status = mk("TextLabel", { Position = UDim2.fromOffset(0, barY + 48), Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1, Text = "Loading...", TextScaled = true, Font = FONT, TextColor3 = Color3.fromRGB(235, 230, 255), ZIndex = 10 }, center)
 mk("UIStroke", { Color = OUTLINE, Thickness = 3 }, status)

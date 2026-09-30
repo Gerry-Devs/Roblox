@@ -166,6 +166,9 @@ local function getDisplayName(kind, item)
 end
 
 local function getIconImage(kind, item)
+	if kind == "egg" and Config.EggIcons and Config.EggIcons[tostring(item.rarity)] then
+		return Config.EggIcons[tostring(item.rarity)]
+	end
 	local key = kind == "egg" and ("Egg_" .. tostring(item.rarity)) or item.monsterId
 	local value = itemIcons:FindFirstChild(key)
 	return value and value.Value or ""

@@ -34,208 +34,172 @@ local function piece(root, name, size, cf, color, material, transparency)
 end
 
 --------------------------------------------------------------------
--- designs (ctx.side = a patch on one side of a layer, ctx.part = a free
--- piece placed relative to the egg's center)
+-- designs (match the egg icons: blocky layers covered in square studs,
+-- plus each rarity's own details). ctx.side = a patch on one side of a
+-- layer, ctx.part = a free piece placed relative to the egg's center,
+-- ctx.studs = the square studs all over
 --------------------------------------------------------------------
 local DESIGNS = {}
+local function C3(r, g, b)
+	return Color3.fromRGB(r, g, b)
+end
 
--- Common: classic spotted egg
+-- each egg's own body color (like its icon)
+local EGG_COLORS = {
+	Common = C3(226, 230, 238),
+	Uncommon = C3(60, 215, 140),
+	Rare = C3(55, 145, 240),
+	Epic = C3(140, 75, 230),
+	Legendary = C3(248, 198, 45),
+	Mythic = C3(225, 60, 205),
+	Secret = C3(48, 42, 112),
+	Celestial = C3(28, 45, 150),
+	Divine = C3(238, 240, 247),
+	Supreme = C3(72, 26, 92),
+}
+
+-- Common: white egg, square studs + two bigger blocks
 DESIGNS.Common = function(ctx)
-	local spot = ctx.base:Lerp(WHITE, 0.55)
-	for _, s in ipairs({ { 3, 0, -0.25 }, { 6, 0, 0.2 }, { 4, 1, 0.1 }, { 7, 1, -0.2 }, { 3, 2, 0.2 }, { 5, 2, -0.15 }, { 4, 3, -0.2 }, { 7, 3, 0.25 } }) do
-		local d = ctx.width * 0.2
-		ctx.side(s[1], s[2], s[3], V(d, d, 0.25), spot)
-	end
-	-- small hairline cracks
-	local crack = ctx.base:Lerp(BLACK, 0.45)
-	for _, c in ipairs({ { 6, 1, 0.05, 0.3 }, { 7, 1, 0.12, 0.14 }, { 5, 3, -0.05, 0.26 } }) do
-		ctx.side(c[1], c[2], c[3], V(ctx.width * c[4], 0.05, 0.22), crack)
-	end
+	ctx.studs(ctx.base:Lerp(WHITE, 0.4))
+	ctx.side(4, 0, -0.3, V(ctx.width * 0.26, ctx.width * 0.24, 0.35), ctx.base:Lerp(WHITE, 0.6))
+	ctx.side(6, 0, 0.35, V(ctx.width * 0.2, ctx.width * 0.2, 0.35), ctx.base:Lerp(WHITE, 0.6))
 end
 
--- Uncommon: leafy sprout on top + darker spots
+-- Uncommon: mint green, lime belt with a square buckle
 DESIGNS.Uncommon = function(ctx)
-	local leaf = Color3.fromRGB(90, 205, 80)
-	local top = ctx.layerTop(#LAYERS)
-	ctx.part("Stem", V(0.35, 1.1, 0.35), CF(0, top + 0.45, 0), Color3.fromRGB(110, 80, 50))
-	for _, s in ipairs({ -1, 1 }) do
-		ctx.part("Leaf", V(1.3, 0.25, 0.8), CF(s * 0.6, top + 0.95, 0) * CFrame.Angles(0, 0, math.rad(s * 25)), leaf)
-	end
-	local dot = ctx.base:Lerp(BLACK, 0.25)
-	for _, s in ipairs({ { 3, 0, 0.2 }, { 6, 0, -0.2 }, { 4, 1, 0 }, { 3, 2, -0.2 }, { 6, 2, 0.15 }, { 5, 3, 0 } }) do
-		local d = ctx.width * 0.18
-		ctx.side(s[1], s[2], s[3], V(d, d, 0.25), dot)
-	end
-	-- a vine ring with little leaves
-	ctx.ring(4, 0.3, Color3.fromRGB(60, 140, 60))
-	for side = 0, 3 do
-		ctx.side(4, side, 0.3, V(ctx.width * 0.16, ctx.width * 0.1, 0.25), leaf)
-	end
+	local lime = C3(130, 225, 30)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.25))
+	ctx.ring(4, 0.45, lime)
+	ctx.side(4, 0, 0, V(ctx.width * 0.2, ctx.width * 0.18, 0.4), lime:Lerp(WHITE, 0.2))
 end
 
--- Rare: ice crystals on top + a ring of bubbles
+-- Rare: blue, a pale band around the middle
 DESIGNS.Rare = function(ctx)
-	local crystal = Color3.fromRGB(160, 235, 255)
-	local top = ctx.layerTop(#LAYERS - 1)
-	for _, s in ipairs({ { 0, 0, 1.6, 0 }, { 0.45, 0.25, 1.1, 20 }, { -0.45, -0.2, 1.1, -20 } }) do
-		ctx.part("Crystal", V(0.55, s[3], 0.55), CF(s[1], top + s[3] / 2, s[2]) * CFrame.Angles(0, 0, math.rad(s[4])), crystal, Enum.Material.Glass, 0.1)
-	end
-	local bubble = ctx.base:Lerp(WHITE, 0.6)
-	for side = 0, 3 do
-		for _, l in ipairs({ -0.25, 0.25 }) do
-			local d = ctx.width * 0.14
-			ctx.side(5, side, l, V(d, d, 0.25), bubble)
-		end
-	end
-	ctx.ring(9, 0.5, Color3.fromRGB(240, 250, 255)) -- frost cap
+	ctx.studs(ctx.base:Lerp(WHITE, 0.3))
+	ctx.ring(4, 0.55, C3(210, 230, 255))
 end
 
--- Epic: glowing gold 4-point stars on every side + sparkles
+-- Epic: purple, a gold cross emblem + gold belt
 DESIGNS.Epic = function(ctx)
-	local gold = Color3.fromRGB(255, 215, 90)
-	for side = 0, 3 do
-		local w = ctx.width * 0.34
-		ctx.side(5, side, 0, V(w, w * 0.28, 0.25), gold, Enum.Material.Neon)
-		ctx.side(5, side, 0, V(w * 0.28, w, 0.26), gold, Enum.Material.Neon)
-	end
-	ctx.ring(3, 0.4, Color3.fromRGB(120, 60, 190)) -- amethyst gem band
-	for side = 0, 3 do
-		ctx.side(3, side, 0, V(ctx.width * 0.12, ctx.width * 0.12, 0.3), Color3.fromRGB(200, 120, 255), Enum.Material.Neon)
-	end
-	ctx.sparkles(Color3.fromRGB(230, 170, 255))
+	local gold = C3(255, 205, 40)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.25))
+	ctx.ring(4, 0.45, gold)
+	ctx.side(4, 0, 0, V(ctx.width * 0.18, ctx.width * 0.16, 0.4), gold:Lerp(WHITE, 0.15))
+	local w = ctx.width
+	ctx.side(7, 0, 0, V(w * 0.3, w * 0.1, 0.35), gold, Enum.Material.Neon)
+	ctx.side(7, 0, 0, V(w * 0.1, w * 0.3, 0.36), gold, Enum.Material.Neon)
+	ctx.sparkles(C3(220, 170, 255))
 end
 
--- Legendary: gold crown with gems, side gems, gold belt + golden sparkles
+-- Legendary: gold, 3-prong crown with red tips, teal gem on the belt
 DESIGNS.Legendary = function(ctx)
-	local gold = Color3.fromRGB(255, 200, 50)
-	local crownBase = ctx.layerTop(#LAYERS - 1)
-	local r = ctx.width * 0.26
-	for i = 0, 7 do
-		local ang = i / 8 * math.pi * 2
-		local tall = i % 2 == 0
-		local h = tall and 1.2 or 0.7
-		ctx.part("Crown", V(0.5, h, 0.5), CF(math.cos(ang) * r, crownBase + h / 2, math.sin(ang) * r), gold)
-		if tall then
-			ctx.part("CrownGem", V(0.38, 0.38, 0.38), CF(math.cos(ang) * r, crownBase + h + 0.19, math.sin(ang) * r), Color3.fromRGB(255, 60, 90), Enum.Material.Neon)
-		end
+	local gold = ctx.base:Lerp(C3(255, 170, 20), 0.3)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.3))
+	ctx.ring(4, 0.4, gold)
+	ctx.side(4, 0, 0, V(ctx.width * 0.22, ctx.width * 0.22, 0.4), C3(40, 210, 190), Enum.Material.Neon)
+	local top = ctx.layerTop(#LAYERS)
+	for i, x in ipairs({ -0.28, 0, 0.28 }) do
+		local hgt = i == 2 and 1.3 or 1.0
+		ctx.part("Crown", V(0.45, hgt, 0.45), CF(x * ctx.width, top + hgt / 2 - 0.2, 0) * CFrame.Angles(0, 0, math.rad(-x * 40)), gold)
+		ctx.part("CrownGem", V(0.4, 0.4, 0.4), CF(x * ctx.width * 1.15, top + hgt - 0.05, 0), C3(235, 45, 80))
 	end
-	local gems = { Color3.fromRGB(255, 60, 90), Color3.fromRGB(80, 200, 255), Color3.fromRGB(120, 255, 140), Color3.fromRGB(200, 120, 255) }
-	for side = 0, 3 do
-		local d = ctx.width * 0.2
-		ctx.side(4, side, 0, V(d, d, 0.3), gems[side + 1], Enum.Material.Neon)
-	end
-	ctx.ring(6, 0.35, gold)
-	ctx.sparkles(Color3.fromRGB(255, 220, 120))
+	ctx.sparkles(C3(255, 220, 120))
 end
 
--- Mythic: horns, glowing lava spots, scorched bottom + ember sparkles
+-- Mythic: magenta, two dark segmented horns, yellow pins
 DESIGNS.Mythic = function(ctx)
-	local horn = Color3.fromRGB(40, 25, 30)
+	local horn = C3(55, 25, 90)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.25))
 	local base = ctx.layerTop(#LAYERS - 2)
 	for _, s in ipairs({ -1, 1 }) do
-		ctx.part("Horn", V(0.6, 1.4, 0.6), CF(s * ctx.width * 0.22, base + 0.6, 0) * CFrame.Angles(0, 0, math.rad(-s * 25)), horn)
-		ctx.part("HornTip", V(0.4, 0.8, 0.4), CF(s * ctx.width * 0.33, base + 1.45, 0) * CFrame.Angles(0, 0, math.rad(-s * 40)), horn)
+		for k = 0, 2 do
+			ctx.part("Horn", V(0.5 - k * 0.08, 0.55, 0.5 - k * 0.08), CF(s * (ctx.width * 0.25 + k * 0.28), base + 0.3 + k * 0.45, 0) * CFrame.Angles(0, 0, math.rad(-s * 30)), horn:Lerp(BLACK, k * 0.1))
+		end
 	end
-	local glow = Color3.fromRGB(255, 150, 40)
-	for _, s in ipairs({ { 3, 0, -0.2 }, { 5, 0, 0.25 }, { 7, 0, -0.1 }, { 4, 1, 0.1 }, { 6, 2, -0.2 }, { 3, 2, 0.2 }, { 5, 3, 0 } }) do
-		local d = ctx.width * 0.16
-		ctx.side(s[1], s[2], s[3], V(d, d, 0.25), glow, Enum.Material.Neon)
+	local yellow = C3(255, 195, 30)
+	for _, p in ipairs({ { 5, -0.3 }, { 4, 0.3 } }) do
+		ctx.side(p[1], 0, p[2], V(ctx.width * 0.14, ctx.width * 0.1, 0.4), yellow)
+		ctx.side(p[1] - 1, 0, p[2], V(ctx.width * 0.04, ctx.width * 0.14, 0.38), yellow)
 	end
-	-- glowing lava cracks
-	for _, c in ipairs({ { 4, 0, -0.1, 0.34 }, { 6, 1, 0.1, 0.3 }, { 3, 2, 0, 0.36 }, { 5, 3, -0.1, 0.28 } }) do
-		ctx.side(c[1], c[2], c[3], V(ctx.width * c[4], 0.05, 0.22), glow, Enum.Material.Neon)
-	end
-	ctx.sparkles(Color3.fromRGB(255, 80, 60))
+	ctx.sparkles(C3(255, 90, 200))
 end
 
--- Secret: a black shadow egg with one glowing violet eye watching you,
--- glowing violet cracks, a glowing "?" on the back, shadow wisps
+-- Secret: dark indigo, a glowing violet panel with a black slot
 DESIGNS.Secret = function(ctx)
-	local violet = Color3.fromRGB(190, 120, 255)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.15))
 	local w = ctx.width
-	ctx.side(5, 0, 0, V(w * 0.34, w * 0.22, 0.24), Color3.fromRGB(12, 8, 18)) -- eye socket
-	ctx.side(5, 0, 0, V(w * 0.26, w * 0.17, 0.26), violet, Enum.Material.Neon) -- glowing iris
-	ctx.side(5, 0, 0, V(w * 0.05, w * 0.15, 0.28), Color3.fromRGB(10, 6, 14)) -- slit pupil
-	ctx.side(6, 0, 0, V(w * 0.38, w * 0.06, 0.26), Color3.fromRGB(20, 16, 28)) -- lid
-	for _, c in ipairs({ { 3, 1, 0.1, 0.3 }, { 7, 3, -0.1, 0.26 }, { 4, 3, 0.15, 0.2 } }) do
-		ctx.side(c[1], c[2], c[3], V(w * c[4], 0.05, 0.22), violet, Enum.Material.Neon)
-	end
-	-- "?" on the back
-	ctx.side(7, 2, 0, V(w * 0.2, w * 0.05, 0.24), violet, Enum.Material.Neon)
-	ctx.side(6, 2, -0.12, V(w * 0.05, w * 0.1, 0.24), violet, Enum.Material.Neon)
-	ctx.side(5, 2, 0, V(w * 0.05, w * 0.08, 0.24), violet, Enum.Material.Neon)
-	ctx.side(3, 2, 0, V(w * 0.05, w * 0.05, 0.24), violet, Enum.Material.Neon)
-	ctx.sparkles(Color3.fromRGB(150, 90, 220))
+	ctx.side(6, 0, 0, V(w * 0.28, w * 0.36, 0.34), C3(20, 16, 40))
+	ctx.side(6, 0, 0, V(w * 0.22, w * 0.3, 0.38), C3(175, 110, 255), Enum.Material.Neon)
+	ctx.side(6, 0, 0, V(w * 0.16, w * 0.05, 0.42), C3(12, 8, 20))
+	ctx.sparkles(C3(150, 90, 220))
 end
 
--- Celestial: deep navy starry egg, glowing stars + constellation lines, a
--- tilted glowing ring around it, cyan sparkles
+-- Celestial: deep blue, glowing cyan strips + tiles and a glowing ring
 DESIGNS.Celestial = function(ctx)
-	local star, cyan = Color3.fromRGB(255, 255, 235), Color3.fromRGB(120, 220, 255)
+	local cyan = C3(110, 225, 255)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.15))
 	local w = ctx.width
-	for _, st in ipairs({ { 2, 0, -0.2 }, { 3, 1, 0.2 }, { 4, 0, 0.25 }, { 5, 2, -0.1 }, { 6, 1, -0.2 }, { 7, 3, 0.1 }, { 8, 0, 0 }, { 3, 3, -0.2 }, { 6, 3, 0.25 }, { 4, 2, 0.2 } }) do
-		ctx.side(st[1], st[2], st[3], V(w * 0.07, w * 0.07, 0.25), star, Enum.Material.Neon)
+	for _, st in ipairs({ { 7, 0, -0.1, 0.05, 0.3 }, { 7, 0, 0.25, 0.05, 0.3 }, { 3, 0, 0.1, 0.05, 0.26 }, { 6, 1, 0, 0.05, 0.3 }, { 6, 3, 0, 0.05, 0.3 } }) do
+		ctx.side(st[1], st[2], st[3], V(w * st[4], w * st[5], 0.38), cyan, Enum.Material.Neon)
 	end
-	for _, ln in ipairs({ { 3, 0, 0, 0.3 }, { 5, 0, 0.1, 0.24 }, { 6, 2, 0, 0.3 } }) do
-		ctx.side(ln[1], ln[2], ln[3], V(w * ln[4], 0.03, 0.24), cyan, Enum.Material.Neon)
+	for _, t in ipairs({ { 8, 0, 0.1 }, { 5, 0, -0.3 }, { 6, 0, 0.35 }, { 3, 2, 0 } }) do
+		ctx.side(t[1], t[2], t[3], V(w * 0.1, w * 0.1, 0.38), cyan:Lerp(WHITE, 0.3), Enum.Material.Neon)
 	end
-	-- a tilted glowing ring (like a planet)
-	for i = 0, 15 do
-		local ang = i / 16 * math.pi * 2
-		local r = w * 0.72
-		ctx.part("CelestialRing", V(w * 0.2, 0.05, 0.08), CFrame.Angles(math.rad(18), 0, 0) * CF(math.sin(ang) * r, 0, math.cos(ang) * r) * CFrame.Angles(0, ang, 0), cyan, Enum.Material.Neon)
+	-- glowing ring around the middle with square nodes
+	for i = 0, 19 do
+		local ang = i / 20 * math.pi * 2
+		local r = w * 0.66
+		ctx.part("CelestialRing", V(w * 0.2, 0.12, 0.12), CFrame.Angles(math.rad(8), 0, 0) * CF(math.sin(ang) * r, -0.1, math.cos(ang) * r) * CFrame.Angles(0, ang, 0), cyan, Enum.Material.Neon)
+		if i % 5 == 0 then
+			ctx.part("RingNode", V(0.4, 0.4, 0.4), CFrame.Angles(math.rad(8), 0, 0) * CF(math.sin(ang) * r, -0.1, math.cos(ang) * r), cyan:Lerp(WHITE, 0.3))
+		end
 	end
 	ctx.sparkles(cyan)
 end
 
--- Divine: white-gold egg with gold wings on its sides, a floating halo,
--- gold bands, golden light
+-- Divine: white, two gold bands + buckle, white-and-gold wings
 DESIGNS.Divine = function(ctx)
-	local gold = Color3.fromRGB(255, 205, 70)
+	local gold = C3(255, 205, 30)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.5))
+	ctx.ring(3, 0.35, gold)
+	ctx.ring(6, 0.35, gold)
+	ctx.side(5, 0, 0, V(ctx.width * 0.2, ctx.width * 0.18, 0.4), gold)
 	local w = ctx.width
-	ctx.ring(3, 0.3, gold)
-	ctx.ring(7, 0.3, gold)
 	for _, sd in ipairs({ -1, 1 }) do
-		for f = 0, 3 do
-			local y = -ctx.height * 0.02 + f * ctx.height * 0.07
-			local len = w * (0.55 - f * 0.08)
-			ctx.part("DivineWing", V(len, ctx.height * 0.05, 0.12), CF(sd * (w * 0.5 + len * 0.4), y, 0.05) * CFrame.Angles(0, 0, math.rad(sd * (25 - f * 10))), f % 2 == 0 and WHITE or gold)
+		for f = 0, 2 do
+			local y = ctx.height * 0.02 + f * ctx.height * 0.1
+			local len = w * (0.5 - f * 0.07)
+			ctx.part("DivineWing", V(len, ctx.height * 0.08, 0.3), CF(sd * (w * 0.52 + len * 0.35), y, 0.1) * CFrame.Angles(0, 0, math.rad(sd * (30 - f * 12))), f == 1 and gold or C3(245, 246, 250))
 		end
-	end
-	for i = 0, 11 do
-		local ang = i / 12 * math.pi * 2
-		ctx.part("DivineHalo", V(w * 0.14, 0.05, 0.06), CF(math.sin(ang) * w * 0.32, ctx.height / 2 + 0.35, math.cos(ang) * w * 0.32) * CFrame.Angles(0, ang, 0), gold, Enum.Material.Neon)
 	end
 	ctx.sparkles(gold)
 end
 
--- Supreme: crimson-black cosmic egg with galaxy swirls, glowing red cracks,
--- a jeweled gold crown, orbiting gems and a red aura
+-- Supreme: dark purple, gold crown with red tips, red cubes around the
+-- sides, gold bars and glowing tiles
 DESIGNS.Supreme = function(ctx)
-	local red, gold = Color3.fromRGB(255, 60, 60), Color3.fromRGB(255, 205, 70)
+	local red, gold = C3(235, 45, 80), C3(255, 200, 40)
+	ctx.studs(ctx.base:Lerp(WHITE, 0.12))
 	local w = ctx.width
-	for _, g in ipairs({ { 3, 0, -0.1, Color3.fromRGB(170, 70, 255) }, { 5, 1, 0.15, Color3.fromRGB(80, 160, 255) }, { 6, 3, -0.15, Color3.fromRGB(170, 70, 255) }, { 4, 2, 0.1, Color3.fromRGB(255, 90, 170) } }) do
-		ctx.side(g[1], g[2], g[3], V(w * 0.26, w * 0.12, 0.23), g[4], Enum.Material.Neon, 0.2) -- galaxy swirls
+	for _, b in ipairs({ { 7, 0, -0.35 }, { 5, 0, 0.35 }, { 4, 0, -0.1 }, { 3, 0, 0.3 }, { 6, 1, 0 }, { 5, 3, 0 } }) do
+		ctx.side(b[1], b[2], b[3], V(w * 0.05, w * 0.16, 0.36), gold)
 	end
-	for _, c in ipairs({ { 4, 1, -0.1, 0.3 }, { 6, 0, 0.1, 0.28 }, { 7, 2, 0, 0.3 } }) do
-		ctx.side(c[1], c[2], c[3], V(w * c[4], 0.05, 0.22), red, Enum.Material.Neon)
-	end
-	-- jeweled gold crown
-	local top = ctx.layerTop(#LAYERS - 1)
-	for i = 0, 7 do
-		local ang = i / 8 * math.pi * 2
-		local tall = i % 2 == 0
-		local h = tall and 0.9 or 0.5
-		ctx.part("Crown", V(0.45, h, 0.45), CF(math.cos(ang) * w * 0.26, top + h / 2, math.sin(ang) * w * 0.26), gold)
-		if tall then
-			ctx.part("CrownGem", V(0.3, 0.3, 0.3), CF(math.cos(ang) * w * 0.26, top + h + 0.15, math.sin(ang) * w * 0.26), red, Enum.Material.Neon)
-		end
-	end
-	-- orbiting gems
+	ctx.side(6, 0, -0.25, V(w * 0.2, w * 0.14, 0.36), C3(150, 90, 255), Enum.Material.Neon)
+	ctx.side(4, 0, 0.3, V(w * 0.2, w * 0.14, 0.36), C3(215, 210, 255), Enum.Material.Neon)
+	-- red cubes sticking out around it
 	for i = 0, 5 do
-		local ang = i / 6 * math.pi * 2
-		ctx.part("OrbitGem", V(0.35, 0.35, 0.35), CF(math.sin(ang) * w * 0.8, math.sin(ang * 2) * 0.3, math.cos(ang) * w * 0.8) * CFrame.Angles(ang, ang, 0), i % 2 == 0 and red or gold, Enum.Material.Neon)
+		local ang = i / 6 * math.pi * 2 + math.pi / 6
+		local y = (i % 2 == 0) and ctx.height * 0.12 or -ctx.height * 0.12
+		ctx.part("RedCube", V(0.6, 0.6, 0.6), CF(math.sin(ang) * w * 0.56, y, math.cos(ang) * w * 0.56) * CFrame.Angles(0, ang, math.rad(45)), red)
 	end
+	-- crown
+	local top = ctx.layerTop(#LAYERS - 1)
+	for i, x in ipairs({ -0.3, 0, 0.3 }) do
+		local hgt = i == 2 and 1.2 or 0.9
+		ctx.part("Crown", V(0.5, hgt, 0.5), CF(x * w, top + hgt / 2, 0), gold)
+		ctx.part("CrownGem", V(0.42, 0.42, 0.42), CF(x * w, top + hgt + 0.1, 0), red)
+	end
+	ctx.part("CrownBand", V(w * 0.8, 0.35, w * 0.5), CF(0, top + 0.15, 0), gold)
 	ctx.sparkles(red)
 end
 
@@ -246,6 +210,8 @@ end
 -- color = rarity color; rarityKey picks the design ("Common", "Epic"...)
 function EggModel.Build(root, height, color, finishKey, rarityKey)
 	local width = height / 1.35
+	-- each rarity's own egg color (like the icons), then the finish on top
+	color = EGG_COLORS[rarityKey] or color
 	if finishKey == "Gold" then
 		color = color:Lerp(Color3.fromRGB(255, 200, 55), 0.45)
 	elseif finishKey == "Silver" then
@@ -257,13 +223,6 @@ function EggModel.Build(root, height, color, finishKey, rarityKey)
 	elseif finishKey == "Galaxy" then
 		color = color:Lerp(Color3.fromRGB(90, 40, 170), 0.6)
 	end
-	local EGG_BASE = {
-		Secret = Color3.fromRGB(30, 26, 40),
-		Celestial = Color3.fromRGB(26, 36, 86),
-		Divine = Color3.fromRGB(250, 244, 226),
-		Supreme = Color3.fromRGB(62, 12, 22),
-	}
-	color = EGG_BASE[rarityKey] or color
 	local shade = color:Lerp(BLACK, 0.1) -- every other layer, so the blocks stand out
 	local cf0 = root.CFrame
 	local h = height / #LAYERS
@@ -271,9 +230,6 @@ function EggModel.Build(root, height, color, finishKey, rarityKey)
 	for i, f in ipairs(LAYERS) do
 		local w = width * f
 		local c = i % 2 == 0 and shade or color
-		if rarityKey == "Mythic" and i <= 2 then
-			c = c:Lerp(BLACK, 0.4) -- scorched bottom
-		end
 		piece(root, "EggLayer", V(w, h, w), cf0 * CF(0, -height / 2 + (i - 0.5) * h, 0), c)
 	end
 
@@ -294,6 +250,21 @@ function EggModel.Build(root, height, color, finishKey, rarityKey)
 	function ctx.ring(i, thickness, c)
 		local w = width * LAYERS[i] * 1.05
 		return piece(root, "EggRing", V(w, h * thickness, w), cf0 * CF(0, -height / 2 + (i - 0.5) * h, 0), c)
+	end
+	-- square studs all over (like the icons): 3 per side on the wide
+	-- layers, 2 on the narrow ones
+	function ctx.studs(c)
+		-- every other layer only (keeps the part count low for phones)
+		for i = 2, #LAYERS - 1, 2 do
+			local f = LAYERS[i]
+			local lats = f >= 0.85 and { -0.3, 0, 0.3 } or { -0.2, 0.2 }
+			local d = width * 0.13
+			for side = 0, 3 do
+				for _, l in ipairs(lats) do
+					ctx.side(i, side, l, V(d, math.min(d, h * 0.7), 0.3), c)
+				end
+			end
+		end
 	end
 	function ctx.sparkles(c)
 		local e = Instance.new("ParticleEmitter")

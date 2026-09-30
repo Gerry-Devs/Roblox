@@ -1160,6 +1160,21 @@ Config.UIStudsImage = "rbxassetid://139993005514116"
 -- uploaded to Roblox). Leave "" until it's uploaded.
 Config.UIHexStudsImage = "rbxassetid://98151350777131"
 
+-- Egg pictures (Backpack, EGGS window, roll animation). The loading
+-- screen keeps its own copy of these ids (it runs before Config loads).
+Config.EggIcons = {
+	Common = "rbxassetid://89065974622258",
+	Uncommon = "rbxassetid://127482163109698",
+	Rare = "rbxassetid://110319386910427",
+	Epic = "rbxassetid://128903214440900",
+	Legendary = "rbxassetid://104500738290331",
+	Mythic = "rbxassetid://128239034591198",
+	Secret = "rbxassetid://129812693239921",
+	Celestial = "rbxassetid://92395625284904",
+	Divine = "rbxassetid://76982835466807",
+	Supreme = "rbxassetid://96209352033929",
+}
+
 -- duration in seconds (0 = instant)
 Config.Potions = {
 	{ key = "luck", name = "Luck Potion", imageId = "rbxassetid://110066320591030", duration = 120, text = "2x roll luck for 2 min" },

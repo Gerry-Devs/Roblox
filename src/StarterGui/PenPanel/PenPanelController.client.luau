@@ -105,6 +105,33 @@ local function iconOrFallback(holder)
 	end
 end
 
+-- egg rows show the egg's picture (Config.EggIcons) where the ball was
+local function setEggPicture(row, rarityKey)
+	local image = Config.EggIcons and Config.EggIcons[rarityKey]
+	local ball = row:FindFirstChild("Ball")
+	if not image or not ball then
+		iconOrFallback(row)
+		return
+	end
+	local icon = row:FindFirstChild("Icon")
+	if not (icon and icon:IsA("ImageLabel")) then
+		icon = Instance.new("ImageLabel")
+		icon.Name = "Icon"
+		icon.BackgroundTransparency = 1
+		icon.AnchorPoint = ball.AnchorPoint
+		icon.Position = ball.Position
+		icon.Size = ball.Size
+		icon.SizeConstraint = ball.SizeConstraint
+		icon.ZIndex = ball.ZIndex + 1
+		icon.LayoutOrder = ball.LayoutOrder
+		icon.Parent = ball.Parent
+	end
+	icon.ScaleType = Enum.ScaleType.Fit
+	icon.Image = image
+	icon.Visible = true
+	ball.Visible = false
+end
+
 local function popIn(frame)
 	local s = frame:FindFirstChildOfClass("UIScale")
 	if s then
@@ -205,7 +232,7 @@ local function renderEggs()
 		row.ItemName.Text = rarity.name .. " Egg"
 		row.ItemName.TextColor3 = colorFromTable(rarity.color)
 		row.Ball.BackgroundColor3 = colorFromTable(rarity.color)
-		iconOrFallback(row)
+		setEggPicture(row, rarity.key)
 		local hatchButton = row.HatchButton
 		bounce(hatchButton)
 		hatchButton.Activated:Connect(function()

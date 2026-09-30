@@ -162,6 +162,9 @@ local function feedMessage(text, color)
 end
 
 local function getEggImage(rarity)
+	if Config.EggIcons and Config.EggIcons[rarity.key] then
+		return Config.EggIcons[rarity.key]
+	end
 	local backpack = playerGui:FindFirstChild("Backpack")
 	local icons = backpack and backpack:FindFirstChild("ItemIcons")
 	local value = icons and icons:FindFirstChild("Egg_" .. rarity.key)

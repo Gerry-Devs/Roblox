@@ -12,7 +12,10 @@ local function popCrit(model)
 	local size = model:GetExtentsSize()
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "CritPop"
-	bb.Size = UDim2.fromOffset(220, 70)
+	-- smaller on phones (a billboard's size is in screen pixels)
+	local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+	local k = math.clamp(math.min(v.Y / 720, v.X / 1100), 0.45, 1)
+	bb.Size = UDim2.fromOffset(220 * k, 70 * k)
 	bb.StudsOffsetWorldSpace = Vector3.new(math.random(-10, 10) / 10, size.Y * 0.6 + 2, 0)
 	bb.AlwaysOnTop = true
 	bb.LightInfluence = 0

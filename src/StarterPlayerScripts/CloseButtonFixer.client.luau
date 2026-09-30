@@ -42,6 +42,18 @@ local function fix(b)
 		b.AnchorPoint = Vector2.new(0.5, 0.5)
 		b.Position = UDim2.new(1, -(size / 2 + MARGIN), 0, 0)
 	end
+	-- LuckiestGuy draws its letters above the middle of their box, so a
+	-- "centered" X looks too high in the button: nudge it down to the middle
+	local label = b:FindFirstChild("Label")
+	if label and label:IsA("TextLabel") then
+		label.AnchorPoint = Vector2.new(0.5, 0.5)
+		label.Position = UDim2.fromScale(0.5, 0.57)
+	elseif b:IsA("TextButton") and b.Text == "X" then
+		local pad = b:FindFirstChildOfClass("UIPadding") or Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0.16, 0)
+		pad.PaddingBottom = UDim.new(0.04, 0)
+		pad.Parent = b
+	end
 	b.ZIndex = math.max(b.ZIndex, 20)
 	for _, d in ipairs(b:GetDescendants()) do
 		if d:IsA("GuiObject") then

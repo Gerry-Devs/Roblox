@@ -24,6 +24,14 @@ end
 
 local monsterFolder = ReplicatedStorage:WaitForChild("MonsterRNG")
 local Config = require(monsterFolder:WaitForChild("Config"))
+local UIStyle
+do
+	local mod = monsterFolder:WaitForChild("UIStyle", 5)
+	local ok, res = pcall(function()
+		return mod and require(mod)
+	end)
+	UIStyle = ok and res or nil
+end
 local adminRemote = monsterFolder:WaitForChild("Remotes"):WaitForChild("AdminAction")
 
 local OUTLINE = Color3.fromRGB(12, 14, 32)
@@ -100,35 +108,58 @@ openBtn.Parent = topRow
 topRow.Size = UDim2.new(topRow.Size.X.Scale, topRow.Size.X.Offset + 56, topRow.Size.Y.Scale, topRow.Size.Y.Offset)
 
 -- window
-local W, H = 660, 560
+-- wider than before: the categories sit in a column on the left (like
+-- the Backpack tabs) and the pages keep their old 620px width
+local W, H = 845, 560
 local main = mk("Frame", { Name = "Main", Size = UDim2.fromOffset(W, H), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), BackgroundColor3 = PURPLE, Visible = false }, gui)
 round(main, 20, 6)
 mk("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(160, 110, 255), PURPLE_DARK), Rotation = 90 }, main)
 local mainScale = mk("UIScale", {}, main)
-local title = mk("Frame", { Size = UDim2.fromOffset(320, 56), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 0), BackgroundColor3 = RED, ZIndex = 5 }, main)
+local title = mk("Frame", { Name = "Title", Size = UDim2.fromOffset(320, 56), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 0), BackgroundColor3 = RED, ZIndex = 5 }, main)
 round(title, 16, 5)
-text(title, "ADMIN PANEL", UDim2.new(1, -30, 0.64, 0), UDim2.new(0, 15, 0.18, 0), { ZIndex = 6 })
+text(title, "Admin Panel", UDim2.new(1, -30, 0.64, 0), UDim2.new(0, 15, 0.18, 0), { ZIndex = 6, Name = "Text" })
 local closeBtn = button(main, "X", UDim2.fromOffset(54, 54), UDim2.new(1, -6, 0, 6), RED)
 closeBtn.AnchorPoint = Vector2.new(0.5, 0.5)
 closeBtn.ZIndex = 10
 
--- tabs
-local tabGive = button(main, "GIVE", UDim2.fromOffset(150, 42), UDim2.fromOffset(20, 42), GOLD)
-local tabChat = button(main, "DEV CHAT", UDim2.fromOffset(170, 42), UDim2.fromOffset(180, 42), GRAY)
-local tabFx = button(main, "EFFECTS", UDim2.fromOffset(160, 42), UDim2.fromOffset(360, 42), GRAY)
-local giveBody = mk("Frame", { Size = UDim2.new(1, -40, 1, -110), Position = UDim2.fromOffset(20, 94), BackgroundColor3 = Color3.fromRGB(26, 20, 60) }, main)
+-- categories: a column on the left, like the Backpack tabs
+local TAB_W, TAB_H = 170, 52
+local tabGive = button(main, "GIVE", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42), GOLD)
+local tabChat = button(main, "DEV CHAT", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42 + (TAB_H + 8)), GRAY)
+local tabFx = button(main, "EFFECTS", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42 + (TAB_H + 8) * 2), GRAY)
+for _, t in ipairs({ tabGive, tabChat, tabFx }) do
+	t.TextXAlignment = Enum.TextXAlignment.Left
+	local pad = t:FindFirstChildOfClass("UIPadding")
+	if pad then
+		pad.PaddingLeft = UDim.new(0, 14)
+		pad.PaddingTop = UDim.new(0, 12)
+		pad.PaddingBottom = UDim.new(0, 12)
+	end
+end
+local BODY_DARK = Color3.fromRGB(28, 31, 42)
+local giveBody = mk("Frame", { Size = UDim2.new(1, -(TAB_W + 55), 1, -62), Position = UDim2.fromOffset(TAB_W + 35, 42), BackgroundColor3 = BODY_DARK }, main)
 round(giveBody, 14, 3)
-local chatBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = Color3.fromRGB(26, 20, 60), Visible = false }, main)
+local chatBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = BODY_DARK, Visible = false }, main)
 round(chatBody, 14, 3)
-local fxBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = Color3.fromRGB(26, 20, 60), Visible = false }, main)
+local fxBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = BODY_DARK, Visible = false }, main)
 round(fxBody, 14, 3)
 local function showTab(which)
 	giveBody.Visible = which == "give"
 	chatBody.Visible = which == "chat"
 	fxBody.Visible = which == "fx"
-	tabGive.BackgroundColor3 = which == "give" and GOLD or GRAY
-	tabChat.BackgroundColor3 = which == "chat" and GOLD or GRAY
-	tabFx.BackgroundColor3 = which == "fx" and GOLD or GRAY
+	-- open tab: lighter with a white rim; the others dark (like the Backpack)
+	for key, t in pairs({ give = tabGive, chat = tabChat, fx = tabFx }) do
+		local on = which == key
+		t.BackgroundColor3 = on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68)
+		local st = t:FindFirstChildOfClass("UIStroke")
+		if st then
+			st.Color = on and Color3.fromRGB(240, 244, 255) or OUTLINE
+			st.Thickness = on and 4 or 3
+		end
+		if UIStyle then
+			pcall(UIStyle.studs, t, 34, 0.25)
+		end
+	end
 end
 tabFx.Activated:Connect(function()
 	showTab("fx")
@@ -139,6 +170,7 @@ end)
 tabChat.Activated:Connect(function()
 	showTab("chat")
 end)
+showTab("give")
 
 --------------------------------------------------------------------
 -- GIVE tab

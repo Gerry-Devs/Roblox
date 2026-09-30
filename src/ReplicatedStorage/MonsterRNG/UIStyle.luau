@@ -219,4 +219,158 @@ function UIStyle.closeButton(button, header)
 	return button
 end
 
+-- Turn any window into the Backpack look: a blue-to-cyan studded header
+-- bar across the top (title on the left), the red studded X at its right
+-- end, and a dark studded body with a light inner rim. Everything that
+-- was inside the window moves down to make room for the header.
+UIStyle.HEADER = 64
+function UIStyle.skinWindow(window, closeBtn)
+	if window:GetAttribute("Skinned") then
+		return
+	end
+	window:SetAttribute("Skinned", true)
+	local H = UIStyle.HEADER
+	local z = window.ZIndex
+
+	-- body
+	window.BackgroundColor3 = UIStyle.BODY
+	window.BackgroundTransparency = 0
+	local grad = window:FindFirstChildOfClass("UIGradient")
+	if grad then
+		grad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 205, 215))
+		grad.Rotation = 90
+	end
+	child(window, "UICorner", "UICorner").CornerRadius = UDim.new(0, 18)
+	local stroke = window:FindFirstChildOfClass("UIStroke") or mk("UIStroke", {}, window)
+	stroke.Color = UIStyle.OUTLINE
+	stroke.Thickness = math.max(stroke.Thickness, 5)
+
+	-- where the old content starts: move it all down under the header
+	local oldTitle = window:FindFirstChild("Title")
+	local titleText, titleIcon
+	if oldTitle and oldTitle:IsA("GuiObject") then
+		titleText = oldTitle:FindFirstChild("Text") or oldTitle:FindFirstChildWhichIsA("TextLabel")
+		local badge = oldTitle:FindFirstChild("GoldBadge")
+		titleIcon = badge
+	else
+		-- script-built window: its title is a big text near the top
+		local best
+		for _, c in ipairs(window:GetChildren()) do
+			if c:IsA("TextLabel") and c.Position.Y.Scale == 0 and c.Position.Y.Offset <= 30 and c.Size.Y.Offset >= 22 then
+				if not best or c.Position.Y.Offset < best.Position.Y.Offset then
+					best = c
+				end
+			end
+		end
+		titleText = best
+	end
+	local shift = H - 34 -- old windows kept ~34px at the top for the title
+	for _, c in ipairs(window:GetChildren()) do
+		if c:IsA("GuiObject") and c ~= oldTitle and c ~= closeBtn and c ~= titleText and c.Name ~= "Studs" and c.Name ~= "Rim" then
+			if c.Position.Y.Scale < 0.5 and c.AnchorPoint.Y < 0.5 then
+				c.Position += UDim2.fromOffset(0, shift)
+			end
+		end
+	end
+	window.Size += UDim2.fromOffset(0, shift)
+
+	UIStyle.studs(window, 44, 0.35)
+	local rim = child(window, "Frame", "Rim")
+	rim.Size = UDim2.new(1, -10, 1, -10)
+	rim.Position = UDim2.fromOffset(5, 5)
+	rim.BackgroundTransparency = 1
+	rim.ZIndex = z
+	child(rim, "UICorner", "UICorner").CornerRadius = UDim.new(0, 14)
+	local rs = child(rim, "UIStroke", "UIStroke")
+	rs.Color = UIStyle.RIM
+	rs.Thickness = 3
+	rs.Transparency = 0.35
+
+	-- header bar
+	local header = child(window, "Frame", "SkinHeader")
+	header.Size = UDim2.new(1, 0, 0, H)
+	header.Position = UDim2.fromOffset(0, 0)
+	header.BackgroundColor3 = Color3.new(1, 1, 1)
+	header.BorderSizePixel = 0
+	header.ZIndex = z + 3
+	child(header, "UICorner", "UICorner").CornerRadius = UDim.new(0, 18)
+	local hg = child(header, "UIGradient", "UIGradient")
+	hg.Color = ColorSequence.new(Color3.fromRGB(110, 95, 255), Color3.fromRGB(55, 200, 255))
+	local fill = child(header, "Frame", "BottomFill")
+	fill.Size = UDim2.new(1, 0, 0, 20)
+	fill.Position = UDim2.new(0, 0, 1, -20)
+	fill.BorderSizePixel = 0
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	fill.ZIndex = z + 3
+	child(fill, "UIGradient", "UIGradient").Color = hg.Color
+	local line = child(header, "Frame", "Line")
+	line.Size = UDim2.new(1, 0, 0, 5)
+	line.Position = UDim2.new(0, 0, 1, 0)
+	line.BorderSizePixel = 0
+	line.BackgroundColor3 = UIStyle.OUTLINE
+	line.ZIndex = z + 4
+	local hs = UIStyle.studs(header, 30, 0)
+	if hs then
+		hs.ZIndex = z + 4
+	end
+
+	-- title: icon + text on the left of the header
+	local x = 18
+	if titleIcon then
+		titleIcon.Parent = header
+		titleIcon.AnchorPoint = Vector2.new(0, 0.5)
+		titleIcon.Position = UDim2.new(0, 10, 0.5, 0)
+		titleIcon.Size = UDim2.fromOffset(H - 12, H - 12)
+		titleIcon.Rotation = 0
+		for _, d in ipairs(titleIcon:GetDescendants()) do
+			if d:IsA("GuiObject") then
+				d.ZIndex = z + 6
+			end
+		end
+		titleIcon.ZIndex = z + 5
+		x = H + 6
+	end
+	if titleText then
+		titleText.Parent = header
+		titleText.AnchorPoint = Vector2.new(0, 0.5)
+		titleText.Position = UDim2.new(0, x, 0.5, 0)
+		titleText.Size = UDim2.new(1, -(x + H + 20), 0.58, 0)
+		titleText.TextXAlignment = Enum.TextXAlignment.Left
+		titleText.TextColor3 = Color3.new(1, 1, 1)
+		titleText.TextStrokeTransparency = 0
+		titleText.TextStrokeColor3 = UIStyle.OUTLINE
+		titleText.BackgroundTransparency = 1
+		titleText.ZIndex = z + 6
+	end
+	if oldTitle and oldTitle:IsA("GuiObject") then
+		oldTitle.Visible = false
+	end
+
+	-- the red X at the header's right end
+	if closeBtn then
+		closeBtn:SetAttribute("KeepPlace", true)
+		closeBtn.AnchorPoint = Vector2.new(1, 0)
+		closeBtn.Position = UDim2.fromScale(1, 0)
+		closeBtn.Size = UDim2.fromOffset(H + 12, H)
+		closeBtn.ZIndex = z + 7
+		UIStyle.closeButton(closeBtn, true)
+		local label = closeBtn:FindFirstChild("Label")
+		if label then
+			label.AnchorPoint = Vector2.new(0.5, 0.5)
+			label.Size = UDim2.fromScale(0.6, 0.62)
+			label.Position = UDim2.fromScale(0.5, 0.55)
+		end
+		local pad = closeBtn:FindFirstChildOfClass("UIPadding")
+		if pad and not label then
+			pad.PaddingTop = UDim.new(0.2, 0)
+			pad.PaddingBottom = UDim.new(0.08, 0)
+		end
+		for _, d in ipairs(closeBtn:GetDescendants()) do
+			if d:IsA("GuiObject") then
+				d.ZIndex = math.max(d.ZIndex, z + 8)
+			end
+		end
+	end
+end
+
 return UIStyle

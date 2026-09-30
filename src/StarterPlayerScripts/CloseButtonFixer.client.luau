@@ -1,7 +1,9 @@
 local Players = game:GetService("Players")
 
 --------------------------------------------------------------------
--- Every window's X (close) button sits in the same place: centered on
+-- Every window gets the studded Backpack look (UIStyle.skinWindow): a
+-- header bar with the title on the left and the red X at its right end.
+-- Without the style module, the X falls back to this: centered on
 -- the window's top border at the top-right corner, half outside the
 -- window, so it never covers anything inside it. Windows that clip their
 -- children get it just inside the corner instead (it would be cut off).
@@ -43,6 +45,14 @@ local function fix(b)
 		return
 	end
 	fixed[b] = true
+	-- the Backpack look for every window: header bar + red X at its end
+	if UIStyle and UIStyle.skinWindow and not window:GetAttribute("NoSkin") then
+		local ok, err = pcall(UIStyle.skinWindow, window, b)
+		if ok then
+			return
+		end
+		warn("Window skin failed for " .. window:GetFullName() .. ": " .. tostring(err))
+	end
 	local w = window.Size.X.Offset
 	local size = (w > 0 and w < 420) and 42 or 50 -- small side panels get a smaller X
 	b.Size = UDim2.fromOffset(size, size)

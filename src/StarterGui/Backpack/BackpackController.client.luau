@@ -971,6 +971,25 @@ local restyled, restyleErr = pcall(function()
 	line.ZIndex = 6
 	line.Parent = title
 	UIStyle.studs(title, 30, 0.15)
+	-- only ONE header with ONE stud layer: remove a second header / studs
+	-- (if the window was auto-styled before this script marked it)
+	local function oneHeader()
+		local skin = main:FindFirstChild("SkinHeader")
+		if skin then
+			skin:Destroy()
+		end
+		local seen = false
+		for _, c in ipairs(title:GetChildren()) do
+			if c.Name == "Studs" then
+				if seen then
+					c:Destroy()
+				end
+				seen = true
+			end
+		end
+	end
+	oneHeader()
+	task.delay(2, oneHeader)
 	local badge = title:FindFirstChild("GoldBadge")
 	if badge then
 		badge.AnchorPoint = Vector2.new(0, 0.5)

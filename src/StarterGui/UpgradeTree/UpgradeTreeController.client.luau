@@ -589,9 +589,36 @@ openBranch = function(bi)
 			t.question = label(t.holder, "?", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(0.25, 0.25), { ZIndex = 7, TextColor3 = Color3.fromRGB(200, 205, 220) })
 			t.vein = vein
 			tiles[node.id] = t
+			-- phones: HOLD a hex to see its info first (letting go then
+			-- doesn't buy); a quick tap buys
+			local heldInfo = false
+			local holdToken
+			t.holder.InputBegan:Connect(function(input)
+				if input.UserInputType ~= Enum.UserInputType.Touch then
+					return
+				end
+				heldInfo = false
+				local token = {}
+				holdToken = token
+				task.delay(0.4, function()
+					if holdToken == token and not panMoved and dim.Visible then
+						heldInfo = true
+						showInfo(node)
+					end
+				end)
+			end)
+			t.holder.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.Touch then
+					holdToken = nil
+				end
+			end)
 			t.holder.Activated:Connect(function(input)
 				if panMoved then
 					return -- that was a drag, not a click
+				end
+				if heldInfo then
+					heldInfo = false
+					return -- it was a hold: the info is showing, don't buy
 				end
 				if statusOf(node) == "available" then
 					selected = node

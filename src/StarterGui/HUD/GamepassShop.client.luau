@@ -264,6 +264,62 @@ task.spawn(function()
 	update()
 end)
 
+-- CODES (the last section): type a code the dev made, get its rewards --
+do
+	local redeemRemote = remotes:FindFirstChild("RedeemCode")
+	local codeGrid = section("CODES", Color3.fromRGB(235, 90, 200))
+	local layout = codeGrid:FindFirstChildOfClass("UIGridLayout")
+	if layout then
+		layout:Destroy()
+	end
+	local box = mk("Frame", { Name = "CodeCard", Size = UDim2.new(1, -4, 0, 150), BackgroundColor3 = Color3.fromRGB(28, 31, 42) }, codeGrid)
+	mk("UICorner", { CornerRadius = UDim.new(0, 16) }, box)
+	mk("UIStroke", { Color = Color3.fromRGB(235, 90, 200), Thickness = 4 }, box)
+	label(box, "REDEEM A CODE", UDim2.new(1, -32, 0, 30), UDim2.fromOffset(16, 12), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Color3.fromRGB(255, 150, 230) })
+	label(box, "Codes are posted in our group and socials. Each code works once!", UDim2.new(1, -32, 0, 18), UDim2.fromOffset(16, 44), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Color3.fromRGB(200, 208, 230) })
+	local input = mk("TextBox", { Size = UDim2.new(1, -210, 0, 48), Position = UDim2.fromOffset(16, 72), BackgroundColor3 = Color3.fromRGB(236, 240, 255), Text = "", PlaceholderText = "Enter code...", TextScaled = true, Font = FONT, TextColor3 = OUTLINE, PlaceholderColor3 = Color3.fromRGB(140, 146, 170), ClearTextOnFocus = false }, box)
+	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, input)
+	mk("UIStroke", { Color = OUTLINE, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, input)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 10), PaddingBottom = UDim.new(0, 10), PaddingLeft = UDim.new(0, 12), PaddingRight = UDim.new(0, 12) }, input)
+	local redeem = mk("TextButton", { Size = UDim2.fromOffset(170, 48), Position = UDim2.new(1, -186, 0, 72), BackgroundColor3 = GREEN, Text = "REDEEM", TextScaled = true, Font = FONT, TextColor3 = WHITE, TextStrokeTransparency = 0, TextStrokeColor3 = OUTLINE }, box)
+	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, redeem)
+	mk("UIStroke", { Color = OUTLINE, Thickness = 3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, redeem)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 9) }, redeem)
+	local result = label(box, "", UDim2.new(1, -32, 0, 20), UDim2.fromOffset(16, 124), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextXAlignment = Enum.TextXAlignment.Left })
+	local busy = false
+	local function tryRedeem()
+		redeemRemote = redeemRemote or remotes:FindFirstChild("RedeemCode")
+		if busy or not redeemRemote then
+			return
+		end
+		local code = input.Text:gsub("%s", "")
+		if code == "" then
+			result.Text = "Type a code first."
+			result.TextColor3 = Color3.fromRGB(255, 140, 140)
+			return
+		end
+		busy = true
+		redeem.Text = "..."
+		local ok, r = pcall(function()
+			return redeemRemote:InvokeServer(code)
+		end)
+		busy = false
+		redeem.Text = "REDEEM"
+		local good = ok and r and r.success
+		result.Text = (ok and r and r.message) or "Something went wrong. Try again."
+		result.TextColor3 = good and Color3.fromRGB(140, 255, 150) or Color3.fromRGB(255, 140, 140)
+		if good then
+			input.Text = ""
+		end
+	end
+	redeem.Activated:Connect(tryRedeem)
+	input.FocusLost:Connect(function(enter)
+		if enter then
+			tryRedeem()
+		end
+	end)
+end
+
 -- light up the category you're looking at
 local activeTab
 local function updateTabs()
@@ -272,6 +328,11 @@ local function updateTabs()
 		if t.header.AbsolutePosition.Y - list.AbsolutePosition.Y <= 60 then
 			current = t
 		end
+	end
+	-- scrolled all the way down: the last section (CODES is short)
+	local maxY = list.AbsoluteCanvasSize.Y - list.AbsoluteWindowSize.Y
+	if maxY > 0 and list.CanvasPosition.Y >= maxY - 4 then
+		current = sectionTabs[#sectionTabs]
 	end
 	if current == activeTab then
 		return

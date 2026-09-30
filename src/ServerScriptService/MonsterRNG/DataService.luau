@@ -156,6 +156,7 @@ local function newProfile()
 		gearStock = { slot = -1, items = {} },
 		adminPasses = {}, -- gamepass perks given by the admin (not a Roblox purchase)
 		tags = {}, -- admin-given tags: admin / tester / beta
+		redeemedCodes = {}, -- codes this player already used (Shop > CODES)
 		autoSell = nil, -- Auto Sell settings (saved; always starts OFF on join)
 		pvp = { credits = 0, points = 0, season = "", wins = 0, losses = 0 }, -- PvP credits + this season's points
 		guildId = nil, -- the guild this player is in
@@ -259,7 +260,7 @@ local function sanitize(data)
 		end
 		profile.gearStock = { slot = math.floor(data.gearStock.slot), items = items }
 	end
-	for _, field in ipairs({ "adminPasses", "tags" }) do
+	for _, field in ipairs({ "adminPasses", "tags", "redeemedCodes" }) do
 		if type(data[field]) == "table" then
 			for k, v in pairs(data[field]) do
 				if type(k) == "string" and v == true then

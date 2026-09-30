@@ -127,7 +127,8 @@ local TAB_W, TAB_H = 170, 52
 local tabGive = button(main, "GIVE", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42), GOLD)
 local tabChat = button(main, "DEV CHAT", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42 + (TAB_H + 8)), GRAY)
 local tabFx = button(main, "EFFECTS", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42 + (TAB_H + 8) * 2), GRAY)
-for _, t in ipairs({ tabGive, tabChat, tabFx }) do
+local tabCodes = button(main, "CODES", UDim2.fromOffset(TAB_W, TAB_H), UDim2.fromOffset(20, 42 + (TAB_H + 8) * 3), GRAY)
+for _, t in ipairs({ tabGive, tabChat, tabFx, tabCodes }) do
 	t.TextXAlignment = Enum.TextXAlignment.Left
 	local pad = t:FindFirstChildOfClass("UIPadding")
 	if pad then
@@ -143,12 +144,19 @@ local chatBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Positio
 round(chatBody, 14, 3)
 local fxBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = BODY_DARK, Visible = false }, main)
 round(fxBody, 14, 3)
+local codeBody = mk("Frame", { Size = giveBody.Size, Position = giveBody.Position, BackgroundColor3 = BODY_DARK, Visible = false }, main)
+round(codeBody, 14, 3)
+local onCodesOpened -- set by the CODES tab below
 local function showTab(which)
 	giveBody.Visible = which == "give"
 	chatBody.Visible = which == "chat"
 	fxBody.Visible = which == "fx"
+	codeBody.Visible = which == "codes"
+	if which == "codes" and onCodesOpened then
+		task.spawn(onCodesOpened)
+	end
 	-- open tab: lighter with a white rim; the others dark (like the Backpack)
-	for key, t in pairs({ give = tabGive, chat = tabChat, fx = tabFx }) do
+	for key, t in pairs({ give = tabGive, chat = tabChat, fx = tabFx, codes = tabCodes }) do
 		local on = which == key
 		t.BackgroundColor3 = on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68)
 		local st = t:FindFirstChildOfClass("UIStroke")
@@ -169,6 +177,9 @@ tabGive.Activated:Connect(function()
 end)
 tabChat.Activated:Connect(function()
 	showTab("chat")
+end)
+tabCodes.Activated:Connect(function()
+	showTab("codes")
 end)
 showTab("give")
 
@@ -205,6 +216,8 @@ local amountBox = mk("TextBox", { Size = UDim2.fromOffset(170, 40), Position = U
 round(amountBox, 10, 3)
 mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), PaddingLeft = UDim.new(0, 8) }, amountBox)
 local giveBtn = button(giveBody, "GIVE", UDim2.fromOffset(160, 50), UDim2.new(1, -172, 1, -64), GREEN)
+-- puts what's picked above into the code you're making (CODES tab)
+local addToCodeBtn = button(giveBody, "+ ADD TO CODE", UDim2.fromOffset(150, 50), UDim2.new(1, -330, 1, -64), GOLD)
 local status = text(giveBody, "", UDim2.new(1, -24, 0, 22), UDim2.new(0, 12, 1, -26), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(200, 255, 200) })
 status.Position = UDim2.new(0, 12, 1, -134)
 
@@ -575,6 +588,227 @@ task.spawn(function()
 		task.wait(1)
 	end
 end)
+
+--------------------------------------------------------------------
+-- CODES tab: make codes players redeem in the Shop (every server)
+--   rewards come from the GIVE tab: pick something + amount, then
+--   press + ADD TO CODE
+--------------------------------------------------------------------
+local draft = {} -- rewards of the code being made
+local function rewardName(r)
+	local name = r.key or ""
+	if r.kind == "cash" then
+		return "$" .. Config.FormatNumber(r.amount)
+	elseif r.kind == "shards" then
+		return Config.FormatNumber(r.amount) .. " Shards"
+	elseif r.kind == "egg" then
+		name = Config.GetRarity(r.key).name .. " Egg"
+	elseif r.kind == "monster" then
+		local m = Config.GetMonster(r.key)
+		name = m and m.name or r.key
+	elseif r.kind == "potion" then
+		local p = Config.GetPotion(r.key)
+		name = p and p.name or r.key
+	elseif r.kind == "item" then
+		local it = Config.Items[r.key]
+		name = it and it.name or r.key
+	elseif r.kind == "gear" then
+		local g = Config.GetGear(r.key)
+		name = g and g.name or r.key
+	end
+	local extra = ""
+	if r.kind == "egg" or r.kind == "monster" then
+		extra = ((r.size and r.size ~= "Normal") and (r.size .. " ") or "") .. ((r.finish and r.finish ~= "Normal") and (r.finish .. " ") or "")
+	end
+	return Config.FormatNumber(r.amount) .. "x " .. extra .. name
+end
+
+local function field(labelText, x, w, placeholder)
+	text(codeBody, labelText, UDim2.fromOffset(w, 20), UDim2.fromOffset(x, 8), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+	local box = mk("TextBox", { Size = UDim2.fromOffset(w, 38), Position = UDim2.fromOffset(x, 30), BackgroundColor3 = Color3.fromRGB(236, 240, 255), Text = "", PlaceholderText = placeholder, TextScaled = true, Font = FONT, TextColor3 = OUTLINE, ClearTextOnFocus = false }, codeBody)
+	round(box, 10, 3)
+	mk("UIPadding", { PaddingTop = UDim.new(0, 7), PaddingBottom = UDim.new(0, 7), PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8) }, box)
+	return box
+end
+local codeBox = field("CODE", 12, 250, "e.g. RELEASE")
+local hoursBox = field("EXPIRES IN (HOURS)", 274, 170, "blank = never")
+local usesBox = field("MAX USES", 456, 150, "blank = no limit")
+codeBox:GetPropertyChangedSignal("Text"):Connect(function()
+	local up = codeBox.Text:upper():gsub("[^%w_]", "")
+	if up ~= codeBox.Text then
+		codeBox.Text = up
+	end
+end)
+
+text(codeBody, "REWARDS", UDim2.fromOffset(200, 20), UDim2.fromOffset(12, 78), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+local draftList = mk("ScrollingFrame", { Size = UDim2.new(1, -24, 0, 118), Position = UDim2.fromOffset(12, 100), BackgroundColor3 = Color3.fromRGB(16, 18, 28), BorderSizePixel = 0, ScrollBarThickness = 6, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new() }, codeBody)
+round(draftList, 10, false)
+mk("UIGridLayout", { CellSize = UDim2.new(0.5, -6, 0, 34), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder }, draftList)
+mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 6) }, draftList)
+local draftHint = text(codeBody, "Pick rewards in the GIVE tab, then press + ADD TO CODE", UDim2.new(1, -60, 0, 22), UDim2.fromOffset(30, 148), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(170, 176, 200) })
+
+local saveCodeBtn = button(codeBody, "SAVE CODE", UDim2.fromOffset(170, 44), UDim2.fromOffset(12, 226), GREEN)
+local clearCodeBtn = button(codeBody, "CLEAR", UDim2.fromOffset(110, 44), UDim2.fromOffset(190, 226), GRAY)
+local codeStatus = text(codeBody, "", UDim2.new(1, -324, 0, 40), UDim2.fromOffset(312, 228), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left })
+
+text(codeBody, "ACTIVE CODES", UDim2.fromOffset(250, 22), UDim2.fromOffset(12, 280), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+local codeList = mk("ScrollingFrame", { Size = UDim2.new(1, -24, 1, -318), Position = UDim2.fromOffset(12, 306), BackgroundColor3 = Color3.fromRGB(16, 18, 28), BorderSizePixel = 0, ScrollBarThickness = 6, AutomaticCanvasSize = Enum.AutomaticSize.Y, CanvasSize = UDim2.new() }, codeBody)
+round(codeList, 10, false)
+mk("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }, codeList)
+mk("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 10), PaddingBottom = UDim.new(0, 6) }, codeList)
+
+local function setCodeStatus(msg, good)
+	codeStatus.Text = msg
+	codeStatus.TextColor3 = good and Color3.fromRGB(160, 255, 170) or Color3.fromRGB(255, 140, 140)
+end
+
+local function renderDraft()
+	for _, c in ipairs(draftList:GetChildren()) do
+		if c:IsA("GuiObject") then
+			c:Destroy()
+		end
+	end
+	draftHint.Visible = #draft == 0
+	for i, r in ipairs(draft) do
+		local row = mk("Frame", { LayoutOrder = i, BackgroundColor3 = Color3.fromRGB(50, 54, 68) }, draftList)
+		round(row, 8, 2)
+		text(row, rewardName(r), UDim2.new(1, -46, 0.62, 0), UDim2.new(0, 8, 0.19, 0), { TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold })
+		-- lowercase "x": a button with the text "X" counts as a window's close button
+		local x = button(row, "x", UDim2.fromOffset(28, 28), UDim2.new(1, -31, 0.5, -14), RED)
+		x.Activated:Connect(function()
+			table.remove(draft, i)
+			renderDraft()
+		end)
+	end
+end
+
+local function timeLeft(expires, now)
+	if not expires then
+		return "never expires"
+	end
+	local s = expires - now
+	if s <= 0 then
+		return "EXPIRED"
+	elseif s >= 86400 then
+		return string.format("%dd %dh left", s // 86400, (s % 86400) // 3600)
+	elseif s >= 3600 then
+		return string.format("%dh %dm left", s // 3600, (s % 3600) // 60)
+	end
+	return string.format("%dm left", math.max(1, s // 60))
+end
+
+local function renderCodes()
+	for _, c in ipairs(codeList:GetChildren()) do
+		if c:IsA("GuiObject") then
+			c:Destroy()
+		end
+	end
+	local ok, r = pcall(function()
+		return adminRemote:InvokeServer("codes_list")
+	end)
+	if not (ok and r and r.success) then
+		text(codeList, "Could not load codes.", UDim2.new(1, 0, 0, 30), UDim2.new(), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1 })
+		return
+	end
+	if #r.codes == 0 then
+		text(codeList, "No codes yet.", UDim2.new(1, 0, 0, 30), UDim2.new(), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(170, 176, 200) })
+	end
+	for i, c in ipairs(r.codes) do
+		local row = mk("Frame", { LayoutOrder = i, Size = UDim2.new(1, 0, 0, 58), BackgroundColor3 = Color3.fromRGB(40, 44, 58) }, codeList)
+		round(row, 10, 2)
+		text(row, c.code, UDim2.new(0.45, 0, 0, 26), UDim2.fromOffset(10, 4), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+		local uses = (c.uses or 0) .. (c.maxUses and ("/" .. c.maxUses) or "") .. " uses  -  " .. timeLeft(c.expires, r.now)
+		text(row, uses, UDim2.new(0.5, -10, 0, 20), UDim2.new(0.45, 0, 0, 8), { TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(200, 210, 240) })
+		local names = {}
+		for _, rw in ipairs(c.rewards or {}) do
+			table.insert(names, rewardName(rw))
+		end
+		text(row, table.concat(names, ", "), UDim2.new(1, -190, 0, 18), UDim2.fromOffset(10, 34), { TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(160, 255, 170) })
+		local edit = button(row, "EDIT", UDim2.fromOffset(76, 34), UDim2.new(1, -170, 0.5, -17), BLUE)
+		local del = button(row, "DELETE", UDim2.fromOffset(86, 34), UDim2.new(1, -90, 0.5, -17), RED)
+		edit.Activated:Connect(function()
+			codeBox.Text = c.code
+			draft = table.clone(c.rewards or {})
+			usesBox.Text = c.maxUses and tostring(c.maxUses) or ""
+			hoursBox.Text = c.expires and tostring(math.max(0, math.floor((c.expires - r.now) / 360) / 10)) or ""
+			renderDraft()
+			setCodeStatus("Editing " .. c.code .. " - change it and press SAVE CODE.", true)
+		end)
+		local armed = false
+		del.Activated:Connect(function()
+			if not armed then
+				armed = true
+				del.Text = "SURE?"
+				task.delay(3, function()
+					if del.Parent then
+						armed = false
+						del.Text = "DELETE"
+					end
+				end)
+				return
+			end
+			local ok2, res = pcall(function()
+				return adminRemote:InvokeServer("code_delete", c.code)
+			end)
+			setCodeStatus((ok2 and res and res.message) or "Failed.", ok2 and res and res.success)
+			renderCodes()
+		end)
+	end
+end
+onCodesOpened = renderCodes
+
+addToCodeBtn.Activated:Connect(function()
+	local kind = state.kind
+	if kind == "pass" or kind == "tag" then
+		status.Text = "Codes can't give gamepasses or tags."
+		status.TextColor3 = Color3.fromRGB(255, 140, 140)
+		return
+	end
+	local amount = readAmount()
+	if amount <= 0 then
+		status.Text = "Enter an amount."
+		status.TextColor3 = Color3.fromRGB(255, 140, 140)
+		return
+	end
+	if #draft >= 12 then
+		status.Text = "A code can have up to 12 rewards."
+		status.TextColor3 = Color3.fromRGB(255, 140, 140)
+		return
+	end
+	local r = { kind = kind, key = state.key, amount = amount, size = state.size, finish = state.finish }
+	table.insert(draft, r)
+	renderDraft()
+	status.Text = "Added " .. rewardName(r) .. " to the code (" .. #draft .. " rewards). Open CODES to save it."
+	status.TextColor3 = Color3.fromRGB(255, 230, 140)
+end)
+
+local saving = false
+saveCodeBtn.Activated:Connect(function()
+	if saving then
+		return
+	end
+	saving = true
+	setCodeStatus("Saving...", true)
+	local ok, r = pcall(function()
+		return adminRemote:InvokeServer("code_save", { code = codeBox.Text, rewards = draft, hours = tonumber(hoursBox.Text), maxUses = tonumber(usesBox.Text) })
+	end)
+	saving = false
+	local good = ok and r and r.success
+	setCodeStatus((ok and r and r.message) or "Failed.", good)
+	if good then
+		draft = {}
+		codeBox.Text, hoursBox.Text, usesBox.Text = "", "", ""
+		renderDraft()
+		renderCodes()
+	end
+end)
+clearCodeBtn.Activated:Connect(function()
+	draft = {}
+	codeBox.Text, hoursBox.Text, usesBox.Text = "", "", ""
+	renderDraft()
+	setCodeStatus("", true)
+end)
+renderDraft()
 
 --------------------------------------------------------------------
 -- open / close

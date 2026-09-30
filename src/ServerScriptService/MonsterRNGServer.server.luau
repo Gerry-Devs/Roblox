@@ -2465,9 +2465,233 @@ do
 		return sent
 	end
 
+	----------------------------------------------------------------
+	-- Codes: the admin makes them in the Admin panel (CODES tab), players
+	-- redeem them in the Shop. Saved in a DataStore so every server has
+	-- them; a MessagingService ping makes new codes work right away.
+	--   codes[CODE] = { rewards = { {kind,key,amount,size,finish} },
+	--                   expires = unix time or nil, maxUses = n or nil }
+	-- Each player can redeem a code once (profile.redeemedCodes).
+	----------------------------------------------------------------
+	local CODES_TOPIC = "MonsterRNG_CodesChanged"
+	local CODE_KINDS = { cash = true, shards = true, egg = true, monster = true, potion = true, item = true, gear = true }
+	local codeStore
+	pcall(function()
+		codeStore = game:GetService("DataStoreService"):GetDataStore("MonsterRNG_Codes")
+	end)
+	local codes = {}
+	local codesLoadedAt = -math.huge
+	local function loadCodes()
+		if not codeStore then
+			return
+		end
+		local ok, data = pcall(function()
+			return codeStore:GetAsync("all")
+		end)
+		if ok then
+			codes = type(data) == "table" and data or {}
+			codesLoadedAt = os.clock()
+		end
+	end
+	task.spawn(function()
+		loadCodes()
+		pcall(function()
+			MessagingService:SubscribeAsync(CODES_TOPIC, function()
+				loadCodes()
+			end)
+		end)
+		while true do
+			task.wait(60)
+			loadCodes()
+		end
+	end)
+	local function cleanCode(text)
+		if type(text) ~= "string" then
+			return nil
+		end
+		local c = text:upper():gsub("%s", "")
+		if not c:match("^[%w_]+$") or #c < 2 or #c > 24 then
+			return nil
+		end
+		return c
+	end
+	local function cleanRewards(list)
+		local out = {}
+		if type(list) ~= "table" then
+			return out
+		end
+		for _, r in ipairs(list) do
+			if #out >= 12 then
+				break
+			end
+			if type(r) == "table" and CODE_KINDS[r.kind] then
+				table.insert(out, {
+					kind = r.kind,
+					key = type(r.key) == "string" and r.key or nil,
+					amount = math.clamp(math.floor(tonumber(r.amount) or 1), 1, 1e15),
+					size = type(r.size) == "string" and r.size or "Normal",
+					finish = type(r.finish) == "string" and r.finish or "Normal",
+				})
+			end
+		end
+		return out
+	end
+	local function editCodes(fn)
+		if not codeStore then
+			return false, "DataStore not available (turn on API access in Studio)."
+		end
+		local ok, err = pcall(function()
+			codeStore:UpdateAsync("all", function(old)
+				old = type(old) == "table" and old or {}
+				fn(old)
+				codes = old
+				return old
+			end)
+		end)
+		if ok then
+			codesLoadedAt = os.clock()
+			pcall(function()
+				MessagingService:PublishAsync(CODES_TOPIC, { t = os.time() })
+			end)
+		end
+		return ok, err
+	end
+	local function codeUses(code)
+		if not codeStore then
+			return 0
+		end
+		local ok, n = pcall(function()
+			return codeStore:GetAsync("uses_" .. code)
+		end)
+		return ok and tonumber(n) or 0
+	end
+	local function handleCodes(action, req)
+		if action == "codes_list" then
+			local list = {}
+			for code, c in pairs(codes) do
+				table.insert(list, { code = code, rewards = c.rewards, expires = c.expires, maxUses = c.maxUses, uses = codeUses(code), created = c.created })
+			end
+			table.sort(list, function(a, b)
+				return (a.created or 0) > (b.created or 0)
+			end)
+			return { success = true, codes = list, now = os.time() }
+		elseif action == "code_save" and type(req) == "table" then
+			local code = cleanCode(req.code)
+			if not code then
+				return { success = false, message = "Code: 2-24 letters / numbers, no spaces." }
+			end
+			local rewards = cleanRewards(req.rewards)
+			if #rewards == 0 then
+				return { success = false, message = "Add at least one reward (GIVE tab > + ADD TO CODE)." }
+			end
+			local hours = tonumber(req.hours)
+			local maxUses = tonumber(req.maxUses)
+			local ok, err = editCodes(function(all)
+				local old = all[code]
+				all[code] = {
+					rewards = rewards,
+					expires = (hours and hours > 0) and (os.time() + math.floor(hours * 3600)) or nil,
+					maxUses = (maxUses and maxUses > 0) and math.floor(maxUses) or nil,
+					created = old and old.created or os.time(),
+				}
+			end)
+			if not ok then
+				return { success = false, message = "Could not save: " .. tostring(err) }
+			end
+			return { success = true, message = "Code " .. code .. " saved! It works in every server." }
+		elseif action == "code_delete" then
+			local code = cleanCode(req)
+			if not code then
+				return { success = false, message = "Pick a code." }
+			end
+			local ok, err = editCodes(function(all)
+				all[code] = nil
+			end)
+			return { success = ok, message = ok and ("Code " .. code .. " deleted.") or ("Could not delete: " .. tostring(err)) }
+		end
+		return { success = false, message = "Unknown code action." }
+	end
+
+	local redeemRemote = getRemote("RedeemCode", "RemoteFunction")
+	local lastRedeem = {}
+	redeemRemote.OnServerInvoke = function(player, text)
+		local now = os.clock()
+		if lastRedeem[player] and now - lastRedeem[player] < 2 then
+			return { success = false, message = "Wait a moment before trying again." }
+		end
+		lastRedeem[player] = now
+		local profile = DataService.Get(player)
+		local code = cleanCode(text)
+		if not profile or not code then
+			return { success = false, message = "Type a code first." }
+		end
+		local c = codes[code]
+		if not c and os.clock() - codesLoadedAt > 10 then
+			loadCodes() -- maybe it was just made in another server
+			c = codes[code]
+		end
+		if not c then
+			return { success = false, message = "That code doesn't exist." }
+		end
+		if c.expires and os.time() > c.expires then
+			return { success = false, message = "That code has expired." }
+		end
+		profile.redeemedCodes = profile.redeemedCodes or {}
+		if profile.redeemedCodes[code] then
+			return { success = false, message = "You already used this code." }
+		end
+		if c.maxUses then
+			if not codeStore then
+				return { success = false, message = "Codes aren't available right now." }
+			end
+			local full = false
+			local ok = pcall(function()
+				codeStore:UpdateAsync("uses_" .. code, function(old)
+					old = tonumber(old) or 0
+					if old >= c.maxUses then
+						full = true
+						return nil
+					end
+					full = false
+					return old + 1
+				end)
+			end)
+			if not ok then
+				return { success = false, message = "Couldn't check the code. Try again." }
+			end
+			if full then
+				return { success = false, message = "This code has been used up." }
+			end
+		elseif codeStore then
+			task.spawn(function()
+				pcall(function()
+					codeStore:IncrementAsync("uses_" .. code, 1)
+				end)
+			end)
+		end
+		profile.redeemedCodes[code] = true
+		local got = {}
+		for _, r in ipairs(c.rewards or {}) do
+			local what = applyGive(profile, r)
+			if what then
+				table.insert(got, what)
+			end
+		end
+		updateLeaderstats(player)
+		sync(player)
+		task.spawn(DataService.Save, player)
+		return { success = true, message = "Code redeemed! You got " .. (#got > 0 and table.concat(got, ", ") or "nothing") .. "!" }
+	end
+	Players.PlayerRemoving:Connect(function(p)
+		lastRedeem[p] = nil
+	end)
+
 	adminRemote.OnServerInvoke = function(player, action, req)
 		if not isAdmin(player) then
 			return { success = false, message = "Not allowed." }
+		end
+		if action == "codes_list" or action == "code_save" or action == "code_delete" then
+			return handleCodes(action, req)
 		end
 		if action == "chat" then
 			local text = type(req) == "string" and req:sub(1, 200) or ""

@@ -228,7 +228,16 @@ local function optionList(kind)
 			table.insert(list, { key = r.key, name = r.name .. " Egg", color = Color3.fromRGB(r.color[1], r.color[2], r.color[3]) })
 		end
 	elseif kind == "monster" then
-		for _, m in ipairs(Config.Monsters) do
+		-- in rarity order (Common first), weakest first inside a rarity
+		local sorted = table.clone(Config.Monsters)
+		table.sort(sorted, function(a, b)
+			local ta, tb = Config.GetRarity(a.rarity).tier, Config.GetRarity(b.rarity).tier
+			if ta ~= tb then
+				return ta < tb
+			end
+			return (a.power or 0) < (b.power or 0)
+		end)
+		for _, m in ipairs(sorted) do
 			local r = Config.GetRarity(m.rarity)
 			table.insert(list, { key = m.id, name = m.name, color = Color3.fromRGB(r.color[1], r.color[2], r.color[3]) })
 		end

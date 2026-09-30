@@ -207,7 +207,18 @@ task.spawn(function()
 	end
 	local btn = warp:Clone()
 	btn.Name = "SkillsButton"
-	btn.LayoutOrder = (warp.LayoutOrder or 0) + 1
+	-- order in the dock: EGGS, PETS, WARP, then SKILLS (under WARP)
+	for i, name in ipairs({ "EggButton", "MonsterButton", "WarpButton" }) do
+		local b = dock:FindFirstChild(name)
+		if b and b:IsA("GuiObject") then
+			b.LayoutOrder = i
+		end
+	end
+	btn.LayoutOrder = 4
+	local dockLayout = dock:FindFirstChildOfClass("UIListLayout")
+	if dockLayout then
+		dockLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	end
 	for _, d in ipairs(btn:GetDescendants()) do
 		if d:IsA("LuaSourceContainer") then
 			d:Destroy()

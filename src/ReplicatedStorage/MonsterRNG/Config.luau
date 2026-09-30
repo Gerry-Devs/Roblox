@@ -1507,7 +1507,7 @@ end
 -- boosted by the monster's size and finish. The same stat from several
 -- monsters adds up, up to the stat's max (cap).
 --------------------------------------------------------------------
-Config.SkillsIconImage = "" -- picture for the SKILLS button (right side); "" = a star
+Config.SkillsIconImage = "rbxassetid://89154708883558" -- picture for the SKILLS button (right side, under WARP)
 Config.SkillSizeBoost = { Normal = 1, Huge = 1.2, Titan = 1.5 }
 Config.SkillFinishBoost = { Normal = 1, Gold = 1.1, Silver = 1.2, Rainbow = 1.35 }
 

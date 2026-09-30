@@ -237,14 +237,14 @@ task.spawn(function()
 	end
 	local btn = warp:Clone()
 	btn.Name = "SkillsButton"
-	-- order in the dock: EGGS, PETS, WARP, then SKILLS (under WARP)
-	for i, name in ipairs({ "EggButton", "MonsterButton", "WarpButton" }) do
-		local b = dock:FindFirstChild(name)
+	-- order in the dock: EGGS, PETS, SKILLS, then WARP at the bottom
+	for i, name in ipairs({ "EggButton", "MonsterButton", "", "WarpButton" }) do
+		local b = name ~= "" and dock:FindFirstChild(name)
 		if b and b:IsA("GuiObject") then
 			b.LayoutOrder = i
 		end
 	end
-	btn.LayoutOrder = 4
+	btn.LayoutOrder = 3
 	local dockLayout = dock:FindFirstChildOfClass("UIListLayout")
 	if dockLayout then
 		dockLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -277,7 +277,20 @@ task.spawn(function()
 	-- make room for one more button in the dock
 	local layout = dock:FindFirstChildOfClass("UIListLayout")
 	local pad = layout and layout.Padding.Offset or 8
-	dock.Size = dock.Size + UDim2.fromOffset(0, warp.Size.Y.Offset + pad)
+	local added = warp.Size.Y.Offset + pad
+	dock.Size = dock.Size + UDim2.fromOffset(0, added)
+	-- the dock grew: move the whole column up so it stays clear of the
+	-- jump button (follows the dock's phone scale)
+	local basePos = dock.Position
+	local dockScale = dock:FindFirstChildOfClass("UIScale")
+	local function place()
+		local sc = dockScale and dockScale.Scale or 1
+		dock.Position = basePos - UDim2.fromOffset(0, (added * 0.5 + 24) * sc)
+	end
+	place()
+	if dockScale then
+		dockScale:GetPropertyChangedSignal("Scale"):Connect(place)
+	end
 	btn.Parent = dock
 	if btn:IsA("GuiButton") then
 		btn.Activated:Connect(function()

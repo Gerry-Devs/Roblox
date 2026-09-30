@@ -102,6 +102,7 @@ corner(main, 18)
 stroke(main, 4)
 local mainScale = mk("UIScale", {}, main)
 
+main:SetAttribute("TitleSize", 0.38) -- monster names are long: a smaller header title
 local title = text(main, { Name = "Title", Position = UDim2.fromOffset(16, 12), Size = UDim2.new(1, -80, 0, 30), TextXAlignment = Enum.TextXAlignment.Left })
 local closeButton = button(main, "X", RED, { Name = "CloseButton", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 10), Size = UDim2.fromOffset(40, 40) })
 

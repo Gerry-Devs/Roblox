@@ -639,14 +639,16 @@ function UIStyle.skinWindow(window, closeBtn)
 		x = H + 6
 	end
 	if titleText then
+		-- a window can ask for a smaller title (e.g. long monster names)
+		local th = window:GetAttribute("TitleSize") or 0.58
 		titleText.AnchorPoint = Vector2.new(0, 0.5)
 		if titleText.Parent == window then
 			-- a title that's a text right in the window: place it by pixels
 			titleText.Position = UDim2.new(0, x, 0, H / 2)
-			titleText.Size = UDim2.new(1, -(x + H + 22), 0, math.floor(H * 0.58))
+			titleText.Size = UDim2.new(1, -(x + H + 22), 0, math.floor(H * th))
 		else
 			titleText.Position = UDim2.new(0, x, 0.5, 0)
-			titleText.Size = UDim2.new(1, -(x + 10), 0.58, 0)
+			titleText.Size = UDim2.new(1, -(x + 10), th, 0)
 		end
 		titleText.TextXAlignment = Enum.TextXAlignment.Left
 		titleText.TextColor3 = Color3.new(1, 1, 1)

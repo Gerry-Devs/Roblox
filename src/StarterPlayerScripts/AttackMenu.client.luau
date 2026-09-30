@@ -162,7 +162,10 @@ end
 --------------------------------------------------------------------
 
 local selected -- the enemy model the window is open for
-local highlight = mk("Highlight", { FillTransparency = 1, OutlineColor = Color3.fromRGB(255, 220, 80), DepthMode = Enum.HighlightDepthMode.AlwaysOnTop, Enabled = false }, workspace)
+-- a small arrow over the chosen enemy. (A Highlight outline froze the game
+-- for a moment on big monsters made of hundreds of parts.)
+local marker = mk("BillboardGui", { Name = "AttackMarker", Size = UDim2.fromOffset(34, 34), SizeOffset = Vector2.new(0, 2.2), AlwaysOnTop = true, LightInfluence = 0, Enabled = false }, gui)
+text(marker, { Size = UDim2.fromScale(1, 1), Text = "\u{25BC}", TextColor3 = Color3.fromRGB(255, 220, 80) })
 
 local function myPetsFolder()
 	local world = workspace:FindFirstChild("MonsterRNGWorld")
@@ -276,8 +279,8 @@ end
 
 local function close()
 	selected = nil
-	highlight.Adornee = nil
-	highlight.Enabled = false
+	marker.Adornee = nil
+	marker.Enabled = false
 	main.Visible = false
 end
 
@@ -285,8 +288,11 @@ local function open(enemy)
 	selected = enemy
 	local nameLabel = enemy:FindFirstChild("NameLabel", true)
 	title.Text = nameLabel and nameLabel.Text or "Enemy"
-	highlight.Adornee = enemy
-	highlight.Enabled = true
+	local root = enemy:FindFirstChild("Root")
+	local ok, cf, size = pcall(enemy.GetBoundingBox, enemy)
+	marker.Adornee = root
+	marker.StudsOffset = Vector3.new(0, (ok and root) and (cf.Position.Y + size.Y / 2 - root.Position.Y + 0.6) or 6, 0)
+	marker.Enabled = root ~= nil
 	-- shrink on small screens so the whole window fits
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
 	if viewport and viewport.Y > 0 then
@@ -338,44 +344,59 @@ end)
 -- phone). WorldToScreenPoint matches InputObject.Position (both leave
 -- out the top bar), so taps line up with what you see.
 local TAP_PADDING = 24
+local function hitsEnemy(camera, enemy, pos)
+	local ok, cf, size = pcall(enemy.GetBoundingBox, enemy)
+	if not ok then
+		return false
+	end
+	local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+	local anyInFront = false
+	for _, x in ipairs({ -0.5, 0.5 }) do
+		for _, y in ipairs({ -0.5, 0.5 }) do
+			for _, z in ipairs({ -0.5, 0.5 }) do
+				local sp = camera:WorldToScreenPoint((cf * CFrame.new(size.X * x, size.Y * y, size.Z * z)).Position)
+				if sp.Z > 0 then
+					anyInFront = true
+					minX, maxX = math.min(minX, sp.X), math.max(maxX, sp.X)
+					minY, maxY = math.min(minY, sp.Y), math.max(maxY, sp.Y)
+				end
+			end
+		end
+	end
+	return anyInFront and pos.X >= minX - TAP_PADDING and pos.X <= maxX + TAP_PADDING
+		and pos.Y >= minY - TAP_PADDING and pos.Y <= maxY + TAP_PADDING
+end
+
+-- returns the tapped enemy, and whether it's close enough to attack.
+-- Only enemies near you get the (slower) whole-body check; far ones just
+-- a quick check around their center, to say "get closer".
 local function enemyAtScreen(pos)
 	local camera = workspace.CurrentCamera
 	if not camera or not enemiesFolder then
 		return nil
 	end
 	local camPos = camera.CFrame.Position
-	local best, bestD
+	local best, bestD, far, farD
 	for _, enemy in ipairs(enemiesFolder:GetChildren()) do
 		local root = enemy:FindFirstChild("Root")
 		if root and enemy:IsA("Model") and not enemy:GetAttribute("Dead") then
 			local depth = (root.Position - camPos).Magnitude
-			if depth < 250 and (not bestD or depth < bestD) then
-				local ok, cf, size = pcall(enemy.GetBoundingBox, enemy)
-				if ok then
-					local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-					local anyInFront = false
-					for _, x in ipairs({ -0.5, 0.5 }) do
-						for _, y in ipairs({ -0.5, 0.5 }) do
-							for _, z in ipairs({ -0.5, 0.5 }) do
-								local corner = (cf * CFrame.new(size.X * x, size.Y * y, size.Z * z)).Position
-								local sp = camera:WorldToScreenPoint(corner)
-								if sp.Z > 0 then
-									anyInFront = true
-									minX, maxX = math.min(minX, sp.X), math.max(maxX, sp.X)
-									minY, maxY = math.min(minY, sp.Y), math.max(maxY, sp.Y)
-								end
-							end
-						end
-					end
-					if anyInFront and pos.X >= minX - TAP_PADDING and pos.X <= maxX + TAP_PADDING
-						and pos.Y >= minY - TAP_PADDING and pos.Y <= maxY + TAP_PADDING then
-						best, bestD = enemy, depth -- the one closest to the camera wins
-					end
+			if distanceTo(enemy) <= Config.Combat.orderRange then
+				if (not bestD or depth < bestD) and hitsEnemy(camera, enemy, pos) then
+					best, bestD = enemy, depth
+				end
+			elseif depth < 250 and (not farD or depth < farD) then
+				local sp = camera:WorldToScreenPoint(root.Position)
+				if sp.Z > 0 and (Vector2.new(sp.X, sp.Y) - pos).Magnitude < 40 then
+					far, farD = enemy, depth
 				end
 			end
 		end
 	end
-	return best
+	if best then
+		return best, true
+	end
+	return far, false
 end
 
 -- only a real tap/click: dragging to turn the camera never opens the menu
@@ -405,12 +426,12 @@ UserInputService.InputEnded:Connect(function(input)
 	if (pos - p.pos).Magnitude > TAP_MOVE then
 		return
 	end
-	local enemy = enemyAtScreen(pos)
+	local enemy, inRange = enemyAtScreen(pos)
 	if not enemy then
 		return
 	end
 	-- you have to walk up to an enemy before you can attack it
-	if distanceTo(enemy) > Config.Combat.orderRange then
+	if not inRange then
 		say("Get closer to attack that enemy!", Color3.fromRGB(255, 170, 90))
 		return
 	end

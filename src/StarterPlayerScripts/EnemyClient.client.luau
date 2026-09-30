@@ -294,7 +294,14 @@ local function headHeight(model, center)
 	return cf.Position.Y + size.Y / 2 - center.Position.Y
 end
 
+local measuredAt = setmetatable({}, { __mode = "k" }) -- model -> os.clock()
 local function placeOverHead(model, center, bars)
+	-- measuring big models isn't free: once, then every 5s (poses change)
+	local now = os.clock()
+	if measuredAt[model] and now - measuredAt[model] < 5 then
+		return
+	end
+	measuredAt[model] = now
 	local top = headHeight(model, center)
 	if not top then
 		return

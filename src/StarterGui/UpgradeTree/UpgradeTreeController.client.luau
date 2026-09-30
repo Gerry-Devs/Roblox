@@ -339,14 +339,14 @@ local function buildCategories()
 	if backBtn then
 		backBtn.Visible = false
 	end
-	local c = makeTile(0, 0, Color3.fromRGB(255, 120, 60), Color3.fromRGB(215, 90, 40))
+	local c = makeTile(0, 0, Color3.fromRGB(255, 120, 60), Color3.fromRGB(215, 90, 40), Config.UpgradeCenterImage)
 	label(c.holder, "UP\nGRADES", UDim2.fromScale(0.7, 0.42), UDim2.fromScale(0.15, 0.29), { ZIndex = 7 })
 	for bi, branch in ipairs(Config.UpgradeBranches) do
 		local d = DIRS[((bi - 1) % 6) + 1]
 		local x, y = hexToPixel(d[1], d[2])
 		x, y = x * GAP, y * GAP
 		local owned, total = branchCounts(branch)
-		local t = makeTile(x, y, owned > 0 and OWNED or CANBUY, owned > 0 and OWNED_DARK or CANBUY_DARK, branch.imageId)
+		local t = makeTile(x, y, owned > 0 and OWNED or CANBUY, owned > 0 and OWNED_DARK or CANBUY_DARK, branch.imageId or (Config.UpgradeBranchImages and Config.UpgradeBranchImages[branch.key]))
 		label(t.holder, branch.name:upper(), UDim2.fromScale(0.86, 0.2), UDim2.fromScale(0.07, 0.3), { ZIndex = 7 })
 		label(t.holder, owned .. "/" .. total, UDim2.fromScale(0.5, 0.16), UDim2.fromScale(0.25, 0.56), { ZIndex = 7, TextColor3 = Color3.fromRGB(255, 240, 200) })
 		t.holder.Activated:Connect(function()
@@ -538,7 +538,7 @@ openBranch = function(bi)
 	clearCanvas()
 	local branch = Config.UpgradeBranches[bi]
 	-- the middle hex is the BACK button
-	local root = makeTile(0, 0, RED, Color3.fromRGB(190, 40, 50))
+	local root = makeTile(0, 0, RED, Color3.fromRGB(190, 40, 50), Config.UpgradeBackImage)
 	label(root.holder, "\u{2190}", UDim2.fromScale(0.5, 0.3), UDim2.fromScale(0.25, 0.2), { ZIndex = 7 })
 	label(root.holder, "BACK", UDim2.fromScale(0.7, 0.22), UDim2.fromScale(0.15, 0.5), { ZIndex = 7 })
 	root.holder.Activated:Connect(function()

@@ -546,6 +546,19 @@ Config.UpgradeBranches = {
 -- a hex frame you like and every node picks it up automatically.
 Config.UpgradeHexImage = ""
 
+-- Image slots for the big hexes (put "rbxassetid://..." when you make
+-- one; "" = the drawn hexagon). The labels still show on top.
+Config.UpgradeCenterImage = "" -- middle "UPGRADES" hex
+Config.UpgradeBackImage = "" -- middle "BACK" hex inside a category
+Config.UpgradeBranchImages = {
+	economy = "",
+	fortune = "",
+	combat = "",
+	variants = "",
+	capacity = "",
+	player = "",
+}
+
 -- Your own hexagon image for each upgrade (every tier of that upgrade uses
 -- it). Leave "" to use the drawn hexagon. To give one single tier its own
 -- image instead, set that node's imageId in Config.UpgradeNodes.

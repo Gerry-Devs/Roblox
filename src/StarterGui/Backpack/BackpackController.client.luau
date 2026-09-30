@@ -6,7 +6,27 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local monsterFolder = ReplicatedStorage:WaitForChild("MonsterRNG")
 local Config = require(monsterFolder:WaitForChild("Config"))
-local UIStyle = require(monsterFolder:WaitForChild("UIStyle"))
+-- the studded look; if the style module is missing or breaks, the
+-- backpack still works in its plain look (never blocks opening)
+local UIStyle
+do
+	local mod = monsterFolder:WaitForChild("UIStyle", 5)
+	local ok, res = pcall(function()
+		return mod and require(mod)
+	end)
+	if ok and res then
+		UIStyle = res
+	else
+		warn("Backpack: UIStyle module missing, using the plain look")
+		local noop = function(f)
+			return f
+		end
+		UIStyle = { OUTLINE = Color3.fromRGB(10, 12, 22), BODY = Color3.fromRGB(40, 44, 58), BODY_DARK = Color3.fromRGB(28, 31, 42), RIM = Color3.fromRGB(185, 192, 210), studs = noop, brick = noop, rarityCard = function(card, color)
+			card.BackgroundColor3 = color
+			return card
+		end }
+	end
+end
 local remotes = monsterFolder:WaitForChild("Remotes")
 local profileRemote = remotes:WaitForChild("GetProfile")
 local sellEggRemote = remotes:WaitForChild("SellEgg")
@@ -300,7 +320,7 @@ local function createCard(kind, item, order)
 	card.Name = "Item_" .. tostring(item.uid)
 	card.LayoutOrder = order
 	card.Visible = true
-	UIStyle.rarityCard(card, rarityColor)
+	pcall(UIStyle.rarityCard, card, rarityColor)
 
 	card.ItemName.Text = getDisplayName(kind, item)
 	-- rarity + odds, then $/s + level (monsters) or hatch time (eggs)
@@ -491,7 +511,7 @@ local function consumableCard(order, name, image, count, desc, color, buttonText
 	card.Name = "Consumable_" .. name
 	card.LayoutOrder = order
 	card.Visible = true
-	UIStyle.rarityCard(card, color)
+	pcall(UIStyle.rarityCard, card, color)
 	card.Icon.Image = image or ""
 	card.Icon.Visible = (image or "") ~= ""
 	card.Fallback.Visible = (image or "") == ""
@@ -776,10 +796,14 @@ end
 
 -- tabs: dark studded tiles; the open tab is lighter with a white rim
 local function styleTab(b, on)
-	UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.7 })
-	local stroke = b:FindFirstChildOfClass("UIStroke")
-	stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
-	stroke.Thickness = on and 4 or 3
+	pcall(function()
+		UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.7 })
+		local stroke = b:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
+			stroke.Thickness = on and 4 or 3
+		end
+	end)
 end
 
 local tabButtons = {}
@@ -870,7 +894,7 @@ end)
 --------------------------------------------------------------------
 -- Cartoony studded look (header bar, dark studded body, rarity cards)
 --------------------------------------------------------------------
-do
+local restyled, restyleErr = pcall(function()
 	local HEADER = 74
 	main.BackgroundColor3 = UIStyle.BODY
 	local mg = main:FindFirstChildOfClass("UIGradient")
@@ -996,6 +1020,9 @@ do
 	end
 	UIStyle.studs(emptyTemplate, 22, 0.9)
 	sizeCells()
+end)
+if not restyled then
+	warn("Backpack restyle failed (the backpack still works): " .. tostring(restyleErr))
 end
 
 main.Visible = false

@@ -110,12 +110,15 @@ local function playClose(window, basePos)
 		return
 	end
 	ghost:SetAttribute(GHOST, true)
+	ghost.Active = false -- the closing copy never blocks taps
 	for _, d in ipairs(ghost:GetDescendants()) do
 		if d:IsA("BaseScript") then
 			d:Destroy()
-		elseif d:IsA("GuiButton") then
+		elseif d:IsA("GuiObject") then
 			d.Active = false
-			d.AutoButtonColor = false
+			if d:IsA("GuiButton") then
+				d.AutoButtonColor = false
+			end
 		end
 	end
 	ghost.Position = basePos
@@ -139,6 +142,12 @@ local function watch(window)
 	local w = { basePos = window.Position, tween = nil }
 	watched[window] = w
 	watchFit(window)
+	-- a tap / click on the window (even on its empty parts) stays in the
+	-- window: without this it goes through to buttons underneath, e.g.
+	-- the UPGRADE button in the bottom bar, which then opens by itself
+	if window:IsA("GuiObject") then
+		window.Active = true
+	end
 
 	window:GetPropertyChangedSignal("Visible"):Connect(function()
 		if not window.Parent then

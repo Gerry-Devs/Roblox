@@ -405,6 +405,27 @@ label(topBars, "VS", UDim2.new(0.1, 0, 0.8, 0), UDim2.new(0.45, 0, 0.1, 0), { Te
 local bigText = label(battleGui, "", UDim2.new(0.6, 0, 0, 110), UDim2.new(0.2, 0, 0.3, 0), { TextColor3 = GOLD })
 local subText = label(battleGui, "", UDim2.new(0.6, 0, 0, 44), UDim2.new(0.2, 0, 0.3, 115), { TextColor3 = WHITE })
 
+-- phones: the bars and the big text shrink with the screen
+do
+	local scales = {}
+	for _, o in ipairs({ topBars, bigText, subText }) do
+		scales[o] = mk("UIScale", { Name = "FitScale" }, o)
+	end
+	local function fit()
+		local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+		local k = math.clamp(math.min(v.Y / 720, v.X / 1100), 0.55, 1)
+		for _, sc in pairs(scales) do
+			sc.Scale = k
+			sc:SetAttribute("Base", k)
+		end
+		topBars.Position = UDim2.new(0.5, 0, 0, math.floor(70 * k))
+	end
+	fit()
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
+	end
+end
+
 local battleCam = false
 local function setBars(d)
 	fillA.Size = UDim2.fromScale(math.clamp((d.aHp or 0) / math.max(1, d.aMax or 1), 0, 1), 1)
@@ -419,9 +440,11 @@ local function pop(text, color, sub)
 	subText.Text = sub or ""
 	bigText.TextTransparency = 0
 	bigText.TextStrokeTransparency = 0
-	local s = bigText:FindFirstChildOfClass("UIScale") or mk("UIScale", {}, bigText)
-	s.Scale = 1.6
-	TweenService:Create(s, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+	-- pops from big to its phone-fit size (FitScale)
+	local s = bigText:FindFirstChild("FitScale")
+	local base = s and s:GetAttribute("Base") or 1
+	s.Scale = base * 1.6
+	TweenService:Create(s, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = base }):Play()
 end
 
 local function startArenaCamera(d)

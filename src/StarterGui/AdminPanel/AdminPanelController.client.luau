@@ -716,9 +716,9 @@ local function renderCodes()
 	for i, c in ipairs(r.codes) do
 		local row = mk("Frame", { LayoutOrder = i, Size = UDim2.new(1, 0, 0, 58), BackgroundColor3 = Color3.fromRGB(40, 44, 58) }, codeList)
 		round(row, 10, 2)
-		text(row, c.code, UDim2.new(0.45, 0, 0, 26), UDim2.fromOffset(10, 4), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
+		text(row, c.code, UDim2.new(0.35, 0, 0, 26), UDim2.fromOffset(10, 4), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = GOLD })
 		local uses = (c.uses or 0) .. (c.maxUses and ("/" .. c.maxUses) or "") .. " uses  -  " .. timeLeft(c.expires, r.now)
-		text(row, uses, UDim2.new(0.5, -10, 0, 20), UDim2.new(0.45, 0, 0, 8), { TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(200, 210, 240) })
+		text(row, uses, UDim2.new(0.6, -190, 0, 18), UDim2.new(0.35, 14, 0, 8), { TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.GothamBold, TextStrokeTransparency = 1, TextColor3 = Color3.fromRGB(200, 210, 240) })
 		local names = {}
 		for _, rw in ipairs(c.rewards or {}) do
 			table.insert(names, rewardName(rw))
@@ -756,6 +756,15 @@ local function renderCodes()
 	end
 end
 onCodesOpened = renderCodes
+-- keep the uses / time left up to date while the CODES tab is open
+task.spawn(function()
+	while true do
+		task.wait(10)
+		if main.Visible and codeBody.Visible then
+			pcall(renderCodes)
+		end
+	end
+end)
 
 addToCodeBtn.Activated:Connect(function()
 	local kind = state.kind
@@ -820,6 +829,9 @@ local function open()
 	local fit = math.min(1, (v.Y - 90) / H, (v.X - 30) / W)
 	mainScale.Scale = fit * 0.85
 	main.Visible = true
+	if codeBody.Visible then
+		task.spawn(renderCodes) -- fresh uses count every time the panel opens
+	end
 	TweenService:Create(mainScale, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Scale = fit }):Play()
 end
 openBtn.Activated:Connect(function()

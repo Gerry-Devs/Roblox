@@ -569,7 +569,7 @@ openBranch = function(bi)
 			local t = makeTile(x, y, BLUE, BLUE_DARK, img)
 			local statInfo = Config.UpgradeStatInfo[node.statKey] or { name = node.statKey }
 			t.name = label(t.holder, statInfo.name .. " " .. node.tier, UDim2.fromScale(0.86, 0.2), UDim2.fromScale(0.07, 0.3), { ZIndex = 7 })
-			-- price + its icon (cash or Rift Shard) after it, centered; the
+			-- icon (cash or Rift Shard) then the price, centered; the
 			-- whole row shrinks when a long price doesn't fit the hex
 			do
 				local txt = Config.FormatNumber(node.cost)
@@ -582,9 +582,9 @@ openBranch = function(bi)
 				local th, tw = h * k, textW * k
 				local x0 = (TILE - (tw + gap * k + th)) / 2
 				local y0 = TILE * 0.55
-				t.cost = label(t.holder, txt, UDim2.fromOffset(tw, th), UDim2.fromOffset(x0, y0), { ZIndex = 7, TextScaled = false, TextSize = th, TextColor3 = priceColor(node) })
+				t.cost = label(t.holder, txt, UDim2.fromOffset(tw, th), UDim2.fromOffset(x0 + th + gap * k, y0), { ZIndex = 7, TextScaled = false, TextSize = th, TextColor3 = priceColor(node) })
 				local image = node.currency == "shards" and Config.RiftShardImage or Config.CashImage
-				t.costIcon = mk("ImageLabel", { Name = "PriceIcon", Size = UDim2.fromOffset(th, th), Position = UDim2.fromOffset(x0 + tw + gap * k, y0), BackgroundTransparency = 1, Image = image or "", ScaleType = Enum.ScaleType.Fit, ZIndex = 7 }, t.holder)
+				t.costIcon = mk("ImageLabel", { Name = "PriceIcon", Size = UDim2.fromOffset(th, th), Position = UDim2.fromOffset(x0, y0), BackgroundTransparency = 1, Image = image or "", ScaleType = Enum.ScaleType.Fit, ZIndex = 7 }, t.holder)
 			end
 			t.question = label(t.holder, "?", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(0.25, 0.25), { ZIndex = 7, TextColor3 = Color3.fromRGB(200, 205, 220) })
 			t.vein = vein

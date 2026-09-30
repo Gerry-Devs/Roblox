@@ -874,6 +874,30 @@ end
 Config.HatchShakeTime = 4.5
 Config.HatchInfoTime = 2.5
 
+-- Rare hatches are announced in the chat of EVERY server:
+-- "[Player] hatched a GIGANTIC GALAXY Void Dragon! (1 in 2.1M)"
+-- A hatch is announced if ANY of these is true:
+Config.HatchAnnounce = {
+	minOdds = 100000, -- its odds are 1 in 100,000 or rarer
+	minTier = 8, -- Celestial, Divine or Supreme
+	sizes = { Gigantic = true },
+	finishes = { Galaxy = true },
+}
+function Config.IsAnnouncedHatch(entry)
+	local m = Config.GetMonster(entry.monsterId)
+	if not m then
+		return false
+	end
+	local A = Config.HatchAnnounce
+	if A.sizes[entry.size] or A.finishes[entry.finish] then
+		return true
+	end
+	if (Config.GetRarity(m.rarity).tier or 1) >= A.minTier then
+		return true
+	end
+	return Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg) >= A.minOdds
+end
+
 -- Base odds of rolling this exact monster + size + finish (no luck/pity),
 -- e.g. Moss Slime ≈ 1 in 3, Huge Rainbow Moss Slime ≈ 1 in 5,000.
 --------------------------------------------------------------------

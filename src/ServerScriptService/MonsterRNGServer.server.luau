@@ -54,6 +54,42 @@ local buyGearRemote = getRemote("BuyGear", "RemoteFunction")
 local useGearRemote = getRemote("UseGear", "RemoteFunction")
 local gearRestockRemote = getRemote("GearRestock", "RemoteEvent")
 local offlineRemote = getRemote("OfflineEarnings", "RemoteEvent")
+local rareHatchRemote = getRemote("RareHatch", "RemoteEvent")
+
+-- rare hatch -> a chat message in every server (MessagingService)
+local RARE_HATCH_TOPIC = "MonsterRNG_RareHatch"
+local function showRareHatch(data)
+	rareHatchRemote:FireAllClients(data)
+end
+task.spawn(function()
+	pcall(function()
+		game:GetService("MessagingService"):SubscribeAsync(RARE_HATCH_TOPIC, function(msg)
+			if type(msg.Data) == "table" then
+				showRareHatch(msg.Data)
+			end
+		end)
+	end)
+end)
+local function announceHatch(player, entry)
+	if not Config.IsAnnouncedHatch(entry) then
+		return
+	end
+	local data = {
+		name = player.DisplayName,
+		monsterId = entry.monsterId,
+		size = entry.size,
+		finish = entry.finish,
+		odds = Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg),
+	}
+	task.spawn(function()
+		local sent = pcall(function()
+			game:GetService("MessagingService"):PublishAsync(RARE_HATCH_TOPIC, data)
+		end)
+		if not sent then
+			showRareHatch(data) -- Studio / failed: at least this server
+		end
+	end)
+end
 local questsRemote = getRemote("Quests", "RemoteFunction")
 local equipDiceRemote = getRemote("EquipDice", "RemoteFunction")
 local sellBulkRemote = getRemote("SellBulk", "RemoteFunction")
@@ -614,6 +650,7 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 		profile.owned[egg.monsterId] = (profile.owned[egg.monsterId] or 0) + 1
 
 		WorldService.MarkHatched(player, monsterEntry, not fitsInPen, position)
+		announceHatch(player, monsterEntry)
 		WorldService.UpdateBase(player, profile)
 		updateLeaderstats(player)
 		sync(player)

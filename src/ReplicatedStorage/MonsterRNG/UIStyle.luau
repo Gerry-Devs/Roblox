@@ -359,16 +359,16 @@ function UIStyle.liftText(button)
 			st:Clone().Parent = label
 		end
 	end
+	-- our own "hide the button's text" (= 1) must not be copied to the
+	-- label: with deferred events it arrives after the script's value
 	button.TextTransparency = 1
-	local busy = false
 	button:GetPropertyChangedSignal("TextTransparency"):Connect(function()
-		if busy then
+		local v = button.TextTransparency
+		if v == 1 then
 			return
 		end
-		busy = true
-		label.TextTransparency = button.TextTransparency
+		label.TextTransparency = v
 		button.TextTransparency = 1
-		busy = false
 	end)
 	button:GetPropertyChangedSignal("ZIndex"):Connect(function()
 		label.ZIndex = button.ZIndex + 1

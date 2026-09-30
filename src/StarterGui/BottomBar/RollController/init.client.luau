@@ -314,192 +314,288 @@ local lastHiddenRarity
 --------------------------------------------------------------------
 local WILD = { name = "WILD", key = "WILD", tier = 0, color = { 255, 205, 40 } }
 local WHEEL_OUTLINE = Color3.fromRGB(10, 15, 35)
-local wheelGui, wheelDisc, wheelTitle, wheelScale
+local WHEEL_SIZE = 440 -- wheel diameter (px)
+local STUDS_IMAGE = Config.UIStudsImage or ""
+local wheel = {} -- the built wheel's parts
 
+local function wmk(class, props, parent)
+	local o = Instance.new(class)
+	for k, v in pairs(props) do
+		o[k] = v
+	end
+	o.Parent = parent
+	return o
+end
+local function wcorner(o, r)
+	return wmk("UICorner", { CornerRadius = r or UDim.new(1, 0) }, o)
+end
+local function wstroke(o, t, c)
+	return wmk("UIStroke", { Thickness = t or 3, Color = c or WHEEL_OUTLINE, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, o)
+end
+-- a small egg shape with a shine
+local function eggShape(parent, color, size, pos, z)
+	local egg = wmk("Frame", { Size = size, AnchorPoint = Vector2.new(0.5, 0.5), Position = pos, BackgroundColor3 = color, ZIndex = z }, parent)
+	wcorner(egg, UDim.new(0.5, 0))
+	wstroke(egg, 3)
+	wmk("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.45), color:Lerp(Color3.new(0, 0, 0), 0.2)) }, egg)
+	local shine = wmk("Frame", { Size = UDim2.fromScale(0.26, 0.26), Position = UDim2.fromScale(0.2, 0.14), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.3, ZIndex = z + 1 }, egg)
+	wcorner(shine)
+	return egg
+end
+
+-- Builds the wheel once:
+--   dark backdrop + turning gold rays, a title that pops, the gold rim
+--   with 20 chasing light bulbs, real pie slices (made of thin wedges)
+--   in each rarity's color with an egg, name and % chance, a studded hub
+--   and a red pointer at the top that flicks on every slice.
 local function buildWheel()
-	if wheelGui then
+	if wheel.gui then
 		return
 	end
-	wheelGui = Instance.new("ScreenGui")
-	wheelGui.Name = "EggWheel"
-	wheelGui.ResetOnSpawn = false
-	wheelGui.IgnoreGuiInset = true
-	wheelGui.DisplayOrder = 60
-	wheelGui.Enabled = false
-	wheelGui.Parent = player:WaitForChild("PlayerGui")
-	local dim = Instance.new("Frame")
-	dim.Size = UDim2.fromScale(1, 1)
-	dim.BackgroundColor3 = Color3.new(0, 0, 0)
-	dim.BackgroundTransparency = 0.45
-	dim.Parent = wheelGui
-	local holder = Instance.new("Frame")
-	holder.Size = UDim2.fromOffset(440, 500)
-	holder.AnchorPoint = Vector2.new(0.5, 0.5)
-	holder.Position = UDim2.fromScale(0.5, 0.52)
-	holder.BackgroundTransparency = 1
-	holder.Parent = wheelGui
-	wheelScale = Instance.new("UIScale")
-	wheelScale.Parent = holder
-	wheelTitle = Instance.new("TextLabel")
-	wheelTitle.Size = UDim2.new(1, 0, 0, 50)
-	wheelTitle.BackgroundTransparency = 1
-	wheelTitle.Font = Enum.Font.LuckiestGuy
-	wheelTitle.TextScaled = true
-	wheelTitle.TextColor3 = Color3.fromRGB(255, 215, 60)
-	wheelTitle.TextStrokeTransparency = 0
-	wheelTitle.TextStrokeColor3 = WHEEL_OUTLINE
-	wheelTitle.Text = "WILD x3! SPIN THE EGG WHEEL!"
-	wheelTitle.Parent = holder
-	-- the wheel
-	local ring = Instance.new("Frame")
-	ring.Size = UDim2.fromOffset(420, 420)
-	ring.AnchorPoint = Vector2.new(0.5, 0)
-	ring.Position = UDim2.new(0.5, 0, 0, 64)
-	ring.BackgroundColor3 = Color3.fromRGB(255, 205, 60)
-	ring.Parent = holder
-	Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
-	local ringStroke = Instance.new("UIStroke")
-	ringStroke.Color = WHEEL_OUTLINE
-	ringStroke.Thickness = 6
-	ringStroke.Parent = ring
-	wheelDisc = Instance.new("Frame")
-	wheelDisc.Size = UDim2.new(1, -24, 1, -24)
-	wheelDisc.AnchorPoint = Vector2.new(0.5, 0.5)
-	wheelDisc.Position = UDim2.fromScale(0.5, 0.5)
-	wheelDisc.BackgroundColor3 = Color3.fromRGB(22, 28, 60)
-	wheelDisc.Parent = ring
-	Instance.new("UICorner", wheelDisc).CornerRadius = UDim.new(1, 0)
+	local gui = wmk("ScreenGui", { Name = "EggWheel", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 60, Enabled = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, player:WaitForChild("PlayerGui"))
+	wheel.gui = gui
+	wheel.dim = wmk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(8, 6, 24), BackgroundTransparency = 0.25 }, gui)
+	-- soft purple glow in the middle
+	local glow = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.55), Size = UDim2.fromScale(1.2, 1.2), BackgroundColor3 = Color3.fromRGB(140, 80, 255), BackgroundTransparency = 0, ZIndex = 1 }, wheel.dim)
+	wcorner(glow)
+	wmk("UIAspectRatioConstraint", {}, glow)
+	wmk("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 1) }) }, glow)
+
+	local holder = wmk("Frame", { Size = UDim2.fromOffset(WHEEL_SIZE + 80, WHEEL_SIZE + 150), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), BackgroundTransparency = 1, ZIndex = 2 }, gui)
+	wheel.scale = wmk("UIScale", {}, holder)
+	local cy = 128 + WHEEL_SIZE / 2 -- wheel center (y)
+
+	-- gold rays turning behind the wheel
+	wheel.rays = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset((WHEEL_SIZE + 80) / 2, cy), Size = UDim2.fromOffset(WHEEL_SIZE * 2.2, WHEEL_SIZE * 2.2), BackgroundTransparency = 1, ZIndex = 2 }, holder)
+	for i = 0, 8 do
+		local ray = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.1, 0, 1, 0), Rotation = i * 20, BackgroundColor3 = Color3.fromRGB(255, 220, 120), BorderSizePixel = 0, ZIndex = 2 }, wheel.rays)
+		wmk("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.3, 0.9), NumberSequenceKeypoint.new(0.5, 0.75), NumberSequenceKeypoint.new(0.7, 0.9), NumberSequenceKeypoint.new(1, 1) }) }, ray)
+	end
+
+	-- title: "WILD x3!" + subtitle
+	wheel.title = wmk("TextLabel", { Size = UDim2.new(1, 0, 0, 70), Position = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = "WILD x3!", TextColor3 = Color3.new(1, 1, 1), ZIndex = 10 }, holder)
+	wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 6 }, wheel.title)
+	wheel.titleGrad = wmk("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(255, 140, 30)) }, wheel.title)
+	wheel.titleScale = wmk("UIScale", {}, wheel.title)
+	wheel.sub = wmk("TextLabel", { Size = UDim2.new(1, 0, 0, 32), Position = UDim2.fromOffset(0, 70), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = "SPIN THE EGG WHEEL!", TextColor3 = Color3.new(1, 1, 1), ZIndex = 10 }, holder)
+	wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 4 }, wheel.sub)
+
+	-- rim: thick gold ring with studs + light bulbs
+	local rim = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset((WHEEL_SIZE + 80) / 2, cy), Size = UDim2.fromOffset(WHEEL_SIZE + 44, WHEEL_SIZE + 44), BackgroundColor3 = Color3.fromRGB(255, 200, 50), ZIndex = 4 }, holder)
+	wcorner(rim)
+	wstroke(rim, 6)
+	wmk("UIGradient", { Rotation = 45, Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 240, 150)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 185, 40)), ColorSequenceKeypoint.new(1, Color3.fromRGB(210, 120, 20)) }) }, rim)
+	if STUDS_IMAGE ~= "" then
+		local st = wmk("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = STUDS_IMAGE, ScaleType = Enum.ScaleType.Tile, TileSize = UDim2.fromOffset(26, 26), ImageTransparency = 0.55, ZIndex = 4 }, rim)
+		wcorner(st)
+	end
+	wheel.bulbs = {}
+	local BULBS = 20
+	for i = 1, BULBS do
+		local a = math.rad((i - 1) * (360 / BULBS))
+		local r = (WHEEL_SIZE + 22) / 2
+		local b = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, math.sin(a) * r, 0.5, -math.cos(a) * r), Size = UDim2.fromOffset(15, 15), BackgroundColor3 = Color3.fromRGB(255, 255, 220), ZIndex = 6 }, rim)
+		wcorner(b)
+		wstroke(b, 2)
+		wheel.bulbs[i] = b
+	end
+
+	-- the disc that spins
+	local disc = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(WHEEL_SIZE, WHEEL_SIZE), BackgroundColor3 = Color3.fromRGB(22, 24, 44), ZIndex = 5 }, rim)
+	wcorner(disc)
+	wstroke(disc, 5)
+	wheel.disc = disc
 	local slices = Config.Wild.wheel
 	local seg = 360 / #slices
+	local total = 0
+	for _, s in ipairs(slices) do
+		total += s.weight
+	end
+	local R = WHEEL_SIZE / 2
+	local STEP = 3 -- degrees per wedge
+	local wedgeW = math.ceil(2 * R * math.tan(math.rad(STEP / 2))) + 3
+	wheel.sliceParts = {}
 	for i, slice in ipairs(slices) do
 		local rarity = Config.GetRarity(slice.rarity)
 		local color = colorFromTable(rarity.color)
-		-- a spoke pointing up, rotated into place
-		local spoke = Instance.new("Frame")
-		spoke.Size = UDim2.fromScale(1, 1)
-		spoke.BackgroundTransparency = 1
-		spoke.Rotation = (i - 1) * seg
-		spoke.Parent = wheelDisc
-		local panel = Instance.new("Frame")
-		panel.Size = UDim2.new(0.28, 0, 0.3, 0)
-		panel.AnchorPoint = Vector2.new(0.5, 0)
-		panel.Position = UDim2.new(0.5, 0, 0.05, 0)
-		-- dividing line between this slice and the next (rotated around the wheel center)
-		local divSpoke = Instance.new("Frame")
-		divSpoke.Size = UDim2.fromScale(1, 1)
-		divSpoke.BackgroundTransparency = 1
-		divSpoke.Rotation = (i - 1) * seg + seg / 2
-		divSpoke.Parent = wheelDisc
-		local divider = Instance.new("Frame")
-		divider.Size = UDim2.new(0, 4, 0.5, 0)
-		divider.AnchorPoint = Vector2.new(0.5, 0)
-		divider.Position = UDim2.fromScale(0.5, 0)
-		divider.BackgroundColor3 = Color3.fromRGB(255, 205, 60)
-		divider.BorderSizePixel = 0
-		divider.Parent = divSpoke
-		panel.BackgroundColor3 = color
-		panel.BackgroundTransparency = 0.15
-		panel.Parent = spoke
-		Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 18)
-		local grad = Instance.new("UIGradient")
-		grad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(120, 120, 140))
-		grad.Rotation = 90
-		grad.Parent = panel
-		local ps = Instance.new("UIStroke")
-		ps.Color = WHEEL_OUTLINE
-		ps.Thickness = 3
-		ps.Parent = panel
-		local eggDot = Instance.new("Frame")
-		eggDot.Size = UDim2.fromScale(0.5, 0.36)
-		eggDot.AnchorPoint = Vector2.new(0.5, 0)
-		eggDot.Position = UDim2.fromScale(0.5, 0.12)
-		eggDot.BackgroundColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35)
-		eggDot.Parent = panel
-		Instance.new("UICorner", eggDot).CornerRadius = UDim.new(0.5, 0)
-		local es = Instance.new("UIStroke")
-		es.Color = WHEEL_OUTLINE
-		es.Thickness = 2
-		es.Parent = eggDot
-		local name = Instance.new("TextLabel")
-		name.Size = UDim2.fromScale(0.95, 0.28)
-		name.AnchorPoint = Vector2.new(0.5, 0)
-		name.Position = UDim2.fromScale(0.5, 0.56)
-		name.BackgroundTransparency = 1
-		name.Font = Enum.Font.LuckiestGuy
-		name.TextScaled = true
-		name.Text = rarity.name:upper()
-		name.TextColor3 = Color3.new(1, 1, 1)
-		name.TextStrokeTransparency = 0
-		name.TextStrokeColor3 = WHEEL_OUTLINE
-		name.Parent = panel
+		local center = (i - 1) * seg
+		local parts = {}
+		-- pie slice: thin wedges from the middle out, lighter at the rim
+		for a = center - seg / 2 + STEP / 2, center + seg / 2 - STEP / 2 + 0.01, STEP do
+			local spoke = wmk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Rotation = a, ZIndex = 5 }, disc)
+			local wedge = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0, wedgeW, 0.5, -2), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 5 }, spoke)
+			wmk("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.25), color:Lerp(Color3.new(0, 0, 0), 0.35)) }, wedge)
+			table.insert(parts, wedge)
+		end
+		-- divider at the slice's edge
+		local divSpoke = wmk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Rotation = center + seg / 2, ZIndex = 7 }, disc)
+		local div = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0, 5, 0.5, -2), BackgroundColor3 = Color3.fromRGB(255, 235, 170), BorderSizePixel = 0, ZIndex = 7 }, divSpoke)
+		wstroke(div, 1.5)
+		-- egg + name + chance, facing outward
+		local labelSpoke = wmk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Rotation = center, ZIndex = 8 }, disc)
+		eggShape(labelSpoke, color:Lerp(Color3.new(1, 1, 1), 0.2), UDim2.fromOffset(46, 58), UDim2.new(0.5, 0, 0, 58), 9)
+		local name = wmk("TextLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 108), Size = UDim2.fromOffset(120, 26), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = rarity.name:upper(), TextColor3 = Color3.new(1, 1, 1), ZIndex = 9 }, labelSpoke)
+		wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 3 }, name)
+		local pct = math.floor(slice.weight / total * 1000 + 0.5) / 10
+		local chance = wmk("TextLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 132), Size = UDim2.fromOffset(80, 20), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = tostring(pct) .. "%", TextColor3 = Color3.fromRGB(255, 240, 170), ZIndex = 9 }, labelSpoke)
+		wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 2.5 }, chance)
+		wheel.sliceParts[i] = { wedges = parts, color = color }
 	end
-	local hub = Instance.new("Frame")
-	hub.Size = UDim2.fromScale(0.26, 0.26)
-	hub.AnchorPoint = Vector2.new(0.5, 0.5)
-	hub.Position = UDim2.fromScale(0.5, 0.5)
-	hub.BackgroundColor3 = Color3.fromRGB(255, 205, 60)
-	hub.ZIndex = 5
-	hub.Parent = ring
-	Instance.new("UICorner", hub).CornerRadius = UDim.new(1, 0)
-	local hs = Instance.new("UIStroke")
-	hs.Color = WHEEL_OUTLINE
-	hs.Thickness = 4
-	hs.Parent = hub
-	-- pointer at the top
-	local pointer = Instance.new("TextLabel")
-	pointer.Size = UDim2.fromOffset(60, 60)
-	pointer.AnchorPoint = Vector2.new(0.5, 0.5)
-	pointer.Position = UDim2.new(0.5, 0, 0, 62)
-	pointer.BackgroundTransparency = 1
-	pointer.Font = Enum.Font.LuckiestGuy
-	pointer.TextScaled = true
-	pointer.Text = "\226\150\188" -- ▼
-	pointer.TextColor3 = Color3.fromRGB(255, 70, 70)
-	pointer.TextStrokeTransparency = 0
-	pointer.TextStrokeColor3 = WHEEL_OUTLINE
-	pointer.ZIndex = 6
-	pointer.Parent = holder
+	-- dark inner ring (depth) + studded hub
+	local hub = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(104, 104), BackgroundColor3 = Color3.fromRGB(255, 200, 50), ZIndex = 12 }, rim)
+	wcorner(hub)
+	wstroke(hub, 5)
+	wmk("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 240, 150), Color3.fromRGB(220, 130, 20)) }, hub)
+	if STUDS_IMAGE ~= "" then
+		local st = wmk("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = STUDS_IMAGE, ScaleType = Enum.ScaleType.Tile, TileSize = UDim2.fromOffset(26, 26), ImageTransparency = 0.5, ZIndex = 12 }, hub)
+		wcorner(st)
+	end
+	wheel.hubText = wmk("TextLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.54), Size = UDim2.fromScale(0.8, 0.36), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = "WILD", TextColor3 = Color3.new(1, 1, 1), ZIndex = 13 }, hub)
+	wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 3 }, wheel.hubText)
+	wheel.hubScale = wmk("UIScale", {}, hub)
+
+	-- pointer: red studded pin at the top, pivoting from its top
+	local pin = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromOffset((WHEEL_SIZE + 80) / 2, 128 - 30), Size = UDim2.fromOffset(56, 84), BackgroundTransparency = 1, ZIndex = 14 }, holder)
+	wheel.pin = pin
+	local tip = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 44), Size = UDim2.fromOffset(38, 38), Rotation = 45, BackgroundColor3 = Color3.fromRGB(235, 50, 60), ZIndex = 14 }, pin)
+	wcorner(tip, UDim.new(0, 6))
+	wstroke(tip, 4)
+	local head = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 24), Size = UDim2.fromOffset(52, 52), BackgroundColor3 = Color3.fromRGB(245, 60, 70), ZIndex = 15 }, pin)
+	wcorner(head)
+	wstroke(head, 4)
+	wmk("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(255, 140, 140), Color3.fromRGB(190, 30, 45)) }, head)
+	local dot = wmk("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Color3.fromRGB(255, 230, 230), ZIndex = 16 }, head)
+	wcorner(dot)
+	wstroke(dot, 2)
+
+	-- result banner (under the wheel)
+	wheel.result = wmk("TextLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.fromOffset(WHEEL_SIZE + 60, 64), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = "", TextColor3 = Color3.new(1, 1, 1), ZIndex = 20, Visible = false }, holder)
+	wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 6 }, wheel.result)
+	wheel.resultScale = wmk("UIScale", {}, wheel.result)
+	wheel.holder = holder
+	wheel.center = Vector2.new((WHEEL_SIZE + 80) / 2, cy)
 end
 
--- spins the wheel so slice `index` ends under the pointer (yields ~6s)
+-- confetti burst from the wheel's middle
+local function wheelBurst(color)
+	for _ = 1, 36 do
+		local piece = wmk("Frame", { Size = UDim2.fromOffset(math.random(8, 16), math.random(8, 16)), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(wheel.center.X, wheel.center.Y), Rotation = math.random(0, 90), BackgroundColor3 = math.random() < 0.5 and color or (math.random() < 0.5 and Color3.fromRGB(255, 220, 80) or Color3.new(1, 1, 1)), BorderSizePixel = 0, ZIndex = 18 }, wheel.holder)
+		wstroke(piece, 2)
+		local a = math.random() * math.pi * 2
+		local d = math.random(180, 380)
+		local tw = TweenService:Create(piece, TweenInfo.new(1.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(wheel.center.X + math.cos(a) * d, wheel.center.Y + math.sin(a) * d), Rotation = piece.Rotation + math.random(-360, 360), BackgroundTransparency = 1 })
+		tw:Play()
+		Debris:AddItem(piece, 1.2)
+	end
+end
+
+-- spins the wheel so slice `index` ends under the pointer (yields ~7s)
 local function spinWheel(index)
 	buildWheel()
 	local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	local fit = math.min(1, (v.Y - 40) / 520, (v.X - 20) / 460)
+	local fit = math.min(1, (v.Y - 30) / (WHEEL_SIZE + 150), (v.X - 20) / (WHEEL_SIZE + 80))
 	local seg = 360 / #Config.Wild.wheel
-	wheelDisc.Rotation = 0
-	wheelTitle.Text = "WILD x3! SPIN THE EGG WHEEL!"
-	wheelTitle.TextColor3 = Color3.fromRGB(255, 215, 60)
-	wheelScale.Scale = fit * 0.5
-	wheelGui.Enabled = true
-	tween(wheelScale, 0.3, { Scale = fit }, Enum.EasingStyle.Back)
-	task.wait(0.5)
-	local target = -((index - 1) * seg) - 360 * 6 + math.random(-math.floor(seg * 0.3), math.floor(seg * 0.3))
-	TweenService:Create(wheelDisc, TweenInfo.new(4.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = target }):Play()
-	-- ticking while it spins (see the WheelTick sound in the sound setup)
-	local tickSound = script:FindFirstChild("WheelTick")
-	if tickSound then
-		task.spawn(function()
-			local last = 0
-			while wheelGui.Enabled and math.abs(wheelDisc.Rotation - target) > 1 do
-				local slot = math.floor(wheelDisc.Rotation / seg)
-				if slot ~= last then
-					last = slot
-					tickSound:Play()
-				end
-				task.wait()
-			end
-		end)
+	local disc = wheel.disc
+	disc.Rotation = 0
+	wheel.title.Text = "WILD x3!"
+	wheel.titleGrad.Color = ColorSequence.new(Color3.fromRGB(255, 240, 130), Color3.fromRGB(255, 140, 30))
+	wheel.sub.Text = "SPIN THE EGG WHEEL!"
+	wheel.sub.Visible = true
+	wheel.result.Visible = false
+	wheel.hubText.Text = "WILD"
+	for _, s in ipairs(wheel.sliceParts) do
+		for _, w in ipairs(s.wedges) do
+			w.BackgroundColor3 = s.color
+		end
 	end
-	task.wait(4.5)
+	wheel.scale.Scale = fit * 0.3
+	wheel.dim.BackgroundTransparency = 1
+	wheel.gui.Enabled = true
+	tween(wheel.dim, 0.3, { BackgroundTransparency = 0.25 })
+	tween(wheel.scale, 0.45, { Scale = fit }, Enum.EasingStyle.Back)
+	wheel.titleScale.Scale = 0
+	tween(wheel.titleScale, 0.5, { Scale = 1 }, Enum.EasingStyle.Back)
+
+	-- one loop animates the rays, bulbs, title and pointer
+	local spinning = true
+	local landed = false
+	local lastSlot
+	local pinKick = 0
+	local tickSound = script:FindFirstChild("WheelTick")
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function(dt)
+		if not wheel.gui.Enabled then
+			conn:Disconnect()
+			return
+		end
+		local t = os.clock() - t0
+		wheel.rays.Rotation = t * (spinning and 40 or 15)
+		-- bulbs: chase while spinning, all blink when it lands
+		for i, b in ipairs(wheel.bulbs) do
+			local on
+			if landed then
+				on = math.floor(t * 6) % 2 == 0
+			else
+				on = (i + math.floor(t * (spinning and 18 or 5))) % 3 == 0
+			end
+			b.BackgroundColor3 = on and Color3.fromRGB(255, 255, 220) or Color3.fromRGB(150, 90, 20)
+		end
+		wheel.title.Rotation = math.sin(t * 3) * 3
+		-- pointer flicks on every slice edge it passes
+		local slot = math.floor((disc.Rotation + seg / 2) / seg)
+		if lastSlot and slot ~= lastSlot then
+			pinKick = 1
+			if tickSound then
+				tickSound:Play()
+			end
+		end
+		lastSlot = slot
+		pinKick = math.max(0, pinKick - dt * 7)
+		wheel.pin.Rotation = -pinKick * 28
+	end)
+
+	task.wait(0.6)
+	local target = -((index - 1) * seg) - 360 * 7 + math.random(-math.floor(seg * 0.3), math.floor(seg * 0.3))
+	TweenService:Create(disc, TweenInfo.new(5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Rotation = target }):Play()
+	wheel.sub.Text = "SPINNING..."
+	task.wait(5.05)
+	spinning = false
+	landed = true
+
+	-- the win: slice flashes, hub + title show it, confetti
 	local rarity = Config.GetRarity(Config.Wild.wheel[index].rarity)
-	wheelTitle.Text = rarity.name:upper() .. " EGG!"
-	wheelTitle.TextColor3 = colorFromTable(rarity.color)
-	confetti(colorFromTable(rarity.color))
-	task.wait(1.5)
-	tween(wheelScale, 0.2, { Scale = fit * 0.3 })
-	task.wait(0.2)
-	wheelGui.Enabled = false
+	local color = colorFromTable(rarity.color)
+	local win = wheel.sliceParts[index]
+	task.spawn(function()
+		for k = 1, 6 do
+			for _, w in ipairs(win.wedges) do
+				w.BackgroundColor3 = (k % 2 == 1) and Color3.new(1, 1, 1) or win.color
+			end
+			task.wait(0.12)
+		end
+	end)
+	wheel.hubText.Text = "WIN!"
+	wheel.hubScale.Scale = 1.3
+	tween(wheel.hubScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+	wheel.title.Text = rarity.name:upper() .. "!"
+	wheel.titleGrad.Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.5), color)
+	wheel.titleScale.Scale = 1.5
+	tween(wheel.titleScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+	wheel.sub.Visible = false
+	wheel.result.Text = "YOU GOT A " .. rarity.name:upper() .. " EGG!"
+	wheel.result.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3)
+	wheel.result.Visible = true
+	wheel.resultScale.Scale = 0
+	tween(wheel.resultScale, 0.4, { Scale = 1 }, Enum.EasingStyle.Back)
+	wheelBurst(color)
+	task.wait(0.35)
+	wheelBurst(color)
+	task.wait(1.8)
+	tween(wheel.scale, 0.25, { Scale = fit * 0.2 }, Enum.EasingStyle.Back)
+	tween(wheel.dim, 0.25, { BackgroundTransparency = 1 })
+	task.wait(0.27)
+	wheel.gui.Enabled = false
 end
 
 local function spinOrb(final, spinTime, token)

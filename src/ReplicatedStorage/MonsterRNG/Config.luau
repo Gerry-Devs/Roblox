@@ -286,12 +286,14 @@ Config.Monsters = {
 --------------------------------------------------------------------
 Config.Wild = {
 	chances = { 0.04, 0.4, 0.25 }, -- chance of the 1st WILD, then the 2nd, then the 3rd
-	wheel = { -- the egg wheel after 3 WILDs (weights = % chance)
-		{ rarity = "Mythic", weight = 50 },
-		{ rarity = "Secret", weight = 25 },
-		{ rarity = "Celestial", weight = 15 },
-		{ rarity = "Divine", weight = 7 },
-		{ rarity = "Supreme", weight = 3 },
+	-- the egg wheel after 3 WILDs (weights = % chance). imageId = your
+	-- picture on that slice ("rbxassetid://..."); "" = the drawn egg
+	wheel = {
+		{ rarity = "Mythic", weight = 50, imageId = "" },
+		{ rarity = "Secret", weight = 25, imageId = "" },
+		{ rarity = "Celestial", weight = 15, imageId = "" },
+		{ rarity = "Divine", weight = 7, imageId = "" },
+		{ rarity = "Supreme", weight = 3, imageId = "" },
 	},
 }
 

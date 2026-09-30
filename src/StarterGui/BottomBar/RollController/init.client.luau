@@ -433,7 +433,12 @@ local function buildWheel()
 		wstroke(div, 1.5)
 		-- egg + name + chance, facing outward
 		local labelSpoke = wmk("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Rotation = center, ZIndex = 8 }, disc)
-		eggShape(labelSpoke, color:Lerp(Color3.new(1, 1, 1), 0.2), UDim2.fromOffset(46, 58), UDim2.new(0.5, 0, 0, 58), 9)
+		if slice.imageId and slice.imageId ~= "" then
+			-- your own picture for this slice
+			wmk("ImageLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 56), Size = UDim2.fromOffset(72, 72), BackgroundTransparency = 1, Image = slice.imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 9 }, labelSpoke)
+		else
+			eggShape(labelSpoke, color:Lerp(Color3.new(1, 1, 1), 0.2), UDim2.fromOffset(46, 58), UDim2.new(0.5, 0, 0, 58), 9)
+		end
 		local name = wmk("TextLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 108), Size = UDim2.fromOffset(120, 26), BackgroundTransparency = 1, Font = Enum.Font.LuckiestGuy, TextScaled = true, Text = rarity.name:upper(), TextColor3 = Color3.new(1, 1, 1), ZIndex = 9 }, labelSpoke)
 		wmk("UIStroke", { Color = WHEEL_OUTLINE, Thickness = 3 }, name)
 		local pct = math.floor(slice.weight / total * 1000 + 0.5) / 10

@@ -838,24 +838,22 @@ end)
 --------------------------------------------------------------------
 -- open / close
 --------------------------------------------------------------------
-local savedZoom
+-- the game camera is frozen while the tree is open: dragging / pinching
+-- on the tree (or between hexes) must not turn or zoom the camera
+local savedCam
 local function lockCamera()
-	if savedZoom then
+	if savedCam then
 		return
 	end
 	local cam = workspace.CurrentCamera
-	local char = player.Character
-	local head = char and char:FindFirstChild("Head")
-	local dist = head and (cam.CFrame.Position - head.Position).Magnitude or 15
-	savedZoom = { player.CameraMinZoomDistance, player.CameraMaxZoomDistance }
-	player.CameraMinZoomDistance = dist
-	player.CameraMaxZoomDistance = dist
+	savedCam = { type = cam.CameraType, cf = cam.CFrame }
+	cam.CameraType = Enum.CameraType.Scriptable
+	cam.CFrame = savedCam.cf
 end
 local function unlockCamera()
-	if savedZoom then
-		player.CameraMinZoomDistance = savedZoom[1]
-		player.CameraMaxZoomDistance = savedZoom[2]
-		savedZoom = nil
+	if savedCam then
+		workspace.CurrentCamera.CameraType = savedCam.type
+		savedCam = nil
 	end
 end
 
@@ -869,7 +867,7 @@ end
 fitScreen = function()
 	local v = workspace.CurrentCamera.ViewportSize
 	local small = math.clamp(math.min(v.Y / 760, v.X / 1100), 0.5, 1)
-	zoom.Scale = math.clamp(v.Y / 820, 0.42, 1)
+	zoom.Scale = math.clamp(v.Y / 620, 0.62, 1) -- phones: hexes big enough to tap
 	for _, sc in pairs(chromeScales) do
 		sc.Scale = small
 	end

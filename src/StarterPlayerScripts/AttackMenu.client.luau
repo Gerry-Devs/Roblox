@@ -192,7 +192,10 @@ local function order(mode, uid)
 		return attackRemote:InvokeServer(selected and selected:GetAttribute("EnemyId"), mode, uid)
 	end)
 	if ok and r then
-		say(r.message, r.success and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(255, 170, 90))
+		-- only say something when it didn't work (no "X pets are attacking!")
+		if not r.success then
+			say(r.message, Color3.fromRGB(255, 170, 90))
+		end
 		return r.success
 	end
 	return false

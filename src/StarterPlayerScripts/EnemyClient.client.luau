@@ -280,6 +280,65 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------
+-- Keep health bars and name tags above each monster's real head. Tall
+-- models (Phoenix, Void Dragon...) reach far above their center, so a
+-- fixed offset put the bar inside their body. Measure the model instead.
+--------------------------------------------------------------------
+
+local HEAD_GAP = 0.6
+local function headHeight(model, center)
+	local ok, cf, size = pcall(model.GetBoundingBox, model)
+	if not ok then
+		return nil
+	end
+	return cf.Position.Y + size.Y / 2 - center.Position.Y
+end
+
+local function placeOverHead(model, center, bars)
+	local top = headHeight(model, center)
+	if not top then
+		return
+	end
+	for _, info in ipairs(bars) do
+		local bb = center:FindFirstChild(info[1])
+		if bb and bb:IsA("BillboardGui") then
+			bb.StudsOffset = Vector3.new(0, top + HEAD_GAP, 0)
+			-- shift up by part of its own height so stacked tags don't overlap
+			bb.SizeOffset = Vector2.new(0, info[2])
+		end
+	end
+end
+
+task.spawn(function()
+	while true do
+		task.wait(1)
+		local camera = workspace.CurrentCamera
+		local camPos = camera and camera.CFrame.Position
+		local world = workspace:FindFirstChild("MonsterRNGWorld")
+		if world and camPos then
+			for _, base in ipairs(world:GetChildren()) do
+				local pets = base.Name:match("^Base_") and base:FindFirstChild("Pets")
+				for _, model in ipairs(pets and pets:GetChildren() or {}) do
+					local body = model:FindFirstChild("MonsterBody")
+					if body and (body.Position - camPos).Magnitude < 150 then
+						-- health bar just over the head, name tag above it
+						placeOverHead(model, body, { { "PetHealthBar", 0 }, { "MonsterName", 0.75 } })
+					end
+				end
+			end
+		end
+		if enemiesFolder and camPos then
+			for _, model in ipairs(enemiesFolder:GetChildren()) do
+				local root = model:FindFirstChild("Root")
+				if root and not model:GetAttribute("Dead") and (root.Position - camPos).Magnitude < 150 then
+					placeOverHead(model, root, { { "EnemyBar", 0.5 } })
+				end
+			end
+		end
+	end
+end)
+
+--------------------------------------------------------------------
 -- popups
 --------------------------------------------------------------------
 

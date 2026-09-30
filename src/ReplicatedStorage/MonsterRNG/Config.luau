@@ -42,10 +42,18 @@ Config.SizeVariants = {
 	{
 		key = "Normal",
 		name = "Normal",
-		weight = 93,
+		weight = 85,
 		incomeMultiplier = 1,
 		powerMultiplier = 1,
 		scale = 1,
+	},
+	{
+		key = "Big",
+		name = "Big",
+		weight = 8,
+		incomeMultiplier = 2.5,
+		powerMultiplier = 1.8,
+		scale = 1.2,
 	},
 	{
 		key = "Huge",
@@ -1233,7 +1241,7 @@ Config.Combat = {
 	potionWeights = { luck = 25, health = 20, damage = 20, cash = 20, level = 13, revive = 8 }, -- revive: ~1 in 330 kills
 }
 Config.RarityPower = { 1, 1.2, 1.45, 1.75, 2.1, 2.5 }
-Config.PetSizePower = { Normal = 1, Huge = 1.3, Titan = 1.7 }
+Config.PetSizePower = { Normal = 1, Big = 1.15, Huge = 1.3, Titan = 1.7 }
 Config.PetFinishPower = { Normal = 1, Gold = 1.15, Silver = 1.25, Rainbow = 1.5 }
 
 -- special enemies: much tougher, more XP and loot (mult applies to all)
@@ -1508,7 +1516,7 @@ end
 -- monsters adds up, up to the stat's max (cap).
 --------------------------------------------------------------------
 Config.SkillsIconImage = "rbxassetid://89154708883558" -- picture for the SKILLS button (right side, under WARP)
-Config.SkillSizeBoost = { Normal = 1, Huge = 1.2, Titan = 1.5 }
+Config.SkillSizeBoost = { Normal = 1, Big = 1.1, Huge = 1.2, Titan = 1.5 }
 Config.SkillFinishBoost = { Normal = 1, Gold = 1.1, Silver = 1.2, Rainbow = 1.35 }
 
 -- stat -> how it shows + its max. text = what it does (for the list)

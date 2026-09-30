@@ -614,7 +614,107 @@ local function rewardInfo(reward)
 	return table.concat(parts, " + "), icon
 end
 
+-- Daily Rewards cards (like the reference): Day 1-3 and 4-6 in two rows,
+-- a big tall Day 7 on the right; dark cards with a colored border, claimed
+-- days dimmed with a big green check.
+local DAY_COLORS = {
+	Color3.fromRGB(70, 210, 90), Color3.fromRGB(60, 150, 255), Color3.fromRGB(160, 80, 255),
+	Color3.fromRGB(255, 190, 40), Color3.fromRGB(240, 60, 70), Color3.fromRGB(80, 110, 255), Color3.fromRGB(255, 255, 255),
+}
+local dailyStyled = false
+local function styleDailyCards()
+	if dailyStyled then
+		return
+	end
+	dailyStyled = true
+	local days = db.Days
+	local grid = days:FindFirstChildOfClass("UIGridLayout")
+	if grid then
+		grid:Destroy() -- placed by hand below (Day 7 is double height)
+	end
+	local GAP = 0.014
+	local COL = (1 - GAP * 3) / 4
+	for d = 1, 7 do
+		local card = days["Day" .. d]
+		if d < 7 then
+			local col, row = (d - 1) % 3, (d - 1) // 3
+			card.Position = UDim2.new(col * (COL + GAP), 0, row * 0.5, row == 1 and 5 or 0)
+			card.Size = UDim2.new(COL, 0, 0.5, -5)
+		else
+			card.Position = UDim2.new(3 * (COL + GAP), 0, 0, 0)
+			card.Size = UDim2.new(COL, 0, 1, 0)
+		end
+		card.BackgroundColor3 = Color3.fromRGB(22, 24, 34)
+		card.ClipsDescendants = false
+		local ring = card:FindFirstChild("Ring")
+		if ring then
+			ring.Color = DAY_COLORS[d]
+			ring.Thickness = 4
+			if d == 7 then
+				-- rainbow border for the big prize
+				local g = ring:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient")
+				g.Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 80)),
+					ColorSequenceKeypoint.new(0.25, Color3.fromRGB(255, 220, 60)),
+					ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 230, 120)),
+					ColorSequenceKeypoint.new(0.75, Color3.fromRGB(80, 170, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(200, 90, 255)),
+				})
+				g.Rotation = 45
+				g.Parent = ring
+			end
+		end
+		-- "Day N" on top, the picture big in the middle, the reward at the bottom
+		card.DayLabel.Text = "Day " .. d
+		card.DayLabel.TextColor3 = Color3.new(1, 1, 1)
+		card.Icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		card.Icon.Position = UDim2.fromScale(0.5, 0.5)
+		card.Icon.Size = d == 7 and UDim2.fromScale(0.85, 0.5) or UDim2.fromScale(0.55, 0.45)
+		card.Icon.SizeConstraint = Enum.SizeConstraint.RelativeXY
+		card.Icon.ScaleType = Enum.ScaleType.Fit
+		card.Reward.AnchorPoint = Vector2.new(0.5, 1)
+		card.Reward.Position = UDim2.new(0.5, 0, 1, -6)
+		card.Reward.Size = UDim2.new(1, -12, 0, d == 7 and 40 or 30)
+		card.Reward.TextColor3 = Color3.new(1, 1, 1)
+		card.Reward.TextStrokeTransparency = 0
+		card.Reward.TextScaled = true
+		card.Reward.TextWrapped = true
+		card.Status.AnchorPoint = Vector2.new(0.5, 0)
+		card.Status.Position = UDim2.new(0.5, 0, 0, 30)
+		card.Status.Size = UDim2.new(1, -10, 0, 16)
+		-- claimed: dark cover + big green check
+		local dim = Instance.new("Frame")
+		dim.Name = "ClaimedDim"
+		dim.Size = UDim2.fromScale(1, 1)
+		dim.BackgroundColor3 = Color3.new(0, 0, 0)
+		dim.BackgroundTransparency = 0.45
+		dim.ZIndex = 20
+		dim.Visible = false
+		Instance.new("UICorner", dim).CornerRadius = (card:FindFirstChildOfClass("UICorner") or { CornerRadius = UDim.new(0, 12) }).CornerRadius
+		dim.Parent = card
+		local check = Instance.new("TextLabel")
+		check.Name = "Check"
+		check.AnchorPoint = Vector2.new(0.5, 0.5)
+		check.Position = UDim2.fromScale(0.5, 0.5)
+		check.Size = UDim2.fromScale(0.7, 0.55)
+		check.BackgroundTransparency = 1
+		check.Text = "\u{2714}"
+		check.Font = Enum.Font.GothamBlack
+		check.TextScaled = true
+		check.TextColor3 = Color3.fromRGB(80, 220, 90)
+		check.TextStrokeTransparency = 0
+		check.TextStrokeColor3 = Color3.fromRGB(10, 40, 15)
+		check.ZIndex = 21
+		check.Parent = dim
+	end
+	-- "Next reward in ..." in green
+	db.Timer.TextColor3 = Color3.fromRGB(150, 255, 90)
+	db.Timer.Font = Enum.Font.LuckiestGuy
+	db.Timer.TextStrokeTransparency = 0
+end
+
 refreshers.DailyPanel = function()
+	styleDailyCards()
 	local day, claimable = dailyState()
 	for d = 1, 7 do
 		local card = db.Days["Day" .. d]
@@ -629,11 +729,12 @@ refreshers.DailyPanel = function()
 		card.Icon.Image = icon
 		local claimed = (d < day) or (d == day and not claimable)
 		local isToday = d == day and claimable
-		card.BackgroundColor3 = isToday and Color3.fromRGB(60, 120, 60) or NAVY
-		card.Ring.Color = isToday and GOLD or Color3.fromRGB(10, 15, 35)
-		card.Ring.Thickness = isToday and 4 or 3
-		card.Status.Text = claimed and "CLAIMED" or (isToday and "READY!" or "")
-		card.Status.TextColor3 = claimed and Color3.fromRGB(140, 255, 150) or GOLD
+		card.BackgroundColor3 = isToday and Color3.fromRGB(34, 44, 30) or Color3.fromRGB(22, 24, 34)
+		card.Ring.Color = isToday and GOLD or DAY_COLORS[d]
+		card.Ring.Thickness = isToday and 6 or 4
+		card.Status.Text = isToday and "READY!" or ""
+		card.Status.TextColor3 = GOLD
+		card.ClaimedDim.Visible = claimed
 	end
 	db.ClaimButton.BackgroundColor3 = claimable and GREEN or GRAY
 	db.ClaimButton.Label.Text = claimable and "CLAIM" or "CLAIMED"

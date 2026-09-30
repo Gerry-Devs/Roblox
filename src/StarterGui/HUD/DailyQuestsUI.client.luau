@@ -159,6 +159,13 @@ function render()
 		if q then
 			local t = TIER[q.tier] or TIER.easy
 			r.tier.BackgroundColor3 = t[2]
+			-- dark card with a border in the quest's tier color (like the rewards)
+			r.row.BackgroundColor3 = Color3.fromRGB(22, 24, 34)
+			local rs = r.row:FindFirstChildOfClass("UIStroke")
+			if rs then
+				rs.Color = q.claimed and Color3.fromRGB(70, 75, 90) or t[2]
+				rs.Thickness = 4
+			end
 			r.tierText.Text = t[1]
 			r.text.Text = q.text
 			r.bar.Size = UDim2.fromScale(math.clamp(q.progress / q.target, 0, 1), 1)

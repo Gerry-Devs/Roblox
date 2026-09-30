@@ -547,7 +547,11 @@ Config.UpgradeBranches = {
 Config.UpgradeHexImage = ""
 
 -- Image slots for the big hexes (put "rbxassetid://..." when you make
--- one; "" = the drawn hexagon). The labels still show on top.
+-- one; "" = just the studded hexagon). The picture goes see-through on
+-- top of the studded hexagon; the labels still show on top of it.
+-- How see-through your pictures are on the studded hexes (0 = solid,
+-- 1 = invisible). 0.35 lets the studs show through.
+Config.UpgradeImageTransparency = 0.35
 Config.UpgradeCenterImage = "" -- middle "UPGRADES" hex
 Config.UpgradeBackImage = "" -- middle "BACK" hex inside a category
 Config.UpgradeBranchImages = {
@@ -560,7 +564,8 @@ Config.UpgradeBranchImages = {
 }
 
 -- Your own hexagon image for each upgrade (every tier of that upgrade uses
--- it). Leave "" to use the drawn hexagon. To give one single tier its own
+-- it, see-through over the studded hexagon). Leave "" for just the hexagon.
+-- To give one single tier its own
 -- image instead, set that node's imageId in Config.UpgradeNodes.
 Config.UpgradeStatImages = {
 	cash = "",

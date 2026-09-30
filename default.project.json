@@ -1,0 +1,139 @@
+{
+  "name": "Monster RNG",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$className": "ReplicatedFirst",
+      "LoadingScreen": {
+        "$path": "src/ReplicatedFirst/LoadingScreen.client.luau"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "MonsterRNG": {
+        "$className": "Folder",
+        "Config": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/Config.luau"
+        },
+        "EggModel": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/EggModel.luau"
+        },
+        "MonsterMesh": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/MonsterMesh.luau"
+        },
+        "MonsterModel": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/MonsterModel.luau"
+        }
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "MonsterRNGServer": {
+        "$path": "src/ServerScriptService/MonsterRNGServer.server.luau"
+      },
+      "FallRescue": {
+        "$path": "src/ServerScriptService/FallRescue.server.luau"
+      },
+      "MonsterRNG": {
+        "$path": "src/ServerScriptService/MonsterRNG"
+      }
+    },
+    "StarterGui": {
+      "$className": "StarterGui",
+      "AdminPanel": {
+        "$className": "ScreenGui",
+        "AdminPanelController": {
+          "$path": "src/StarterGui/AdminPanel/AdminPanelController.client.luau"
+        }
+      },
+      "AutoSell": {
+        "$className": "ScreenGui",
+        "AutoSellController": {
+          "$path": "src/StarterGui/AutoSell/AutoSellController.client.luau"
+        }
+      },
+      "Backpack": {
+        "$className": "ScreenGui",
+        "BackpackController": {
+          "$path": "src/StarterGui/Backpack/BackpackController.client.luau"
+        }
+      },
+      "BiomeBanner": {
+        "$className": "ScreenGui",
+        "BiomeBannerController": {
+          "$path": "src/StarterGui/BiomeBanner/BiomeBannerController.client.luau"
+        }
+      },
+      "BottomBar": {
+        "$className": "ScreenGui",
+        "RollController": {
+          "$path": "src/StarterGui/BottomBar/RollController"
+        }
+      },
+      "DiceShop": {
+        "$className": "ScreenGui",
+        "DiceShopController": {
+          "$path": "src/StarterGui/DiceShop/DiceShopController.client.luau"
+        }
+      },
+      "GearShop": {
+        "$className": "ScreenGui",
+        "GearShopController": {
+          "$path": "src/StarterGui/GearShop/GearShopController.client.luau"
+        }
+      },
+      "Gift": {
+        "$className": "ScreenGui",
+        "GiftController": {
+          "$path": "src/StarterGui/Gift/GiftController.client.luau"
+        }
+      },
+      "GuildUI": {
+        "$className": "ScreenGui",
+        "GuildController": {
+          "$path": "src/StarterGui/GuildUI/GuildController.client.luau"
+        }
+      },
+      "HUD": {
+        "$className": "ScreenGui",
+        "DailyQuestsUI": {
+          "$path": "src/StarterGui/HUD/DailyQuestsUI.client.luau"
+        },
+        "GamepassShop": {
+          "$path": "src/StarterGui/HUD/GamepassShop.client.luau"
+        },
+        "HUDController": {
+          "$path": "src/StarterGui/HUD/HUDController.client.luau"
+        },
+        "PvpController": {
+          "$path": "src/StarterGui/HUD/PvpController.client.luau"
+        }
+      },
+      "PenPanel": {
+        "$className": "ScreenGui",
+        "PenPanelController": {
+          "$path": "src/StarterGui/PenPanel/PenPanelController.client.luau"
+        }
+      },
+      "SellShop": {
+        "$className": "ScreenGui",
+        "SellShopController": {
+          "$path": "src/StarterGui/SellShop/SellShopController.client.luau"
+        }
+      },
+      "UpgradeTree": {
+        "$className": "ScreenGui",
+        "UpgradeTreeController": {
+          "$path": "src/StarterGui/UpgradeTree/UpgradeTreeController.client.luau"
+        }
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "$path": "src/StarterPlayerScripts"
+      }
+    }
+  }
+}

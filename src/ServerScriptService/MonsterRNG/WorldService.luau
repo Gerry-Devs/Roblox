@@ -2637,46 +2637,52 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.Parent = body
 
+	-- info over the monster's head (4 lines):
+	--   Name              (white)
+	--   Rarity            (white)
+	--   $cash/s  -  odds  (yellow)
+	--   kg  -  Lv         (green)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "MonsterName"
-	billboard.Size = UDim2.fromOffset(110, 42)
+	billboard.Size = UDim2.fromOffset(170, 78)
 	billboard.MaxDistance = 28 -- only shows when the monster is near you
 	billboard.StudsOffset = Vector3.new(0, bodySize * 1.45 + 0.5, 0) -- above the model's head
 	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
 	billboard.Parent = body
 
 	local nameFrame = Instance.new("Frame")
 	nameFrame.Size = UDim2.fromScale(1, 1)
-	nameFrame.BackgroundColor3 = Color3.fromRGB(10, 13, 26)
 	nameFrame.BackgroundTransparency = 1
-	nameFrame.BorderSizePixel = 0
 	nameFrame.Parent = billboard
+	local lines = Instance.new("UIListLayout")
+	lines.SortOrder = Enum.SortOrder.LayoutOrder
+	lines.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	lines.VerticalAlignment = Enum.VerticalAlignment.Bottom
+	lines.Parent = nameFrame
 
-	local cornerRadius = Instance.new("UICorner")
-	cornerRadius.CornerRadius = UDim.new(0, 10)
-	cornerRadius.Parent = nameFrame
-
-	local ringStroke = Instance.new("UIStroke")
-	ringStroke.Color = bodyColor
-	ringStroke.Thickness = 1.5
-	ringStroke.Enabled = false
-	ringStroke.Parent = nameFrame
-
-	local label = Instance.new("TextLabel")
-	label.Size = UDim2.fromScale(1, 1)
-	label.BackgroundTransparency = 1
-	label.Text = string.format(
-		"%s\n$%d/s\n%s  \226\128\162  Lv. %d",
-		Config.BuildDisplayName(monster.name, entry.size, entry.finish),
-		WorldService.GetEntryIncome(entry),
-		Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg)) .. "  \226\128\162  " .. Config.FormatKg(entry.kg),
-		entry.level
-	)
-	label.TextColor3 = bodyColor
-	label.TextStrokeTransparency = 0.35
-	label.Font = Enum.Font.LuckiestGuy
-	label.TextScaled = true
-	label.Parent = nameFrame
+	local DOT = "  \226\128\162  "
+	local odds = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg))
+	local infoLines = {
+		{ Config.BuildDisplayName(monster.name, entry.size, entry.finish), Color3.fromRGB(245, 245, 245), 0.28 },
+		{ rarity.name, Color3.fromRGB(235, 235, 235), 0.24 },
+		{ "$" .. Config.FormatNumber(WorldService.GetEntryIncome(entry)) .. "/s" .. DOT .. odds, Color3.fromRGB(255, 222, 60), 0.24 },
+		{ Config.FormatKg(entry.kg) .. DOT .. "Lv. " .. (entry.level or 1), Color3.fromRGB(95, 225, 85), 0.24 },
+	}
+	for i, info in ipairs(infoLines) do
+		local line = Instance.new("TextLabel")
+		line.Name = "Line" .. i
+		line.LayoutOrder = i
+		line.Size = UDim2.fromScale(1, info[3])
+		line.BackgroundTransparency = 1
+		line.Text = info[1]
+		line.TextColor3 = entry.defeated and info[2]:Lerp(Color3.fromRGB(120, 125, 140), 0.6) or info[2]
+		line.TextStrokeColor3 = Color3.fromRGB(15, 15, 20)
+		line.TextStrokeTransparency = 0
+		line.Font = Enum.Font.GothamBlack
+		line.TextScaled = true
+		line.Parent = nameFrame
+	end
 
 	model.PrimaryPart = body
 	model:SetAttribute("Defeated", entry.defeated == true)

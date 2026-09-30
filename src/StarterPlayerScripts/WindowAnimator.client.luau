@@ -21,6 +21,79 @@ local GHOST = "WindowAnimGhost"
 
 local watched = setmetatable({}, { __mode = "k" })
 
+--------------------------------------------------------------------
+-- Fit on screen (phones!): a window may never be bigger than the screen.
+-- Its UIScale is capped so the whole window fits, with room for
+-- Roblox's top bar. Windows that pick their own scale keep doing so;
+-- this only stops them from getting too big.
+--------------------------------------------------------------------
+local GuiService = game:GetService("GuiService")
+local MARGIN = 16
+local function maxScaleFor(window)
+	local camera = workspace.CurrentCamera
+	local parent = window.Parent
+	if not camera or not parent or not parent:IsA("GuiBase2d") then
+		return math.huge
+	end
+	local v = camera.ViewportSize
+	local inset = GuiService:GetGuiInset().Y
+	local ps = parent.AbsoluteSize
+	local w = window.Size.X.Scale * ps.X + window.Size.X.Offset
+	local h = window.Size.Y.Scale * ps.Y + window.Size.Y.Offset
+	if w <= 0 or h <= 0 then
+		return math.huge
+	end
+	-- keep a little extra room for the X / title that sit on the edge
+	return math.min((v.X - MARGIN * 2) / w, (v.Y - inset - MARGIN * 2 - 20) / h)
+end
+local fitting = setmetatable({}, { __mode = "k" })
+local function watchFit(window)
+	if fitting[window] then
+		return
+	end
+	local scale = window:FindFirstChildOfClass("UIScale")
+	if not scale then
+		scale = Instance.new("UIScale")
+		scale.Name = "FitScale"
+		scale.Parent = window
+	end
+	fitting[window] = scale
+	local busy = false
+	local function clamp()
+		if busy then
+			return
+		end
+		local cap = maxScaleFor(window)
+		if scale.Scale > cap then
+			busy = true
+			scale.Scale = cap
+			busy = false
+		end
+	end
+	local scaleConn = scale:GetPropertyChangedSignal("Scale"):Connect(clamp)
+	-- the window's own script adds its UIScale later: use that one instead
+	window.ChildAdded:Connect(function(c)
+		if c:IsA("UIScale") and c ~= scale and scale.Name == "FitScale" then
+			scaleConn:Disconnect()
+			scale:Destroy()
+			scale = c
+			fitting[window] = c
+			scaleConn = c:GetPropertyChangedSignal("Scale"):Connect(clamp)
+			task.defer(clamp)
+		end
+	end)
+	window:GetPropertyChangedSignal("Size"):Connect(clamp)
+	window:GetPropertyChangedSignal("Visible"):Connect(function()
+		if window.Visible then
+			task.defer(clamp)
+		end
+	end)
+	if workspace.CurrentCamera then
+		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(clamp)
+	end
+	clamp()
+end
+
 local function isCloseButton(b)
 	if not b:IsA("GuiButton") then
 		return false
@@ -65,6 +138,7 @@ local function watch(window)
 	end
 	local w = { basePos = window.Position, tween = nil }
 	watched[window] = w
+	watchFit(window)
 
 	window:GetPropertyChangedSignal("Visible"):Connect(function()
 		if not window.Parent then

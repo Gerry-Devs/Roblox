@@ -243,6 +243,9 @@ local function makeTile(x, y, fillColor, innerColor, imageId)
 	if imageId and imageId ~= "" then
 		image = mk("ImageLabel", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Image = imageId, ScaleType = Enum.ScaleType.Fit, ZIndex = 6 }, holder)
 		outline.Visible, fill.Visible, inner.Visible = false, false, false
+	elseif (Config.UIHexStudsImage or "") ~= "" then
+		-- studs on the hex (same cartoony studs as the windows)
+		mk("ImageLabel", { Name = "Studs", Size = UDim2.fromOffset(TILE - 10, TILE - 10), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BackgroundTransparency = 1, Image = Config.UIHexStudsImage, ImageTransparency = 0.5, ZIndex = 5 }, holder)
 	end
 	local scale = mk("UIScale", { Scale = 0 }, holder)
 	local t = { holder = holder, fill = fill, inner = inner, image = image, scale = scale, pop = rippleIn and 0 or 1, mag = 1, press = 1 }

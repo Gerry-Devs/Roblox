@@ -135,6 +135,17 @@ function UIStyle.rarityCard(card, color)
 	return card
 end
 
+-- a Backpack-style tab: dark brick, the open one lighter with a white rim
+function UIStyle.tab(button, on)
+	UIStyle.brick(button, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.65 })
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
+		stroke.Thickness = on and 4 or 3
+	end
+	return button
+end
+
 -- the red studded X (like the reference): red square with studs, a
 -- darker red edge on the left and a white X with a thick dark outline.
 -- header = true: sits at the right end of a header bar, so only its
@@ -262,6 +273,44 @@ local function isNavy(c)
 	local r, g, b = c.R * 255, c.G * 255, c.B * 255
 	return b > r + 20 and b > g + 10 and r < 90 and g < 90 and b < 170
 end
+-- a bright colored card / row inside a list or grid becomes a dark card
+-- with a border in its color (like the Backpack's rarity cards). If the
+-- window's script recolors it later, the new color goes to the border.
+local function isColorful(c)
+	local r, g, b = c.R * 255, c.G * 255, c.B * 255
+	return math.max(r, g, b) - math.min(r, g, b) > 45 and math.max(r, g, b) > 110
+end
+local function cardify(d)
+	if d:GetAttribute("Carded") or d:FindFirstChild("RarityGlow") then
+		return
+	end
+	d:SetAttribute("Carded", true)
+	local stroke = d:FindFirstChildOfClass("UIStroke") or mk("UIStroke", { ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, d)
+	stroke.Thickness = math.max(stroke.Thickness, 4)
+	local grad = stroke:FindFirstChildOfClass("UIGradient") or mk("UIGradient", { Rotation = 90 }, stroke)
+	local busy = false
+	local function apply()
+		if busy then
+			return
+		end
+		local c = d.BackgroundColor3
+		if c == UIStyle.BODY_DARK then
+			return
+		end
+		busy = true
+		stroke.Color = c
+		grad.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.3), c:Lerp(Color3.new(0, 0, 0), 0.2))
+		d.BackgroundColor3 = UIStyle.BODY_DARK
+		local g = d:FindFirstChildOfClass("UIGradient")
+		if g then
+			g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 205, 215))
+		end
+		busy = false
+	end
+	apply()
+	d:GetPropertyChangedSignal("BackgroundColor3"):Connect(apply)
+end
+
 local function studOne(d)
 	if not d:IsA("GuiObject") or d:IsA("TextLabel") or d:IsA("TextBox") or d:IsA("ImageLabel") then
 		return
@@ -276,7 +325,9 @@ local function studOne(d)
 	if not laidOut and d.Size.Y.Scale == 0 and d.Size.Y.Offset < 20 then
 		return -- thin bars (cards in a grid / list get their size from the layout)
 	end
-	if d:IsA("Frame") and isNavy(d.BackgroundColor3) then
+	if d:IsA("Frame") and laidOut and d.BackgroundTransparency <= 0.05 and (d.AbsoluteSize.Y >= 40 or d.Size.Y.Offset >= 40 or d.Parent:FindFirstChildOfClass("UIGridLayout")) and isColorful(d.BackgroundColor3) and d:FindFirstChildWhichIsA("GuiObject") then
+		cardify(d)
+	elseif d:IsA("Frame") and isNavy(d.BackgroundColor3) then
 		d.BackgroundColor3 = UIStyle.BODY_DARK
 		local g = d:FindFirstChildOfClass("UIGradient")
 		if g then

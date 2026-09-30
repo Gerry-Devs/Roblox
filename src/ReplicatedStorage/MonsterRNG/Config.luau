@@ -968,6 +968,9 @@ Config.RiftShardImage = "rbxassetid://75633089538163"
 -- uploaded to Roblox). Leave "" until it's uploaded: windows still get the
 -- new look, just without the studs.
 Config.UIStudsImage = "rbxassetid://139993005514116"
+-- Hexagon of studs for the Upgrade tree tiles (assets/ui/studs_hex.png
+-- uploaded to Roblox). Leave "" until it's uploaded.
+Config.UIHexStudsImage = ""
 
 -- duration in seconds (0 = instant)
 Config.Potions = {

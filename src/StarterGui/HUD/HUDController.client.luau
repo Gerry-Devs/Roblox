@@ -10,6 +10,20 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local monsterFolder = ReplicatedStorage:WaitForChild("MonsterRNG")
 local Config = require(monsterFolder:WaitForChild("Config"))
+-- the studded card / tab look (nil if the module isn't synced)
+local UIStyle
+do
+	local mod = monsterFolder:WaitForChild("UIStyle", 5)
+	local ok, res = pcall(function()
+		return mod and require(mod)
+	end)
+	UIStyle = ok and res or nil
+end
+local function styled(fnName, ...)
+	if UIStyle and UIStyle[fnName] then
+		pcall(UIStyle[fnName], ...)
+	end
+end
 local remotes = monsterFolder:WaitForChild("Remotes")
 local profileRemote = remotes:WaitForChild("GetProfile")
 local profileUpdated = remotes:WaitForChild("ProfileUpdated")
@@ -314,6 +328,8 @@ refreshers.IndexPanel = function()
 	end
 	indexBody.Tabs.PetsTab.BackgroundColor3 = indexTab == "pets" and GOLD or BLUE
 	indexBody.Tabs.EnemiesTab.BackgroundColor3 = indexTab == "enemies" and GOLD or BLUE
+	styled("tab", indexBody.Tabs.PetsTab, indexTab == "pets")
+	styled("tab", indexBody.Tabs.EnemiesTab, indexTab == "enemies")
 
 	local list = table.clone(Config.Monsters)
 	table.sort(list, function(a, b)
@@ -354,6 +370,7 @@ refreshers.IndexPanel = function()
 		else
 			card.Info.Text = rarity.name:upper()
 		end
+		styled("rarityCard", card, discovered and color or Color3.fromRGB(70, 75, 90))
 		card.Parent = grid
 	end
 	indexBody.Counter.Text = found .. "/" .. #list .. " found"

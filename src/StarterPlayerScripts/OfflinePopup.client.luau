@@ -53,11 +53,11 @@ remote.OnClientEvent:Connect(function(data)
 
 	mk("TextLabel", { Size = UDim2.new(1, -24, 0, 44), Position = UDim2.fromOffset(12, 14), BackgroundTransparency = 1, Text = "WELCOME BACK!", Font = FONT, TextScaled = true, TextColor3 = GOLD }, panel)
 	mk("TextLabel", { Size = UDim2.new(1, -40, 0, 40), Position = UDim2.fromOffset(20, 62), BackgroundTransparency = 1, Text = "Your monsters kept working while you were away:", Font = FONT, TextScaled = true, TextWrapped = true, TextColor3 = Color3.fromRGB(220, 225, 255) }, panel)
-	local amount = mk("TextLabel", { Size = UDim2.new(1, -40, 0, 64), Position = UDim2.fromOffset(20, 106), BackgroundTransparency = 1, Text = "+$0", Font = FONT, TextScaled = true, TextColor3 = Color3.fromRGB(130, 255, 140) }, panel)
+	local amount = mk("TextLabel", { Size = UDim2.new(1, -40, 0, 64), Position = UDim2.fromOffset(20, 128), BackgroundTransparency = 1, Text = "+$0", Font = FONT, TextScaled = true, TextColor3 = Color3.fromRGB(130, 255, 140) }, panel)
 	mk("UIStroke", { Thickness = 3, Color = Color3.fromRGB(10, 40, 15) }, amount)
 	local capped = data.away > data.seconds
 	if capped then
-		mk("TextLabel", { Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(20, 198), BackgroundTransparency = 1, Text = "Upgrade OFFLINE TIME in the Upgrade tree to earn for longer!", Font = FONT, TextScaled = true, TextColor3 = GOLD }, panel)
+		mk("TextLabel", { Size = UDim2.new(1, -40, 0, 20), Position = UDim2.fromOffset(20, 202), BackgroundTransparency = 1, Text = "Upgrade OFFLINE TIME in the Upgrade tree to earn for longer!", Font = FONT, TextScaled = true, TextColor3 = GOLD }, panel)
 	end
 	local ok = mk("TextButton", { Size = UDim2.fromOffset(180, 50), AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 232), BackgroundColor3 = GREEN, Text = "COLLECT", Font = FONT, TextScaled = true, TextColor3 = Color3.new(1, 1, 1), AutoButtonColor = true }, panel)
 	round(ok, 14, 3)

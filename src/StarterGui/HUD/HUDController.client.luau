@@ -619,6 +619,12 @@ refreshers.DailyPanel = function()
 	for d = 1, 7 do
 		local card = db.Days["Day" .. d]
 		local textInfo, icon = rewardInfo(Config.DailyRewards[d])
+		-- the reward text stops above the status line (long rewards used to
+		-- run under "CLAIMED"); long text shrinks to fit instead
+		card.Reward.Size = UDim2.new(1, -10, 1, -(90 + 30))
+		card.Reward.TextScaled = true
+		card.Reward.TextWrapped = true
+		card.Status.Size = UDim2.new(1, -10, 0, 20)
 		card.Reward.Text = textInfo
 		card.Icon.Image = icon
 		local claimed = (d < day) or (d == day and not claimable)

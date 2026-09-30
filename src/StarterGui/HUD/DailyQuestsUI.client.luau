@@ -166,8 +166,17 @@ function render()
 			r.reward.Text = rewardText(Config.DailyQuestRewards[q.tier])
 			local ready = not q.claimed and q.progress >= q.target
 			anyReady = anyReady or ready
-			r.btn.BackgroundColor3 = q.claimed and Color3.fromRGB(70, 90, 140) or (ready and GREEN or GRAY)
-			r.btnText.Text = q.claimed and "DONE" or (ready and "CLAIM" or "...")
+			-- claimed: just a green "COMPLETE" text, not a button any more
+			r.btn.BackgroundColor3 = ready and GREEN or GRAY
+			r.btn.BackgroundTransparency = q.claimed and 1 or 0
+			r.btn.AutoButtonColor = not q.claimed
+			r.btn.Active = not q.claimed
+			local btnStroke = r.btn:FindFirstChildOfClass("UIStroke")
+			if btnStroke then
+				btnStroke.Enabled = not q.claimed
+			end
+			r.btnText.Text = q.claimed and "COMPLETE" or (ready and "CLAIM" or "...")
+			r.btnText.TextColor3 = q.claimed and GREEN or Color3.new(1, 1, 1)
 		end
 	end
 	-- streak dots (today's dot lights up once all 5 are claimed)

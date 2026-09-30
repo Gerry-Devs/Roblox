@@ -47,11 +47,11 @@ end)
 -- window
 --------------------------------------------------------------------
 local gui = mk("ScreenGui", { Name = "SkillsGui", ResetOnSpawn = false, DisplayOrder = 12, ZIndexBehavior = Enum.ZIndexBehavior.Sibling }, playerGui)
-local W, H = 460, 470
+local W, H = 340, 390 -- same as the PETS / EGGS / WARP panels
 local main = mk("Frame", { Name = "Main", Size = UDim2.fromOffset(W, H), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.52), BackgroundColor3 = Color3.fromRGB(40, 44, 58), Visible = false }, gui)
 mk("UICorner", { CornerRadius = UDim.new(0, 18) }, main)
 mk("UIStroke", { Color = OUTLINE, Thickness = 5 }, main)
-mk("UIScale", {}, main)
+local mainScale = mk("UIScale", {}, main)
 -- title (the studded header is added by CloseButtonFixer)
 local titleFrame = mk("Frame", { Name = "Title", Size = UDim2.fromOffset(260, 50), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0, 0), BackgroundColor3 = GOLD, ZIndex = 5 }, main)
 mk("UICorner", { CornerRadius = UDim.new(0, 14) }, titleFrame)
@@ -152,8 +152,29 @@ local function render()
 	end
 end
 
+-- sits exactly where the PETS panel does, same size + same scale
+local function matchPetsPanel()
+	local pen = playerGui:FindFirstChild("PenPanel")
+	local pets = pen and pen:FindFirstChild("MonsterPanel")
+	if not pets then
+		return
+	end
+	if main.Parent ~= pen then
+		gui.Enabled = false
+		main.Parent = pen
+	end
+	main.AnchorPoint = pets.AnchorPoint
+	main.Position = pets.Position
+	main.Size = pets.Size
+	local ps = pets:FindFirstChildOfClass("UIScale")
+	if ps then
+		mainScale.Scale = pets:GetAttribute("BaseScale") or ps.Scale
+	end
+end
+
 local function open()
 	closeAllBridge:Fire("skills")
+	pcall(matchPetsPanel)
 	lastSig = nil
 	render()
 	main.Visible = true

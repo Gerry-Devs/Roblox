@@ -236,7 +236,7 @@ local SKIP_NAMES = { Studs = true, Rim = true, SkinHeader = true, Fill = true, B
 local function isNavy(c)
 	-- the old dark-blue panel colors
 	local r, g, b = c.R * 255, c.G * 255, c.B * 255
-	return b > r + 25 and b > g + 10 and r < 70 and g < 90 and b < 160
+	return b > r + 20 and b > g + 10 and r < 90 and g < 90 and b < 170
 end
 local function studOne(d)
 	if not d:IsA("GuiObject") or d:IsA("TextLabel") or d:IsA("TextBox") or d:IsA("ImageLabel") then
@@ -308,6 +308,18 @@ function UIStyle.skinWindow(window, closeBtn)
 
 	-- where the old content starts: move it all down under the header
 	local oldTitle = window:FindFirstChild("Title")
+	if not (oldTitle and oldTitle:IsA("GuiObject")) then
+		-- script-built windows: a title "bubble" (a frame with a text in
+		-- it) sitting on the top edge of the window
+		oldTitle = nil
+		for _, c in ipairs(window:GetChildren()) do
+			if c:IsA("Frame") and c ~= closeBtn and c.Position.Y.Scale == 0 and c.Position.Y.Offset <= 12
+				and c.Size.Y.Offset > 0 and c.Size.Y.Offset <= 90 and c:FindFirstChildWhichIsA("TextLabel") then
+				oldTitle = c
+				break
+			end
+		end
+	end
 	local titleText, titleIcon
 	if oldTitle and oldTitle:IsA("GuiObject") then
 		titleText = oldTitle:FindFirstChild("Text") or oldTitle:FindFirstChildWhichIsA("TextLabel")

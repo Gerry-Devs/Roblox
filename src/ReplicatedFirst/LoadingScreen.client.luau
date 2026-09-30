@@ -188,7 +188,8 @@ corner(tipBox, UDim.new(0, 12))
 stroke(tipBox, 3, Color3.fromRGB(120, 100, 255)).Transparency = 0.2
 local tipText = mk("TextLabel", { Size = UDim2.new(1, -24, 1, -12), Position = UDim2.fromOffset(12, 6), BackgroundTransparency = 1, RichText = true, Text = "", TextScaled = true, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(220, 222, 255), ZIndex = 11 }, tipBox)
 
-local skip = mk("TextButton", { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -24, 1, -24), Size = UDim2.fromOffset(150, 52), BackgroundColor3 = Color3.fromRGB(88, 96, 122), Text = "", AutoButtonColor = false, Visible = false, ZIndex = 20 }, gui)
+-- SKIP: top-right corner (away from the tip), shrinks with the screen
+local skip = mk("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 16), Size = UDim2.fromOffset(130, 46), BackgroundColor3 = Color3.fromRGB(88, 96, 122), Text = "", AutoButtonColor = false, Visible = false, ZIndex = 20 }, gui)
 corner(skip, UDim.new(0, 14))
 stroke(skip, 4)
 mk("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(190, 196, 210)) }, skip)
@@ -205,6 +206,8 @@ local shown = 0 -- progress 0..1 (what the bar shows)
 local target = 0
 local alive = true
 local t0 = os.clock()
+local MIN_TIME = 7 -- seconds the loading screen shows at least
+local finished = false
 local conn
 conn = RunService.Heartbeat:Connect(function(dt)
 	if not alive then
@@ -244,14 +247,16 @@ conn = RunService.Heartbeat:Connect(function(dt)
 	local k = (t % 2.5) / 1.1
 	sweep.Offset = Vector2.new(-1 + math.min(k, 1) * 2, 0)
 	-- bar: eases toward the target, shine runs along it, egg bobs
-	shown += (target - shown) * math.min(1, dt * 6)
+	-- the bar never runs ahead of the minimum time, so it fills smoothly
+	local goal = finished and target or math.min(target, t / MIN_TIME)
+	shown += (goal - shown) * math.min(1, dt * 2.5)
 	fill.Size = UDim2.fromScale(shown, 1)
 	runner.Position = UDim2.fromScale((t * 0.9) % 1.4 - 0.2, 0.5)
 	rider.Position = UDim2.new(math.clamp(shown, 0.03, 0.97), 0, 0, -2 - math.abs(math.sin(t * 6)) * 6)
 	rider.Rotation = math.sin(t * 6) * 10
 	percent.Text = math.floor(shown * 100 + 0.5) .. "%"
 	-- SKIP pulses a little
-	skipScale.Scale = 1 + math.sin(t * 4) * 0.03
+	skipScale.Scale = math.min(1, fitScale) * (1 + math.sin(t * 4) * 0.03)
 end)
 
 -- logo pops in
@@ -283,7 +288,6 @@ end
 --------------------------------------------------------------------
 -- closing: the logo zooms, everything fades, the screen slides away
 --------------------------------------------------------------------
-local finished = false
 local function close()
 	if finished then
 		return
@@ -291,9 +295,10 @@ local function close()
 	finished = true
 	setProgress(1, "Ready!")
 	status.TextColor3 = Color3.fromRGB(140, 255, 160)
-	task.wait(0.45)
-	local info = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-	TweenService:Create(logoScale, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 1.4 }):Play()
+	-- let the bar fill all the way and show "Ready!" for a moment
+	task.wait(1.4)
+	local info = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	TweenService:Create(logoScale, TweenInfo.new(0.9, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 1.4 }):Play()
 	for _, d in ipairs(gui:GetDescendants()) do
 		if d:IsA("TextLabel") or d:IsA("TextButton") then
 			TweenService:Create(d, info, { TextTransparency = 1 }):Play()
@@ -308,7 +313,7 @@ local function close()
 			TweenService:Create(d, info, { Transparency = 1 }):Play()
 		end
 	end
-	task.wait(0.55)
+	task.wait(0.95)
 	alive = false
 	gui:Destroy()
 end
@@ -383,6 +388,10 @@ task.spawn(function()
 		while preloading and not finished and os.clock() - start < 20 do
 			task.wait(0.1)
 		end
+	end
+	-- stay at least MIN_TIME so the screen can be seen (SKIP still works)
+	while not finished and os.clock() - t0 < MIN_TIME do
+		task.wait(0.1)
 	end
 	close()
 end)

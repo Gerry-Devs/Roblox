@@ -281,10 +281,11 @@ Config.Monsters = {
 --------------------------------------------------------------------
 -- WILD rolls: each roll can land on WILD, which rolls again. Getting 3
 -- WILDs in a row (chances multiplied together) spins the egg wheel.
--- 0.15 x 0.3 x 0.15 = 0.00675 -> about 1 in 150 rolls gets 3 WILDs.
+-- 0.04 x 0.4 x 0.25 = 0.004 -> about 1 in 250 rolls gets 3 WILDs.
+-- (1st WILD ~1 in 25 rolls, 2 WILDs ~1 in 63 rolls)
 --------------------------------------------------------------------
 Config.Wild = {
-	chances = { 0.004, 0.3, 0.15 }, -- 1st WILD ~1 in 250 rolls, then 2nd, then 3rd
+	chances = { 0.04, 0.4, 0.25 }, -- chance of the 1st WILD, then the 2nd, then the 3rd
 	wheel = { -- the egg wheel after 3 WILDs (weights = % chance)
 		{ rarity = "Mythic", weight = 50 },
 		{ rarity = "Secret", weight = 25 },

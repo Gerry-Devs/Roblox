@@ -1149,6 +1149,7 @@ Config.GlobalBoostKinds = {
 	{ key = "income", name = "Income", imageId = "", color = { 255, 205, 60 }, text = "More cash from your monsters" },
 	{ key = "exp", name = "EXP", imageId = "", color = { 110, 170, 255 }, text = "More EXP from enemies" },
 	{ key = "speed", name = "Speed", imageId = "", color = { 90, 230, 230 }, text = "Everyone runs faster" },
+	{ key = "drops", name = "Drops", imageId = "", color = { 190, 130, 255 }, text = "More drops from enemies" },
 }
 Config.GlobalSpeedCap = 3 -- walking faster than 3x breaks the map, so the speed effect stops there
 Config.GlobalBoostMax = 16

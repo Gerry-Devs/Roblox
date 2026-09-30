@@ -498,6 +498,7 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 	local drops = {}
 	-- special enemies drop more; every unlocked biome adds +10% drop chance
 	local bonus = math.sqrt(e.mult) * (1 + Config.GetBiomeBonusCount(profile) * Config.BiomeBonus.drops / 100)
+	bonus *= Config.GlobalBoost("drops", now) -- admin panel: server-wide Drops effect
 	local C = Config.Combat
 	-- upgrades: Drops (+shard chance), Potion Drop (+potion chance), Rift Shards (+amount)
 	local shardChanceBonus = 1 + Config.GetUpgradeBonus(profile.upgrades, "drops") / 100

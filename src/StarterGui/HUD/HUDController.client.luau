@@ -504,17 +504,83 @@ task.spawn(function()
 	end
 end)
 
+-- ON/OFF switches (like the reference): a dark track with a knob that
+-- slides right (green ON) or left (red OFF)
 local function styleToggle(rowName, on)
 	local t = sb[rowName].Options.Toggle
-	t.BackgroundColor3 = on and GREEN or Color3.fromRGB(235, 70, 80)
-	t.Label.Text = on and "ON" or "OFF"
+	local knob = t:FindFirstChild("Knob")
+	if not knob then
+		t.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
+		t.AutoButtonColor = false
+		local st = t:FindFirstChildOfClass("UIStroke")
+		if st then
+			st.Color = Color3.fromRGB(95, 100, 115)
+			st.Thickness = 2
+		end
+		local g = t:FindFirstChildOfClass("UIGradient")
+		if g then
+			g.Enabled = false
+		end
+		knob = Instance.new("Frame")
+		knob.Name = "Knob"
+		knob.Size = UDim2.new(0.56, 0, 1, 0)
+		knob.ZIndex = t.ZIndex + 2
+		Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 10)
+		local ks = Instance.new("UIStroke")
+		ks.Color = Color3.fromRGB(10, 12, 22)
+		ks.Thickness = 2.5
+		ks.Parent = knob
+		local kg = Instance.new("UIGradient")
+		kg.Rotation = 90
+		kg.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 200, 205))
+		kg.Parent = knob
+		knob.Parent = t
+		local lbl = t:FindFirstChild("Label")
+		if lbl then
+			lbl.Parent = knob
+			lbl.AnchorPoint = Vector2.new(0.5, 0.5)
+			lbl.Position = UDim2.fromScale(0.5, 0.5)
+			lbl.Size = UDim2.fromScale(0.8, 0.62)
+			lbl.ZIndex = knob.ZIndex + 1
+		end
+	end
+	knob.BackgroundColor3 = on and GREEN or Color3.fromRGB(235, 70, 80)
+	TweenService:Create(knob, TweenInfo.new(0.15, Enum.EasingStyle.Quad), { Position = on and UDim2.fromScale(0.44, 0) or UDim2.fromScale(0, 0) }):Play()
+	local lbl = knob:FindFirstChild("Label")
+	if lbl then
+		lbl.Text = on and "ON" or "OFF"
+	end
+end
+
+-- rows: dark cards, the names in a clean bold font (Title Case)
+local function titleCase(str)
+	return (string.lower(str):gsub("(%a)([%w']*)", function(a, b)
+		return string.upper(a) .. b
+	end))
+end
+for _, row in ipairs(sb:GetChildren()) do
+	if row:IsA("Frame") then
+		row.BackgroundColor3 = Color3.fromRGB(34, 36, 44)
+		local st = row:FindFirstChildOfClass("UIStroke")
+		if st then
+			st.Color = Color3.fromRGB(58, 61, 72)
+			st.Thickness = 2
+		end
+		local lbl = row:FindFirstChild("Label")
+		if lbl and lbl:IsA("TextLabel") then
+			lbl.Text = titleCase(lbl.Text)
+			lbl.FontFace = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy)
+			lbl.TextColor3 = Color3.new(1, 1, 1)
+			lbl.TextStrokeTransparency = 0.5
+		end
+	end
 end
 
 refreshers.SettingsPanel = function()
 	for _, q in ipairs(Config.Graphics.order) do
 		local b = sb.Graphics.Options:FindFirstChild(q)
 		if b then
-			b.BackgroundColor3 = settings.graphics == q and GOLD or BLUE
+			b.BackgroundColor3 = settings.graphics == q and GOLD or Color3.fromRGB(58, 62, 76)
 		end
 	end
 	styleToggle("Sound", settings.sound)
@@ -835,35 +901,80 @@ trayLayout.SortOrder = Enum.SortOrder.LayoutOrder
 trayLayout.Padding = UDim.new(0, 8)
 trayLayout.Parent = tray
 
+-- info box for active potions / server effects (like the reference):
+-- dark box, white rounded border, bold title, a thin line, then the
+-- icon + the amount ("x2") in italics
+local TIP_FONT = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy, Enum.FontStyle.Normal)
+local TIP_ITALIC = Font.new("rbxasset://fonts/families/GothamSSm.json", Enum.FontWeight.Heavy, Enum.FontStyle.Italic)
 local tip = Instance.new("Frame")
 tip.Name = "BoostTip"
 tip.AnchorPoint = Vector2.new(1, 1)
-tip.Size = UDim2.fromOffset(220, 56)
-tip.BackgroundColor3 = Color3.fromRGB(15, 20, 35)
-tip.BackgroundTransparency = 0.08
+tip.Size = UDim2.fromOffset(260, 100)
+tip.BackgroundColor3 = Color3.fromRGB(24, 25, 30)
+tip.BackgroundTransparency = 0.05
 tip.Visible = false
+tip.ZIndex = 50
 tip.Parent = gui
-Instance.new("UICorner", tip).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", tip).CornerRadius = UDim.new(0, 14)
 local tipStroke = Instance.new("UIStroke")
-tipStroke.Color = Color3.fromRGB(10, 15, 35)
-tipStroke.Thickness = 3
+tipStroke.Color = Color3.fromRGB(225, 228, 235)
+tipStroke.Thickness = 2.5
 tipStroke.Parent = tip
 local tipTitle = Instance.new("TextLabel")
-tipTitle.Size = UDim2.new(1, -16, 0, 24)
-tipTitle.Position = UDim2.fromOffset(8, 4)
+tipTitle.Size = UDim2.new(1, -28, 0, 30)
+tipTitle.Position = UDim2.fromOffset(14, 10)
 tipTitle.BackgroundTransparency = 1
-tipTitle.Font = Enum.Font.LuckiestGuy
-tipTitle.TextSize = 18
-tipTitle.TextColor3 = GOLD
+tipTitle.FontFace = TIP_FONT
+tipTitle.TextScaled = true
+tipTitle.TextColor3 = Color3.new(1, 1, 1)
+tipTitle.TextStrokeTransparency = 0.4
 tipTitle.TextXAlignment = Enum.TextXAlignment.Left
+tipTitle.ZIndex = 51
 tipTitle.Parent = tip
-local tipDesc = tipTitle:Clone()
-tipDesc.Position = UDim2.fromOffset(8, 28)
-tipDesc.TextSize = 14
+local tipLine = Instance.new("Frame")
+tipLine.Size = UDim2.new(1, -28, 0, 3)
+tipLine.Position = UDim2.fromOffset(14, 48)
+tipLine.BorderSizePixel = 0
+tipLine.BackgroundColor3 = Color3.fromRGB(200, 204, 214)
+tipLine.ZIndex = 51
+tipLine.Parent = tip
+local lineGrad = Instance.new("UIGradient")
+lineGrad.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.9), NumberSequenceKeypoint.new(0.5, 0.1), NumberSequenceKeypoint.new(1, 0.9) })
+lineGrad.Parent = tipLine
+-- bottom row: icon + amount, centered
+local tipRow = Instance.new("Frame")
+tipRow.Size = UDim2.new(1, -20, 0, 30)
+tipRow.Position = UDim2.fromOffset(10, 60)
+tipRow.BackgroundTransparency = 1
+tipRow.ZIndex = 51
+tipRow.Parent = tip
+local rowLayout = Instance.new("UIListLayout")
+rowLayout.FillDirection = Enum.FillDirection.Horizontal
+rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+rowLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+rowLayout.Padding = UDim.new(0, 8)
+rowLayout.Parent = tipRow
+local tipIcon = Instance.new("ImageLabel")
+tipIcon.Size = UDim2.fromOffset(28, 28)
+tipIcon.BackgroundTransparency = 1
+tipIcon.ScaleType = Enum.ScaleType.Fit
+tipIcon.ZIndex = 52
+tipIcon.Parent = tipRow
+local tipDot = Instance.new("Frame")
+tipDot.Size = UDim2.fromOffset(20, 20)
+tipDot.ZIndex = 52
+tipDot.Parent = tipRow
+Instance.new("UICorner", tipDot).CornerRadius = UDim.new(1, 0)
+local tipDesc = Instance.new("TextLabel")
+tipDesc.AutomaticSize = Enum.AutomaticSize.X
+tipDesc.Size = UDim2.fromOffset(0, 26)
+tipDesc.BackgroundTransparency = 1
+tipDesc.FontFace = TIP_ITALIC
+tipDesc.TextSize = 22
 tipDesc.TextColor3 = Color3.new(1, 1, 1)
-tipDesc.Size = UDim2.new(1, -16, 0, 20)
-tipDesc.TextScaled = true
-tipDesc.Parent = tip
+tipDesc.TextStrokeTransparency = 0.4
+tipDesc.ZIndex = 52
+tipDesc.Parent = tipRow
 
 -- phones/tablets: at the very bottom-right, smaller, just LEFT of
 -- Roblox's jump button (found on screen, so it never covers the
@@ -919,8 +1030,16 @@ local tipKey
 local function showTip(potion)
 	tipKey = potion.key
 	tipTitle.Text = potion.name
-	tipDesc.Text = potion.text
-	tip.Position = UDim2.new(1, trayRight(), 1, trayBottom() - 68 * trayScale.Scale)
+	-- "x2" for server effects; the potion's short text otherwise
+	tipDesc.Text = potion.amount or potion.text or ""
+	tipDesc.TextSize = potion.amount and 24 or 16
+	local img = potion.imageId or ""
+	tipIcon.Image = img
+	tipIcon.Visible = img ~= ""
+	tipDot.Visible = img == ""
+	local c = potion.color
+	tipDot.BackgroundColor3 = typeof(c) == "Color3" and c or (type(c) == "table" and Color3.fromRGB(c[1], c[2], c[3])) or GOLD
+	tip.Position = UDim2.new(1, trayRight(), 1, trayBottom() - 72 * trayScale.Scale)
 	tip.Visible = true
 end
 local function hideTip(key)
@@ -974,7 +1093,13 @@ task.spawn(function()
 				timer.TextStrokeTransparency = 0
 				timer.Parent = item
 				local function info()
-					return { key = id, name = item:GetAttribute("Tip") or k.name, text = item:GetAttribute("TipText") or k.text }
+					return {
+						key = id,
+						name = k.name .. " Event",
+						amount = "x" .. tostring(Config.GlobalBoost(k.key, workspace:GetServerTimeNow())),
+						imageId = k.imageId,
+						color = k.color,
+					}
 				end
 				btn.MouseEnter:Connect(function()
 					showTip(info())

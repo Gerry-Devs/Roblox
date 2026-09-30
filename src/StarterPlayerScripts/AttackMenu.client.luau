@@ -115,7 +115,7 @@ local hpText = text(hpBack, { Size = UDim2.fromScale(1, 1), ZIndex = 2 })
 local allButton = button(main, "ATTACK ALL", GREEN, { Position = UDim2.fromOffset(16, 80), Size = UDim2.new(0.5, -20, 0, 46) })
 local stopButton = button(main, "STOP", GRAY, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 80), Size = UDim2.new(0.5, -20, 0, 46) })
 
-text(main, { Position = UDim2.fromOffset(16, 134), Size = UDim2.new(1, -32, 0, 20), Text = "OR SEND ONE PET", TextColor3 = Color3.fromRGB(200, 215, 240), TextXAlignment = Enum.TextXAlignment.Left })
+text(main, { Position = UDim2.fromOffset(16, 134), Size = UDim2.new(1, -32, 0, 20), Text = "SEND PET", TextColor3 = Color3.fromRGB(200, 215, 240), TextXAlignment = Enum.TextXAlignment.Left })
 
 local list = mk("ScrollingFrame", {
 	Position = UDim2.fromOffset(12, 160),
@@ -412,38 +412,4 @@ UserInputService.InputEnded:Connect(function(input)
 		return
 	end
 	open(enemy)
-end)
-
---------------------------------------------------------------------
--- hint: near an enemy with pets ready but none fighting
---------------------------------------------------------------------
-
-task.spawn(function()
-	local lastHint = 0
-	while true do
-		task.wait(1)
-		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		local pets = myPetsFolder()
-		if hrp and pets and enemiesFolder and not main.Visible and os.clock() - lastHint > 45 then
-			local ready, fighting = 0, false
-			for _, m in ipairs(pets:GetChildren()) do
-				if m:GetAttribute("Kind") == "monster" and not m:GetAttribute("Defeated") then
-					ready += 1
-					if (m:GetAttribute("AttackTarget") or 0) ~= 0 then
-						fighting = true
-					end
-				end
-			end
-			if ready > 0 and not fighting then
-				for _, e in ipairs(enemiesFolder:GetChildren()) do
-					local r = e:FindFirstChild("Root")
-					if r and (r.Position - hrp.Position).Magnitude < Config.Combat.orderRange then
-						lastHint = os.clock()
-						say(UserInputService.TouchEnabled and "Tap an enemy to send your pets!" or "Click an enemy to send your pets!", Color3.fromRGB(255, 220, 80))
-						break
-					end
-				end
-			end
-		end
-	end
 end)

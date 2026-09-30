@@ -2598,6 +2598,10 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 		bodyColor = Color3.fromRGB(211, 223, 239)
 	elseif entry.finish == "Rainbow" then
 		bodyColor = Color3.fromHSV((index * 0.17) % 1, 0.8, 1)
+	elseif entry.finish == "Diamond" then
+		bodyColor = Color3.fromRGB(190, 240, 255)
+	elseif entry.finish == "Galaxy" then
+		bodyColor = Color3.fromRGB(90, 40, 170)
 	end
 
 	local body = makePart(

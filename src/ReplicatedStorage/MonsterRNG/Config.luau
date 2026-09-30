@@ -58,7 +58,7 @@ Config.SizeVariants = {
 	{
 		key = "Huge",
 		name = "Huge",
-		weight = 6,
+		weight = 5.8,
 		incomeMultiplier = 5,
 		powerMultiplier = 3,
 		scale = 1.45,
@@ -70,6 +70,14 @@ Config.SizeVariants = {
 		incomeMultiplier = 20,
 		powerMultiplier = 8,
 		scale = 2.1,
+	},
+	{
+		key = "Gigantic",
+		name = "Gigantic",
+		weight = 0.2, -- ~1 in 500
+		incomeMultiplier = 50,
+		powerMultiplier = 15,
+		scale = 2.6,
 	},
 }
 
@@ -96,11 +104,25 @@ Config.FinishVariants = {
 		powerMultiplier = 2,
 	},
 	{
+		key = "Diamond",
+		name = "Diamond",
+		weight = 1.5, -- icy sparkly shine
+		incomeMultiplier = 6,
+		powerMultiplier = 3,
+	},
+	{
 		key = "Rainbow",
 		name = "Rainbow",
-		weight = 1,
+		weight = 1, -- keeps changing color
 		incomeMultiplier = 10,
 		powerMultiplier = 4,
+	},
+	{
+		key = "Galaxy",
+		name = "Galaxy",
+		weight = 0.2, -- ~1 in 500; deep space colors that drift + stars
+		incomeMultiplier = 25,
+		powerMultiplier = 8,
 	},
 }
 
@@ -1241,8 +1263,8 @@ Config.Combat = {
 	potionWeights = { luck = 25, health = 20, damage = 20, cash = 20, level = 13, revive = 8 }, -- revive: ~1 in 330 kills
 }
 Config.RarityPower = { 1, 1.2, 1.45, 1.75, 2.1, 2.5 }
-Config.PetSizePower = { Normal = 1, Big = 1.15, Huge = 1.3, Titan = 1.7 }
-Config.PetFinishPower = { Normal = 1, Gold = 1.15, Silver = 1.25, Rainbow = 1.5 }
+Config.PetSizePower = { Normal = 1, Big = 1.15, Huge = 1.3, Titan = 1.7, Gigantic = 2.1 }
+Config.PetFinishPower = { Normal = 1, Gold = 1.15, Silver = 1.25, Diamond = 1.35, Rainbow = 1.5, Galaxy = 1.8 }
 
 -- special enemies: much tougher, more XP and loot (mult applies to all)
 -- pets that attack from a little further away (fire / breath attacks)
@@ -1516,8 +1538,8 @@ end
 -- monsters adds up, up to the stat's max (cap).
 --------------------------------------------------------------------
 Config.SkillsIconImage = "rbxassetid://89154708883558" -- picture for the SKILLS button (right side, under WARP)
-Config.SkillSizeBoost = { Normal = 1, Big = 1.1, Huge = 1.2, Titan = 1.5 }
-Config.SkillFinishBoost = { Normal = 1, Gold = 1.1, Silver = 1.2, Rainbow = 1.35 }
+Config.SkillSizeBoost = { Normal = 1, Big = 1.1, Huge = 1.2, Titan = 1.5, Gigantic = 1.8 }
+Config.SkillFinishBoost = { Normal = 1, Gold = 1.1, Silver = 1.2, Diamond = 1.25, Rainbow = 1.35, Galaxy = 1.6 }
 
 -- stat -> how it shows + its max. text = what it does (for the list)
 Config.SkillStats = {

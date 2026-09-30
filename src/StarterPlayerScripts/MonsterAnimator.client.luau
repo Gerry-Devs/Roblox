@@ -75,10 +75,27 @@ local function register(model, root)
 		hitAt = 0,
 		flashing = false,
 	}
+	-- Rainbow / Galaxy: the pieces whose color keeps moving
+	st.finish = root:GetAttribute("Finish")
+	st.finishAmount = root:GetAttribute("FinishAmount") or 0.5
+	local function collectFinish()
+		st.finishParts = {}
+		if st.finish ~= "Rainbow" and st.finish ~= "Galaxy" then
+			return
+		end
+		for _, pc in ipairs(st.parts) do
+			local orig = pc[1]:GetAttribute("OrigColor")
+			if typeof(orig) == "Color3" then
+				table.insert(st.finishParts, { pc, orig })
+			end
+		end
+	end
+	collectFinish()
 	-- pieces added / swapped on this screen (RigSkinner): pick them up
 	root:GetAttributeChangedSignal("SkinVersion"):Connect(function()
 		st.parts, st.eyesOpen, st.eyesClosed = collectParts()
 		st.flashing = false
+		collectFinish()
 	end)
 	model:GetAttributeChangedSignal("LungeAt"):Connect(function()
 		st.attackAt = os.clock()
@@ -2431,6 +2448,47 @@ smoothMove = function(st, dt)
 	st.shownCF = root.CFrame -- read back (stored rounded), so we can tell our value from the server's
 end
 
+-- Rainbow keeps cycling through every color; Galaxy drifts through deep
+-- space purples / blues / pinks, a little different on every piece
+local function finishColor(finish, t, offset)
+	if finish == "Rainbow" then
+		return Color3.fromHSV((t * 0.22 + offset * 0.15) % 1, 0.75, 1)
+	end
+	local h = 0.7 + 0.11 * math.sin(t * 0.7 + offset * 2.3)
+	local v = 0.45 + 0.35 * (0.5 + 0.5 * math.sin(t * 1.4 + offset * 4.1))
+	return Color3.fromHSV(h % 1, 0.8, v)
+end
+local function animateFinish(st, now)
+	if not st.finish or (st.finish ~= "Rainbow" and st.finish ~= "Galaxy") then
+		return
+	end
+	if now - (st.finishAt or 0) < 0.08 then
+		return
+	end
+	st.finishAt = now
+	local t = now + st.phase
+	local amt = st.finishAmount
+	for i, fp in ipairs(st.finishParts or {}) do
+		local pc, orig = fp[1], fp[2]
+		local p = pc[1]
+		if p.Parent then
+			local c = orig:Lerp(finishColor(st.finish, t, i * 0.05), amt)
+			pc[2] = c -- (the hit flash goes back to this color)
+			if not st.flashing then
+				if pc[3] ~= nil and not p.UsePartColor then
+					p.UsePartColor = true
+				end
+				p.Color = c
+			end
+		end
+	end
+	-- sculpted (mesh) monsters: their colored glow
+	local hl = st.root:FindFirstChild("FinishTint")
+	if hl then
+		hl.FillColor = finishColor(st.finish, t, 0)
+	end
+end
+
 RunService.RenderStepped:Connect(function(dt)
 	local camera = workspace.CurrentCamera
 	if not camera then
@@ -2444,6 +2502,7 @@ RunService.RenderStepped:Connect(function(dt)
 		elseif (root.Position - camPos).Magnitude < MAX_DISTANCE and not st.model:GetAttribute("LowCulled") then
 			smoothMove(st, dt)
 			animate(st, now, dt)
+			animateFinish(st, now)
 		end
 	end
 end)

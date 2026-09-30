@@ -15,6 +15,7 @@ local function C(r, g, b)
 end
 
 local BUILDERS = {}
+local finishSparkles -- (defined below)
 
 -- Moss Slime (cute): mint see-through jelly in 6 soft layers, darker core
 -- with bubbles, olive moss cap, sprout + tiny flower. Eyes: big round glossy.
@@ -1182,6 +1183,39 @@ local PRESETS = {
 	end,
 }
 
+-- Diamond: white sparkles + a cold shine; Galaxy: twinkling stars + a
+-- purple glow; Rainbow: colored sparkles
+finishSparkles = function(root, s, finish)
+	local colors = {
+		Diamond = { ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(170, 235, 255)), Color3.fromRGB(170, 235, 255) },
+		Galaxy = { ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 140, 255)), Color3.fromRGB(150, 80, 255) },
+		Rainbow = { ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 90, 90)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 255, 140)), ColorSequenceKeypoint.new(1, Color3.fromRGB(110, 140, 255)) }), nil },
+	}
+	local c = colors[finish]
+	if not c or root:FindFirstChild("FinishSparkles") then
+		return
+	end
+	local e = Instance.new("ParticleEmitter")
+	e.Name = "FinishSparkles"
+	e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	e.Color = c[1]
+	e.LightEmission = 1
+	e.Rate = finish == "Galaxy" and 8 or 5
+	e.Lifetime = NumberRange.new(0.6, 1.4)
+	e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.4, 0.12 * s), NumberSequenceKeypoint.new(1, 0) })
+	e.Speed = NumberRange.new(0.2 * s, 0.5 * s)
+	e.SpreadAngle = Vector2.new(180, 180)
+	e.Parent = root
+	if c[2] then
+		local l = Instance.new("PointLight")
+		l.Name = "FinishGlow"
+		l.Color = c[2]
+		l.Brightness = 0.8
+		l.Range = 2.5 * s
+		l.Parent = root
+	end
+end
+
 local function buildFromMesh(root, s, opts, template)
 	local id = opts.monsterId
 	local style = MESH_STYLES[id] or "walk"
@@ -1276,7 +1310,15 @@ local function buildFromMesh(root, s, opts, template)
 	elseif opts.finish == "Silver" then
 		tint = Color3.fromRGB(215, 225, 240)
 	elseif opts.finish == "Rainbow" then
-		tint = Color3.fromHSV(math.random(), 0.75, 1)
+		tint = Color3.fromHSV(math.random(), 0.75, 1) -- (keeps changing: MonsterAnimator)
+	elseif opts.finish == "Diamond" then
+		tint = Color3.fromRGB(190, 240, 255)
+	elseif opts.finish == "Galaxy" then
+		tint = Color3.fromRGB(90, 40, 170) -- (drifts through space colors: MonsterAnimator)
+	end
+	if not opts.defeated and opts.finish then
+		root:SetAttribute("Finish", opts.finish)
+		finishSparkles(root, s, opts.finish)
 	end
 	if tint then
 		local h = Instance.new("Highlight")
@@ -1451,6 +1493,10 @@ function MonsterModel.Skin(root, setName)
 				local rel = rest:Inverse() * pieceRest -- piece relative to its joint
 				p.CFrame = pv.CFrame * rel
 				if tint and amount and p.Transparency < 0.9 then
+					local fin = root:GetAttribute("Finish")
+					if fin == "Rainbow" or fin == "Galaxy" then
+						p:SetAttribute("OrigColor", p:GetAttribute("VertexColored") and Color3.new(1, 1, 1) or (p:IsA("UnionOperation") and p:GetAttribute("AvgColor")) or p.Color)
+					end
 					if p:GetAttribute("VertexColored") then
 						-- mesh with its own colours: the part colour tints them
 						p.Color = Color3.new(1, 1, 1):Lerp(tint, amount)
@@ -1528,6 +1574,17 @@ function MonsterModel.Build(root, s, opts)
 		tint, amount = C(215, 225, 240), 0.55
 	elseif opts.finish == "Rainbow" then
 		tint, amount = Color3.fromHSV(math.random(), 0.75, 1), 0.45
+	elseif opts.finish == "Diamond" then
+		tint, amount = C(190, 240, 255), 0.55
+	elseif opts.finish == "Galaxy" then
+		tint, amount = C(90, 40, 170), 0.6
+	end
+	-- Rainbow / Galaxy colors keep moving on every screen (MonsterAnimator):
+	-- each piece remembers its own color to mix with
+	local animatedFinish = not opts.defeated and (opts.finish == "Rainbow" or opts.finish == "Galaxy")
+	if not opts.defeated and opts.finish and opts.finish ~= "Normal" then
+		root:SetAttribute("Finish", opts.finish)
+		root:SetAttribute("FinishAmount", amount)
 	end
 	local base = root.CFrame
 	local lift = V(0, gOff, 0)
@@ -1560,10 +1617,14 @@ function MonsterModel.Build(root, s, opts)
 	end
 
 	function b.add(group, size, pos, color, material, rot, name, transparency, noTint)
+		local orig = color
 		if tint and not noTint then
 			color = color:Lerp(tint, amount)
 		end
 		local p = Instance.new("Part")
+		if animatedFinish and not noTint then
+			p:SetAttribute("OrigColor", orig)
+		end
 		p.Name = name or "Piece"
 		p.Size = size * s
 		p.CFrame = base * CF(pos * s - lift) * (rot or CFrame.identity)
@@ -1855,6 +1916,9 @@ function MonsterModel.Build(root, s, opts)
 	end
 	root:SetAttribute("RigScale", s)
 	root:SetAttribute("RigStyle", flags.style or "walk")
+	if not opts.defeated and opts.finish then
+		finishSparkles(root, s, opts.finish)
+	end
 	return flags
 end
 

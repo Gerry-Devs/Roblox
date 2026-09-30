@@ -252,6 +252,10 @@ function EggModel.Build(root, height, color, finishKey, rarityKey)
 		color = color:Lerp(Color3.fromRGB(215, 225, 240), 0.45)
 	elseif finishKey == "Rainbow" then
 		color = color:Lerp(Color3.fromHSV(math.random(), 0.6, 1), 0.5)
+	elseif finishKey == "Diamond" then
+		color = color:Lerp(Color3.fromRGB(190, 240, 255), 0.55)
+	elseif finishKey == "Galaxy" then
+		color = color:Lerp(Color3.fromRGB(90, 40, 170), 0.6)
 	end
 	local EGG_BASE = {
 		Secret = Color3.fromRGB(30, 26, 40),

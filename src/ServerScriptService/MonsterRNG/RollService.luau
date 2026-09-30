@@ -113,7 +113,12 @@ function RollService.Roll(profile)
 	end
 	-- WILD chain: each WILD rolls again; all 3 in a row spins the egg wheel
 	local wilds = 0
-	for _, chance in ipairs(Config.Wild.chances) do
+	-- Wild Chance upgrade: makes the 1st WILD more likely
+	local wildBoost = 1 + Config.GetUpgradeBonus(profile.upgrades, "wildChance") / 100
+	for i, chance in ipairs(Config.Wild.chances) do
+		if i == 1 then
+			chance = math.min(1, chance * wildBoost)
+		end
 		if random:NextNumber() < chance then
 			wilds += 1
 		else

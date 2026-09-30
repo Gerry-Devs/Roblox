@@ -538,7 +538,7 @@ Config.UpgradeBranches = {
 	{ key = "combat", name = "Combat", icon = "\226\154\148\239\184\143", stats = { "health", "damage", "critChance", "critDamage" } },
 	{ key = "variants", name = "Variants", icon = "\226\156\168", stats = { "mutation", "size" } },
 	{ key = "capacity", name = "Capacity", icon = "\240\159\147\166", stats = { "monsterCap", "eggCap" } },
-	{ key = "player", name = "Player", icon = "\240\159\143\131", stats = { "speed", "rollSpeed" } },
+	{ key = "player", name = "Player", icon = "\240\159\143\131", stats = { "speed", "rollSpeed", "wildChance" } },
 }
 
 -- Shared hex-shaped background asset for every upgrade node in the UI.
@@ -587,6 +587,7 @@ Config.UpgradeStatImages = {
 	eggCap = "",
 	speed = "",
 	rollSpeed = "",
+	wildChance = "",
 }
 
 Config.UpgradeStatInfo = {
@@ -608,7 +609,12 @@ Config.UpgradeStatInfo = {
 	eggCap = { name = "Egg Cap", unit = "", live = true },
 	speed = { name = "Speed", unit = "%", live = true },
 	rollSpeed = { name = "Roll Speed", unit = "%", live = true },
+	wildChance = { name = "Wild Chance", unit = "%", live = true }, -- more WILD rolls
 }
+
+-- upgrades paid with Rift Shards instead of cash (their costs below are
+-- in shards and grow slower: SHARD_GROWTH per tier)
+Config.UpgradeShardStats = { crystal = true, shardSurge = true, rollSpeed = true, wildChance = true }
 
 -- Upgrades are permanent (they survive rebirth), so the tree is long:
 -- tier 1 is cheap for new players, and each tier costs GROWTH x the one
@@ -621,8 +627,8 @@ local BASE_COST = {
 	luck = 1500,
 	drops = 500000, -- Rift Shard drop chance: $500K -> $5M -> ...
 	potionDrop = 2000,
-	crystal = 1000000, -- Rift Shards per drop: $1M -> $10M -> ...
-	shardSurge = 2000000, -- chance to double a shard drop: $2M -> $20M -> ...
+	crystal = 50, -- SHARDS: Rift Shards per drop: 50 -> 100 -> 200 ...
+	shardSurge = 100, -- SHARDS: chance to double a shard drop: 100 -> 200 -> ...
 	health = 1000,
 	damage = 1000,
 	critChance = 5000,
@@ -632,13 +638,15 @@ local BASE_COST = {
 	monsterCap = 100000, -- only 3 tiers (3 -> 6 pets), very expensive
 	eggCap = 2000,
 	speed = 600,
-	rollSpeed = 2500,
+	rollSpeed = 30, -- SHARDS: 30 -> 60 -> 120 ...
+	wildChance = 150, -- SHARDS: 150 -> 300 -> 600 ...
 }
 
 local GROWTH = {
 	monsterCap = 20, -- $100K -> $2M -> $40M
 }
 local DEFAULT_GROWTH = 10 -- each tier costs 10x the one before
+local SHARD_GROWTH = 2 -- shard upgrades: each tier costs 2x the one before
 
 local TIER_VALUES = {
 	-- every upgrade is about 1.7x stronger than before (3% -> 5% per level)
@@ -660,13 +668,15 @@ local TIER_VALUES = {
 	eggCap = { 2, 2, 2, 2, 2, 2, 2, 2, 2, 2 }, -- 5 -> 25 eggs
 	speed = { 5, 5, 5, 5, 5, 5, 5, 5, 5, 5 },
 	rollSpeed = { 5, 5, 5, 5, 5, 5, 5, 5, 5, 5 },
+	wildChance = { 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 }, -- +100% WILD chance total (3 WILDs: 1 in 250 -> 1 in 125)
 }
 
 Config.UpgradeNodes = {}
 for _, branch in ipairs(Config.UpgradeBranches) do
 	for _, statKey in ipairs(branch.stats) do
 		local previousId = nil
-		local growth = GROWTH[statKey] or DEFAULT_GROWTH
+		local shards = Config.UpgradeShardStats[statKey] == true
+		local growth = GROWTH[statKey] or (shards and SHARD_GROWTH or DEFAULT_GROWTH)
 		for tier, value in ipairs(TIER_VALUES[statKey]) do
 			local id = statKey .. tier
 			table.insert(Config.UpgradeNodes, {
@@ -677,11 +687,26 @@ for _, branch in ipairs(Config.UpgradeBranches) do
 				cost = math.floor(BASE_COST[statKey] * growth ^ (tier - 1)),
 				value = value,
 				requires = previousId,
+				currency = shards and "shards" or "cash",
 				imageId = "",
 			})
 			previousId = id
 		end
 	end
+end
+
+-- what a player has of the node's currency, and the price text
+function Config.UpgradeFunds(profile, node)
+	if node.currency == "shards" then
+		return profile and profile.riftShards or 0
+	end
+	return profile and profile.cash or 0
+end
+function Config.UpgradePriceText(node)
+	if node.currency == "shards" then
+		return Config.FormatNumber(node.cost) .. " Shards"
+	end
+	return "$" .. Config.FormatNumber(node.cost)
 end
 
 function Config.GetUpgradeTierCount(statKey)

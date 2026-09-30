@@ -1785,11 +1785,15 @@ buyUpgradeRemote.OnServerInvoke = function(player, nodeId)
 	if node.requires and not profile.upgrades[node.requires] then
 		return { success = false, message = "Purchase the previous tier first." }
 	end
-	if profile.cash < node.cost then
-		return { success = false, message = "You need $" .. Config.FormatNumber(node.cost) .. " for this upgrade." }
+	if Config.UpgradeFunds(profile, node) < node.cost then
+		return { success = false, message = "You need " .. Config.UpgradePriceText(node) .. " for this upgrade." }
 	end
 
-	profile.cash -= node.cost
+	if node.currency == "shards" then
+		profile.riftShards -= node.cost
+	else
+		profile.cash -= node.cost
+	end
 	profile.upgrades[nodeId] = true
 	QuestService.Add(profile, "upgrades", 1)
 	updateLeaderstats(player)

@@ -191,6 +191,11 @@ local function statusOf(node)
 	return "available"
 end
 
+-- price color: gold for cash, purple for Rift Shards
+local function priceColor(node)
+	return node.currency == "shards" and Color3.fromRGB(200, 150, 255) or Color3.fromRGB(255, 220, 110)
+end
+
 local function nodeText(node)
 	local statInfo = Config.UpgradeStatInfo[node.statKey] or { name = node.statKey, unit = "" }
 	return statInfo.name, string.format("+%s%s %s (Tier %d/%d)", tostring(node.value), statInfo.unit or "", statInfo.name, node.tier, Config.GetUpgradeTierCount(node.statKey))
@@ -217,11 +222,11 @@ local function showInfo(node)
 		buyBtn.Visible = false
 		info.Size = UDim2.fromOffset(290, 112)
 	else
-		local canPay = (profile and profile.cash or 0) >= node.cost
-		infoStatus.Text = Config.FormatNumber(node.cost)
-		infoStatus.TextColor3 = canPay and Color3.fromRGB(255, 220, 110) or Color3.fromRGB(255, 120, 120)
+		local canPay = Config.UpgradeFunds(profile, node) >= node.cost
+		infoStatus.Text = Config.UpgradePriceText(node)
+		infoStatus.TextColor3 = canPay and priceColor(node) or Color3.fromRGB(255, 120, 120)
 		buyBtn.Visible = true
-		buyBtn.Text = canPay and "BUY" or ("NEED " .. Config.FormatNumber(node.cost))
+		buyBtn.Text = canPay and "BUY" or ("NEED " .. Config.UpgradePriceText(node))
 		buyBtn.BackgroundColor3 = canPay and GREEN or GRAY
 		info.Size = UDim2.fromOffset(290, 150)
 	end
@@ -498,8 +503,11 @@ local function paintTile(node)
 	t.question.Visible = st == "locked"
 	t.name.Visible = st ~= "locked"
 	t.cost.Visible = st == "available"
-	local canPay = (profile and profile.cash or 0) >= node.cost
-	t.cost.TextColor3 = canPay and Color3.fromRGB(255, 220, 110) or Color3.fromRGB(255, 70, 70)
+	if t.shardIcon then
+		t.shardIcon.Visible = st == "available"
+	end
+	local canPay = Config.UpgradeFunds(profile, node) >= node.cost
+	t.cost.TextColor3 = canPay and priceColor(node) or Color3.fromRGB(255, 70, 70)
 end
 
 -- hover tooltip next to a hex
@@ -522,9 +530,9 @@ showTip = function(node, t)
 			tipStatus.Text = "OWNED"
 			tipStatus.TextColor3 = Color3.fromRGB(120, 220, 255)
 		else
-			local canPay = (profile and profile.cash or 0) >= node.cost
-			tipStatus.Text = "$" .. Config.FormatNumber(node.cost) .. (canPay and "  -  CLICK TO BUY" or "")
-			tipStatus.TextColor3 = canPay and Color3.fromRGB(255, 220, 110) or Color3.fromRGB(255, 110, 110)
+			local canPay = Config.UpgradeFunds(profile, node) >= node.cost
+			tipStatus.Text = Config.UpgradePriceText(node) .. (canPay and "  -  CLICK TO BUY" or "")
+			tipStatus.TextColor3 = canPay and priceColor(node) or Color3.fromRGB(255, 110, 110)
 		end
 	end
 	local abs = t.holder.AbsolutePosition + t.holder.AbsoluteSize / 2
@@ -560,7 +568,13 @@ openBranch = function(bi)
 			local t = makeTile(x, y, BLUE, BLUE_DARK, img)
 			local statInfo = Config.UpgradeStatInfo[node.statKey] or { name = node.statKey }
 			t.name = label(t.holder, statInfo.name .. " " .. node.tier, UDim2.fromScale(0.86, 0.2), UDim2.fromScale(0.07, 0.3), { ZIndex = 7 })
-			t.cost = label(t.holder, Config.FormatNumber(node.cost), UDim2.fromScale(0.62, 0.18), UDim2.fromScale(0.19, 0.55), { ZIndex = 7, TextColor3 = Color3.fromRGB(255, 220, 110) })
+			t.cost = label(t.holder, (node.currency == "shards" and "" or "$") .. Config.FormatNumber(node.cost), UDim2.fromScale(0.62, 0.18), UDim2.fromScale(0.19, 0.55), { ZIndex = 7, TextColor3 = priceColor(node) })
+			if node.currency == "shards" then
+				-- shard price: the Rift Shard icon in front of the number
+				t.cost.Size = UDim2.fromScale(0.5, 0.18)
+				t.cost.Position = UDim2.fromScale(0.33, 0.55)
+				t.shardIcon = mk("ImageLabel", { Name = "ShardIcon", Size = UDim2.fromScale(0.16, 0.16), Position = UDim2.fromScale(0.17, 0.56), BackgroundTransparency = 1, Image = Config.RiftShardImage or "", ScaleType = Enum.ScaleType.Fit, ZIndex = 7 }, t.holder)
+			end
 			t.question = label(t.holder, "?", UDim2.fromScale(0.5, 0.5), UDim2.fromScale(0.25, 0.25), { ZIndex = 7, TextColor3 = Color3.fromRGB(200, 205, 220) })
 			t.vein = vein
 			tiles[node.id] = t
@@ -641,8 +655,8 @@ buyNode = function(node)
 	if busy or not node then
 		return
 	end
-	if (profile and profile.cash or 0) < node.cost then
-		flash("You don't have enough money to buy this upgrade!", Color3.fromRGB(255, 70, 70))
+	if Config.UpgradeFunds(profile, node) < node.cost then
+		flash(node.currency == "shards" and "You don't have enough Rift Shards for this upgrade!" or "You don't have enough money to buy this upgrade!", Color3.fromRGB(255, 70, 70))
 		return
 	end
 	busy = true

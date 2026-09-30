@@ -623,7 +623,7 @@ local function combatTick(now)
 				living[uid] = true
 				local pick = orders[uid]
 				if pick and (pick.dead or pen.state.nearby or not here or pick.biome.key ~= here.key
-					or flatDistance(pick.root.Position, hrp.Position) > (C.leashRange or 120)) then
+					or flatDistance(pick.root.Position, hrp.Position) > (C.leashRange or 80)) then
 					orders[uid] = nil
 					pick = nil
 				end
@@ -916,7 +916,7 @@ function EnemyService.Start(d)
 		if not here or here.key ~= e.biome.key then
 			return { success = false, message = "Walk into that enemy's area first." }
 		end
-		if flatDistance(e.root.Position, hrp.Position) > (Config.Combat.orderRange or 90) then
+		if flatDistance(e.root.Position, hrp.Position) > (Config.Combat.orderRange or 35) + 8 then -- a little slack for lag
 			return { success = false, message = "Get closer to that enemy first." }
 		end
 

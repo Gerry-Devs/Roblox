@@ -170,6 +170,15 @@ local function myPetsFolder()
 	return base and base:FindFirstChild("Pets")
 end
 
+local function distanceTo(enemy)
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local root = enemy:FindFirstChild("Root")
+	if not hrp or not root then
+		return math.huge
+	end
+	return Vector2.new(root.Position.X - hrp.Position.X, root.Position.Z - hrp.Position.Z).Magnitude
+end
+
 local function petName(entry)
 	local monster = Config.GetMonster(entry.monsterId)
 	return "Lv " .. (entry.level or 1) .. " " .. Config.BuildDisplayName(monster and monster.name or "Pet", entry.size, entry.finish)
@@ -306,7 +315,7 @@ task.spawn(function()
 	while true do
 		task.wait(0.25)
 		if selected then
-			if not selected.Parent or selected:GetAttribute("Dead") then
+			if not selected.Parent or selected:GetAttribute("Dead") or distanceTo(selected) > Config.Combat.orderRange + 15 then
 				close()
 			else
 				refreshEnemy()
@@ -321,24 +330,44 @@ end)
 -- never bump into them), so pick the enemy by where it is on screen.
 --------------------------------------------------------------------
 
+-- Which enemy is under this screen point? The whole body counts (its
+-- bounding box on screen, plus some padding so it's easy to hit on a
+-- phone). WorldToScreenPoint matches InputObject.Position (both leave
+-- out the top bar), so taps line up with what you see.
+local TAP_PADDING = 24
 local function enemyAtScreen(pos)
 	local camera = workspace.CurrentCamera
 	if not camera or not enemiesFolder then
 		return nil
 	end
+	local camPos = camera.CFrame.Position
 	local best, bestD
 	for _, enemy in ipairs(enemiesFolder:GetChildren()) do
 		local root = enemy:FindFirstChild("Root")
-		if root and not enemy:GetAttribute("Dead") then
-			local size = enemy:GetAttribute("BodySize") or 4
-			local center, onScreen = camera:WorldToViewportPoint(root.Position)
-			if onScreen and center.Z > 0 then
-				-- how big the enemy looks on screen (at least a finger's width)
-				local top = camera:WorldToViewportPoint(root.Position + camera.CFrame.UpVector * size * 0.7)
-				local radius = math.max(36, (Vector2.new(top.X, top.Y) - Vector2.new(center.X, center.Y)).Magnitude)
-				local d = (Vector2.new(center.X, center.Y) - pos).Magnitude
-				if d <= radius and (not bestD or center.Z < bestD) then
-					best, bestD = enemy, center.Z -- the closest one to the camera wins
+		if root and enemy:IsA("Model") and not enemy:GetAttribute("Dead") then
+			local depth = (root.Position - camPos).Magnitude
+			if depth < 250 and (not bestD or depth < bestD) then
+				local ok, cf, size = pcall(enemy.GetBoundingBox, enemy)
+				if ok then
+					local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+					local anyInFront = false
+					for _, x in ipairs({ -0.5, 0.5 }) do
+						for _, y in ipairs({ -0.5, 0.5 }) do
+							for _, z in ipairs({ -0.5, 0.5 }) do
+								local corner = (cf * CFrame.new(size.X * x, size.Y * y, size.Z * z)).Position
+								local sp = camera:WorldToScreenPoint(corner)
+								if sp.Z > 0 then
+									anyInFront = true
+									minX, maxX = math.min(minX, sp.X), math.max(maxX, sp.X)
+									minY, maxY = math.min(minY, sp.Y), math.max(maxY, sp.Y)
+								end
+							end
+						end
+					end
+					if anyInFront and pos.X >= minX - TAP_PADDING and pos.X <= maxX + TAP_PADDING
+						and pos.Y >= minY - TAP_PADDING and pos.Y <= maxY + TAP_PADDING then
+						best, bestD = enemy, depth -- the one closest to the camera wins
+					end
 				end
 			end
 		end
@@ -374,9 +403,15 @@ UserInputService.InputEnded:Connect(function(input)
 		return
 	end
 	local enemy = enemyAtScreen(pos)
-	if enemy then
-		open(enemy)
+	if not enemy then
+		return
 	end
+	-- you have to walk up to an enemy before you can attack it
+	if distanceTo(enemy) > Config.Combat.orderRange then
+		say("Get closer to attack that enemy!", Color3.fromRGB(255, 170, 90))
+		return
+	end
+	open(enemy)
 end)
 
 --------------------------------------------------------------------
@@ -402,7 +437,7 @@ task.spawn(function()
 			if ready > 0 and not fighting then
 				for _, e in ipairs(enemiesFolder:GetChildren()) do
 					local r = e:FindFirstChild("Root")
-					if r and (r.Position - hrp.Position).Magnitude < Config.Combat.aggroRange then
+					if r and (r.Position - hrp.Position).Magnitude < Config.Combat.orderRange then
 						lastHint = os.clock()
 						say(UserInputService.TouchEnabled and "Tap an enemy to send your pets!" or "Click an enemy to send your pets!", Color3.fromRGB(255, 220, 80))
 						break

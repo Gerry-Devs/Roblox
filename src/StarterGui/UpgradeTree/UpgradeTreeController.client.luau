@@ -840,7 +840,20 @@ end)
 --------------------------------------------------------------------
 -- the game camera is frozen while the tree is open: dragging / pinching
 -- on the tree (or between hexes) must not turn or zoom the camera
+-- the character can't walk either (joystick / WASD off), so it never
+-- walks out of view behind the tree
 local savedCam
+local controls
+local function getControls()
+	if controls == nil then
+		local ok, c = pcall(function()
+			local pm = player:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule", 5)
+			return require(pm):GetControls()
+		end)
+		controls = ok and c or false
+	end
+	return controls
+end
 local function lockCamera()
 	if savedCam then
 		return
@@ -849,11 +862,27 @@ local function lockCamera()
 	savedCam = { type = cam.CameraType, cf = cam.CFrame }
 	cam.CameraType = Enum.CameraType.Scriptable
 	cam.CFrame = savedCam.cf
+	local c = getControls()
+	if c then
+		pcall(function()
+			c:Disable()
+		end)
+	end
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	if hum then
+		hum:Move(Vector3.zero) -- stop right where you are
+	end
 end
 local function unlockCamera()
 	if savedCam then
 		workspace.CurrentCamera.CameraType = savedCam.type
 		savedCam = nil
+		local c = getControls()
+		if c then
+			pcall(function()
+				c:Enable()
+			end)
+		end
 	end
 end
 

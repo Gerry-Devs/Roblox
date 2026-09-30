@@ -166,7 +166,7 @@ function render()
 			r.reward.Text = rewardText(Config.DailyQuestRewards[q.tier])
 			local ready = not q.claimed and q.progress >= q.target
 			anyReady = anyReady or ready
-			-- claimed: just a green "COMPLETE" text, not a button any more
+			-- claimed: just a green "COMPLETED" text, not a button any more
 			r.btn.BackgroundColor3 = ready and GREEN or GRAY
 			r.btn.BackgroundTransparency = q.claimed and 1 or 0
 			r.btn.AutoButtonColor = not q.claimed
@@ -175,7 +175,7 @@ function render()
 			if btnStroke then
 				btnStroke.Enabled = not q.claimed
 			end
-			r.btnText.Text = q.claimed and "COMPLETE" or (ready and "CLAIM" or "...")
+			r.btnText.Text = q.claimed and "COMPLETED" or (ready and "CLAIM" or "...")
 			r.btnText.TextColor3 = q.claimed and GREEN or Color3.new(1, 1, 1)
 		end
 	end

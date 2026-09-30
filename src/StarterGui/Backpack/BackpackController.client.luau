@@ -21,7 +21,7 @@ do
 		local noop = function(f)
 			return f
 		end
-		UIStyle = { OUTLINE = Color3.fromRGB(10, 12, 22), BODY = Color3.fromRGB(40, 44, 58), BODY_DARK = Color3.fromRGB(28, 31, 42), RIM = Color3.fromRGB(185, 192, 210), studs = noop, brick = noop, rarityCard = function(card, color)
+		UIStyle = { OUTLINE = Color3.fromRGB(10, 12, 22), BODY = Color3.fromRGB(40, 44, 58), BODY_DARK = Color3.fromRGB(28, 31, 42), RIM = Color3.fromRGB(185, 192, 210), studs = noop, brick = noop, closeButton = noop, rarityCard = function(card, color)
 			card.BackgroundColor3 = color
 			return card
 		end }
@@ -797,7 +797,7 @@ end
 -- tabs: dark studded tiles; the open tab is lighter with a white rim
 local function styleTab(b, on)
 	pcall(function()
-		UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.7 })
+		UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.25 })
 		local stroke = b:FindFirstChildOfClass("UIStroke")
 		if stroke then
 			stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
@@ -903,7 +903,7 @@ local restyled, restyleErr = pcall(function()
 	end
 	main:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
 	main:FindFirstChildOfClass("UIStroke").Color = UIStyle.OUTLINE
-	UIStyle.studs(main, 44, 0.88)
+	UIStyle.studs(main, 44, 0.35)
 	-- light inner rim, like a plastic tray
 	local rim = main:FindFirstChild("Rim") or Instance.new("Frame")
 	rim.Name = "Rim"
@@ -953,7 +953,7 @@ local restyled, restyleErr = pcall(function()
 	line.BackgroundColor3 = UIStyle.OUTLINE
 	line.ZIndex = 6
 	line.Parent = title
-	UIStyle.studs(title, 30, 0.55)
+	UIStyle.studs(title, 30, 0)
 	local badge = title:FindFirstChild("GoldBadge")
 	if badge then
 		badge.AnchorPoint = Vector2.new(0, 0.5)
@@ -978,20 +978,9 @@ local restyled, restyleErr = pcall(function()
 	closeButton.Position = UDim2.fromScale(1, 0)
 	closeButton.Size = UDim2.fromOffset(84, HEADER)
 	closeButton.ZIndex = 8
-	closeButton.BackgroundColor3 = Color3.fromRGB(240, 60, 70)
-	closeButton:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
-	local cs = closeButton:FindFirstChildOfClass("UIStroke")
-	if cs then
-		cs.Enabled = false
-	end
-	UIStyle.studs(closeButton, 26, 0.5)
-	closeButton.Label.Size = UDim2.fromScale(0.6, 0.6)
+	UIStyle.closeButton(closeButton, true)
+	closeButton.Label.Size = UDim2.fromScale(0.6, 0.62)
 	closeButton.Label.Position = UDim2.fromScale(0.5, 0.55)
-	for _, d in ipairs(closeButton:GetDescendants()) do
-		if d:IsA("GuiObject") then
-			d.ZIndex = math.max(d.ZIndex, 9)
-		end
-	end
 
 	-- everything below the header moves down to make room for it
 	local top = HEADER + 16
@@ -1007,10 +996,10 @@ local restyled, restyleErr = pcall(function()
 	search.TextColor3 = Color3.new(1, 1, 1)
 	search.PlaceholderColor3 = Color3.fromRGB(170, 176, 196)
 	content.BackgroundColor3 = UIStyle.BODY_DARK
-	UIStyle.studs(content, 36, 0.9)
+	UIStyle.studs(content, 36, 0.45)
 	main.Count.BackgroundColor3 = Color3.fromRGB(50, 54, 68)
-	UIStyle.studs(main.Count, 30, 0.8)
-	UIStyle.studs(sortButton, 30, 0.6)
+	UIStyle.studs(main.Count, 30, 0.3)
+	UIStyle.studs(sortButton, 30, 0.15)
 
 	-- empty slots: dark sockets
 	emptyTemplate.BackgroundColor3 = Color3.fromRGB(36, 39, 52)
@@ -1018,7 +1007,7 @@ local restyled, restyleErr = pcall(function()
 	if es then
 		es.Color = Color3.fromRGB(62, 66, 84)
 	end
-	UIStyle.studs(emptyTemplate, 22, 0.9)
+	UIStyle.studs(emptyTemplate, 22, 0.4)
 	sizeCells()
 end)
 if not restyled then

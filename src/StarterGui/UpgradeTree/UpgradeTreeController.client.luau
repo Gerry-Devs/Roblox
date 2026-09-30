@@ -232,6 +232,7 @@ local function showInfo(node)
 end
 
 local allTiles = {} -- every tile on screen (for the honeycomb animation)
+local rippleIn = false -- the next page build pops in as a ripple (only when a page opens)
 -- one hex tile (outline + fill + inner, optional custom image, labels)
 local function makeTile(x, y, fillColor, innerColor, imageId)
 	local holder = mk("TextButton", { Size = UDim2.fromOffset(TILE, TILE), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(x, y), BackgroundTransparency = 1, Text = "", ZIndex = 3 }, canvas)
@@ -244,9 +245,13 @@ local function makeTile(x, y, fillColor, innerColor, imageId)
 		outline.Visible, fill.Visible, inner.Visible = false, false, false
 	end
 	local scale = mk("UIScale", { Scale = 0 }, holder)
-	local t = { holder = holder, fill = fill, inner = inner, image = image, scale = scale, pop = 0, mag = 1, press = 1 }
+	local t = { holder = holder, fill = fill, inner = inner, image = image, scale = scale, pop = rippleIn and 0 or 1, mag = 1, press = 1 }
+	scale.Scale = t.pop
 	-- pops in like a ripple from the middle
 	task.delay(math.sqrt(x * x + y * y) * 0.0012, function()
+		if t.pop >= 1 then
+			return
+		end
 		local start = os.clock()
 		while holder.Parent do
 			local k = math.clamp((os.clock() - start) / 0.28, 0, 1)
@@ -344,6 +349,7 @@ local function buildCategories()
 		t.holder.Activated:Connect(function()
 			if not panMoved then
 				openBranch(bi)
+				rippleIn = false
 			end
 		end)
 	end
@@ -524,6 +530,7 @@ end
 
 -- vein view for one category
 openBranch = function(bi)
+	rippleIn = true
 	currentBranch = bi
 	clearCanvas()
 	local branch = Config.UpgradeBranches[bi]
@@ -533,7 +540,9 @@ openBranch = function(bi)
 	label(root.holder, "BACK", UDim2.fromScale(0.7, 0.22), UDim2.fromScale(0.15, 0.5), { ZIndex = 7 })
 	root.holder.Activated:Connect(function()
 		if not panMoved then
+			rippleIn = true
 			buildCategories()
+			rippleIn = false
 		end
 	end)
 	local layout = veinLayout(bi)
@@ -588,9 +597,12 @@ mk("UICorner", { CornerRadius = UDim.new(0, 12) }, backBtn)
 mk("UIStroke", { Color = OUTLINE, Thickness = 4, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, backBtn)
 mk("UIPadding", { PaddingTop = UDim.new(0, 8), PaddingBottom = UDim.new(0, 8) }, backBtn)
 backBtn.Activated:Connect(function()
+	rippleIn = true
 	buildCategories()
+	rippleIn = false
 end)
 
+local lastCategorySig
 local function refreshAll()
 	cashText.Text = Config.FormatNumber((profile and profile.cash) or 0) .. " CASH"
 	shardText.Text = Config.FormatNumber((profile and profile.riftShards) or 0) .. " SHARDS"
@@ -602,7 +614,17 @@ local function refreshAll()
 			showInfo(selected)
 		end
 	else
-		buildCategories()
+		-- the server sends the profile every second: only rebuild the
+		-- category page when an owned count changed
+		local sig = {}
+		for _, branch in ipairs(Config.UpgradeBranches) do
+			table.insert(sig, (branchCounts(branch)))
+		end
+		sig = table.concat(sig, ",")
+		if sig ~= lastCategorySig then
+			lastCategorySig = sig
+			buildCategories()
+		end
 	end
 end
 
@@ -823,8 +845,11 @@ local function open()
 	dragging = false
 	applyOffset()
 	info.Visible = false
-	buildCategories()
+	currentBranch = nil
+	lastCategorySig = nil
+	rippleIn = true -- opening the tree: the page pops in as a ripple
 	refreshAll()
+	rippleIn = false
 	dim.Visible = true
 end
 local function close()

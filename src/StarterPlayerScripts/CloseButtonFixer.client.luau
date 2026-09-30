@@ -11,6 +11,17 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local MARGIN = 12
+
+-- the red studded X look (UIStyle); if the module isn't there, X buttons
+-- just keep their own look
+local UIStyle
+do
+	local mod = game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("UIStyle", 5)
+	local ok, res = pcall(function()
+		return mod and require(mod)
+	end)
+	UIStyle = ok and res or nil
+end
 local fixed = setmetatable({}, { __mode = "k" })
 
 local function isCloseButton(b)
@@ -55,6 +66,9 @@ local function fix(b)
 		pad.Parent = b
 	end
 	b.ZIndex = math.max(b.ZIndex, 20)
+	if UIStyle and UIStyle.closeButton then
+		pcall(UIStyle.closeButton, b, false)
+	end
 	for _, d in ipairs(b:GetDescendants()) do
 		if d:IsA("GuiObject") then
 			d.ZIndex = math.max(d.ZIndex, 21)

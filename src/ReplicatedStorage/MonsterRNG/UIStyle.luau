@@ -53,7 +53,7 @@ function UIStyle.studs(frame, tile, transparency, color)
 	studs.Image = image
 	studs.ScaleType = Enum.ScaleType.Tile
 	studs.TileSize = UDim2.fromOffset(tile or 40, tile or 40)
-	studs.ImageTransparency = transparency or 0.6
+	studs.ImageTransparency = transparency or 0.2
 	studs.ImageColor3 = color or Color3.new(1, 1, 1)
 	studs.ZIndex = frame.ZIndex
 	local corner = frame:FindFirstChildOfClass("UICorner")
@@ -99,7 +99,7 @@ function UIStyle.brick(frame, color, opts)
 		end)
 	end
 	if opts.studs ~= false then
-		UIStyle.studs(frame, opts.tile or 34, opts.studTransparency or 0.55)
+		UIStyle.studs(frame, opts.tile or 34, opts.studTransparency or 0.15)
 	end
 	return frame
 end
@@ -131,8 +131,92 @@ function UIStyle.rarityCard(card, color)
 	local gg = child(glow, "UIGradient", "UIGradient")
 	gg.Rotation = 90
 	gg.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.85), NumberSequenceKeypoint.new(1, 0.2) })
-	UIStyle.studs(card, 22, 0.8)
+	UIStyle.studs(card, 22, 0.35)
 	return card
+end
+
+-- the red studded X (like the reference): red square with studs, a
+-- darker red edge on the left and a white X with a thick dark outline.
+-- header = true: sits at the right end of a header bar, so only its
+-- top-right corner is rounded.
+function UIStyle.closeButton(button, header)
+	local RED = Color3.fromRGB(240, 58, 66)
+	button.BackgroundColor3 = RED
+	button.BackgroundTransparency = 0
+	button.AutoButtonColor = true
+	if button:IsA("ImageButton") then
+		button.Image = ""
+	end
+	local radius = header and 18 or 10
+	child(button, "UICorner", "UICorner").CornerRadius = UDim.new(0, radius)
+	local grad = button:FindFirstChildOfClass("UIGradient")
+	if grad then
+		grad.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(215, 205, 205))
+		grad.Rotation = 90
+	end
+	local stroke = button:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Enabled = not header
+		stroke.Color = UIStyle.OUTLINE
+		stroke.Thickness = 3
+	end
+	local z = button.ZIndex
+	if header then
+		-- square off every corner but the top-right one
+		local left = child(button, "Frame", "SquareLeft")
+		left.Size = UDim2.fromScale(0.5, 1)
+		left.BorderSizePixel = 0
+		left.BackgroundColor3 = RED
+		left.ZIndex = z
+		local bottom = child(button, "Frame", "SquareBottom")
+		bottom.Size = UDim2.fromScale(1, 0.5)
+		bottom.Position = UDim2.fromScale(0, 0.5)
+		bottom.BorderSizePixel = 0
+		bottom.BackgroundColor3 = RED
+		bottom.ZIndex = z
+		for _, f in ipairs({ left, bottom }) do
+			local g = child(f, "UIGradient", "UIGradient")
+			g.Rotation = 90
+			if f == bottom then
+				g.Color = ColorSequence.new(Color3.fromRGB(235, 225, 225), Color3.fromRGB(215, 205, 205))
+			else
+				g.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(215, 205, 205))
+			end
+		end
+		-- darker red edge on the left, where it meets the header
+		local edge = child(button, "Frame", "Edge")
+		edge.Size = UDim2.new(0, 5, 1, 0)
+		edge.BorderSizePixel = 0
+		edge.BackgroundColor3 = Color3.fromRGB(150, 25, 35)
+		edge.ZIndex = z + 1
+	end
+	local studs = UIStyle.studs(button, header and 22 or 16, 0)
+	if studs then
+		studs.ZIndex = z + 1
+	end
+	local label = button:FindFirstChild("Label")
+	if not label and button:IsA("TextButton") then
+		-- script-built X: the text is on the button itself
+		button.TextColor3 = Color3.new(1, 1, 1)
+		button.TextStrokeTransparency = 0
+		button.TextStrokeColor3 = UIStyle.OUTLINE
+		return button
+	end
+	if label then
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.TextStrokeTransparency = 1
+		label.ZIndex = z + 2
+		local ls = label:FindFirstChildOfClass("UIStroke") or mk("UIStroke", {}, label)
+		ls.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+		ls.Color = UIStyle.OUTLINE
+		ls.Thickness = header and 3.5 or 2.5
+		local icon = button:FindFirstChild("Icon")
+		if icon and icon:IsA("ImageLabel") then
+			icon.Visible = false -- the drawn X replaces any icon
+		end
+		label.Visible = true
+	end
+	return button
 end
 
 return UIStyle

@@ -60,11 +60,20 @@ local function track(model)
 			table.insert(st.parts, p)
 		end
 	end
-	local bar = root:FindFirstChild("EnemyBar")
-	local fill = bar and bar:FindFirstChild("Bar") and bar.Bar:FindFirstChild("Fill")
-	-- HP number on the bar
-	local hpText
-	if fill then
+	-- the health bar can replicate a moment after the model itself, so look
+	-- it up again until it's there (otherwise the bar never moves)
+	local bar, fill, hpText
+	local function findBar()
+		if fill and fill.Parent then
+			return true
+		end
+		bar = root:FindFirstChild("EnemyBar")
+		local barFrame = bar and bar:FindFirstChild("Bar")
+		fill = barFrame and barFrame:FindFirstChild("Fill")
+		if not fill then
+			return false
+		end
+		-- HP number on the bar
 		hpText = Instance.new("TextLabel")
 		hpText.Size = UDim2.fromScale(1, 1.6)
 		hpText.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -76,13 +85,22 @@ local function track(model)
 		hpText.TextStrokeTransparency = 0
 		hpText.TextStrokeColor3 = OUTLINE
 		hpText.ZIndex = 5
-		hpText.Parent = fill.Parent
+		hpText.Parent = barFrame
+		return true
+	end
+	if not findBar() then
+		local bb = root:WaitForChild("EnemyBar", 5)
+		local barFrame = bb and bb:WaitForChild("Bar", 5)
+		if barFrame then
+			barFrame:WaitForChild("Fill", 5)
+		end
+		findBar()
 	end
 	local lastHealth = model:GetAttribute("Health") or 0
 	local function updateBar()
 		local h = model:GetAttribute("Health") or 0
 		local m = model:GetAttribute("MaxHealth") or 1
-		if fill then
+		if findBar() then
 			fill.Size = UDim2.fromScale(math.clamp(h / m, 0, 1), 1)
 			hpText.Text = Config.FormatNumber(h)
 		end
@@ -122,6 +140,7 @@ local function track(model)
 	end)
 	model:GetAttributeChangedSignal("Dead"):Connect(function()
 		st.deadAt = os.clock()
+		findBar()
 		if bar then
 			bar.Enabled = false
 		end

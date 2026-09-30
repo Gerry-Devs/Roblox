@@ -94,8 +94,15 @@ local function render()
 			local sk = Config.GetEntrySkill(entry)
 			if sk then
 				local m = Config.GetMonster(entry.monsterId)
-				sources[sk.stat] = sources[sk.stat] or {}
-				table.insert(sources[sk.stat], (m and m.name or "?") .. " Lv " .. (entry.level or 1))
+				-- grouped by monster: { name = { levels } }
+				sources[sk.stat] = sources[sk.stat] or { order = {}, byName = {} }
+				local src = sources[sk.stat]
+				local name = m and m.name or "?"
+				if not src.byName[name] then
+					src.byName[name] = {}
+					table.insert(src.order, name)
+				end
+				table.insert(src.byName[name], entry.level or 1)
 			end
 		end
 	end
@@ -109,7 +116,12 @@ local function render()
 	-- only rebuild when something changed (the profile comes every second)
 	local sigParts = {}
 	for _, stat in ipairs(stats) do
-		table.insert(sigParts, stat .. "=" .. string.format("%.2f", totals[stat]) .. "/" .. #(sources[stat] or {}))
+		local src = sources[stat]
+		local n = 0
+		for _, lv in pairs(src and src.byName or {}) do
+			n += #lv
+		end
+		table.insert(sigParts, stat .. "=" .. string.format("%.2f", totals[stat]) .. "/" .. n)
 	end
 	local sig = table.concat(sigParts, ",")
 	if sig == lastSig then
@@ -126,7 +138,9 @@ local function render()
 		local info = Config.SkillStats[stat] or { name = stat, unit = "", cap = 1 }
 		local total, cap = totals[stat], info.cap or 1
 		local maxed = (raw[stat] or 0) >= cap - 1e-6
-		local row = mk("Frame", { Name = stat, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 72), BackgroundColor3 = Color3.fromRGB(28, 31, 42) }, list)
+		-- grows taller when the "from" text needs more lines
+		local row = mk("Frame", { Name = stat, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 66), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = Color3.fromRGB(28, 31, 42) }, list)
+		mk("UIPadding", { PaddingBottom = UDim.new(0, 8) }, row)
 		mk("UICorner", { CornerRadius = UDim.new(0, 12) }, row)
 		mk("UIStroke", { Color = maxed and GOLD or Color3.fromRGB(70, 76, 96), Thickness = maxed and 3 or 2 }, row)
 		label(row, info.name, UDim2.new(0.58, -12, 0, 24), UDim2.fromOffset(12, 6), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = maxed and GOLD or WHITE })
@@ -142,11 +156,27 @@ local function render()
 		back:SetAttribute("NoStuds", true)
 		local fill = mk("Frame", { Name = "Fill", Size = UDim2.fromScale(math.clamp(total / cap, 0, 1), 1), BackgroundColor3 = maxed and GOLD or Color3.fromRGB(90, 220, 130) }, back)
 		mk("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
-		local from = table.concat(sources[stat] or {}, ", ")
-		label(row, from, UDim2.new(1, -24, 0, 16), UDim2.fromOffset(12, 50), {
+		-- which monsters give it, e.g. "Shadow Wraith x3 (Lv 10, 1, 10)";
+		-- a fixed readable size that wraps onto more lines if needed
+		local parts = {}
+		local src = sources[stat]
+		for _, name in ipairs(src and src.order or {}) do
+			local lv = src.byName[name]
+			if #lv == 1 then
+				table.insert(parts, name .. " Lv " .. lv[1])
+			else
+				table.insert(parts, name .. " x" .. #lv .. " (Lv " .. table.concat(lv, ", ") .. ")")
+			end
+		end
+		label(row, table.concat(parts, "  \u{2022}  "), UDim2.new(1, -24, 0, 16), UDim2.fromOffset(12, 50), {
 			Font = Enum.Font.GothamBold,
+			TextScaled = false,
+			TextSize = 14,
+			TextWrapped = true,
+			AutomaticSize = Enum.AutomaticSize.Y,
 			TextStrokeTransparency = 1,
 			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
 			TextColor3 = Color3.fromRGB(180, 186, 205),
 		})
 	end

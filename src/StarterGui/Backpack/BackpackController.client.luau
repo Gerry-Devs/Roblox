@@ -6,6 +6,7 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local monsterFolder = ReplicatedStorage:WaitForChild("MonsterRNG")
 local Config = require(monsterFolder:WaitForChild("Config"))
+local UIStyle = require(monsterFolder:WaitForChild("UIStyle"))
 local remotes = monsterFolder:WaitForChild("Remotes")
 local profileRemote = remotes:WaitForChild("GetProfile")
 local sellEggRemote = remotes:WaitForChild("SellEgg")
@@ -299,7 +300,7 @@ local function createCard(kind, item, order)
 	card.Name = "Item_" .. tostring(item.uid)
 	card.LayoutOrder = order
 	card.Visible = true
-	card.BackgroundColor3 = rarityColor
+	UIStyle.rarityCard(card, rarityColor)
 
 	card.ItemName.Text = getDisplayName(kind, item)
 	-- rarity + odds, then $/s + level (monsters) or hatch time (eggs)
@@ -324,6 +325,24 @@ local function createCard(kind, item, order)
 	card.Icon.Visible = image ~= ""
 	card.Fallback.Visible = image == ""
 	card.Fallback.BackgroundColor3 = darker(rarityColor, 0.35)
+	-- level in the corner (like the "x15" counts)
+	if kind == "monster" then
+		local lv = Instance.new("TextLabel")
+		lv.Name = "Corner"
+		lv.AnchorPoint = Vector2.new(1, 1)
+		lv.Position = UDim2.new(1, -6, 1, -4)
+		lv.Size = UDim2.new(0.6, 0, 0.2, 0)
+		lv.BackgroundTransparency = 1
+		lv.Font = Enum.Font.LuckiestGuy
+		lv.Text = "Lv" .. (item.level or 1)
+		lv.TextScaled = true
+		lv.TextXAlignment = Enum.TextXAlignment.Right
+		lv.TextColor3 = Color3.new(1, 1, 1)
+		lv.TextStrokeTransparency = 0
+		lv.TextStrokeColor3 = UIStyle.OUTLINE
+		lv.ZIndex = 6
+		lv.Parent = card
+	end
 	card.Fallback.UICorner.CornerRadius = kind == "egg" and UDim.new(1, 0) or UDim.new(0, 14)
 	card.Fallback.Letter.Text = kind == "egg" and "EGG" or string.sub(card.ItemName.Text, 1, 1)
 
@@ -472,7 +491,7 @@ local function consumableCard(order, name, image, count, desc, color, buttonText
 	card.Name = "Consumable_" .. name
 	card.LayoutOrder = order
 	card.Visible = true
-	card.BackgroundColor3 = color
+	UIStyle.rarityCard(card, color)
 	card.Icon.Image = image or ""
 	card.Icon.Visible = (image or "") ~= ""
 	card.Fallback.Visible = (image or "") == ""
@@ -689,7 +708,19 @@ local function gridSignature()
 	return table.concat(parts, "|")
 end
 
+local gridLayout = grid:FindFirstChildOfClass("UIGridLayout")
+local function sizeCells()
+	if not gridLayout then
+		return
+	end
+	local tall = activeTab == "Potion" or activeTab == "Item"
+	local w = grid.AbsoluteSize.X > 0 and (grid.AbsoluteSize.X - 30) / 4 - 9 or 120
+	gridLayout.CellSize = UDim2.new(0.25, -9, 0, tall and 162 or math.floor(w))
+end
+grid:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeCells)
+
 renderGrid = function()
+	sizeCells()
 	local signature = gridSignature()
 	if signature == lastSignature then
 		updateCount()
@@ -743,6 +774,14 @@ end
 -- Tabs
 --------------------------------------------------------------------
 
+-- tabs: dark studded tiles; the open tab is lighter with a white rim
+local function styleTab(b, on)
+	UIStyle.brick(b, on and Color3.fromRGB(88, 96, 122) or Color3.fromRGB(50, 54, 68), { side = false, studTransparency = 0.7 })
+	local stroke = b:FindFirstChildOfClass("UIStroke")
+	stroke.Color = on and Color3.fromRGB(240, 244, 255) or UIStyle.OUTLINE
+	stroke.Thickness = on and 4 or 3
+end
+
 local tabButtons = {}
 for _, b in ipairs(tabs:GetChildren()) do
 	if b:IsA("GuiButton") and b.Name:match("^Tab_") then
@@ -754,14 +793,14 @@ for _, b in ipairs(tabs:GetChildren()) do
 			activeTab = key
 			closePopup()
 			for k, other in pairs(tabButtons) do
-				other.BackgroundColor3 = (k == activeTab) and GOLD or BLUE
+				styleTab(other, k == activeTab)
 			end
 			renderGrid()
 		end)
 	end
 end
 for k, b in pairs(tabButtons) do
-	b.BackgroundColor3 = (k == activeTab) and GOLD or BLUE
+	styleTab(b, k == activeTab)
 end
 
 --------------------------------------------------------------------
@@ -827,6 +866,137 @@ profileUpdated.OnClientEvent:Connect(function(newProfile)
 		updateCount()
 	end
 end)
+
+--------------------------------------------------------------------
+-- Cartoony studded look (header bar, dark studded body, rarity cards)
+--------------------------------------------------------------------
+do
+	local HEADER = 74
+	main.BackgroundColor3 = UIStyle.BODY
+	local mg = main:FindFirstChildOfClass("UIGradient")
+	if mg then
+		mg.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(200, 205, 215))
+	end
+	main:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
+	main:FindFirstChildOfClass("UIStroke").Color = UIStyle.OUTLINE
+	UIStyle.studs(main, 44, 0.88)
+	-- light inner rim, like a plastic tray
+	local rim = main:FindFirstChild("Rim") or Instance.new("Frame")
+	rim.Name = "Rim"
+	rim.Size = UDim2.new(1, -10, 1, -10)
+	rim.Position = UDim2.fromOffset(5, 5)
+	rim.BackgroundTransparency = 1
+	rim.ZIndex = 1
+	rim.Parent = main
+	local rc = rim:FindFirstChildOfClass("UICorner") or Instance.new("UICorner", rim)
+	rc.CornerRadius = UDim.new(0, 14)
+	local rs = rim:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke", rim)
+	rs.Color = UIStyle.RIM
+	rs.Thickness = 3
+	rs.Transparency = 0.35
+
+	-- header bar across the top: blue to cyan, studs, icon + title on the left
+	local title = main.Title
+	title.AnchorPoint = Vector2.new(0, 0)
+	title.Position = UDim2.fromOffset(0, 0)
+	title.Size = UDim2.new(1, 0, 0, HEADER)
+	title.BackgroundColor3 = Color3.new(1, 1, 1)
+	title.ZIndex = 5
+	title:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
+	local ts = title:FindFirstChildOfClass("UIStroke")
+	if ts then
+		ts.Enabled = false
+	end
+	local tg = title:FindFirstChildOfClass("UIGradient")
+	tg.Rotation = 0
+	tg.Color = ColorSequence.new(Color3.fromRGB(110, 95, 255), Color3.fromRGB(55, 200, 255))
+	-- square off the header's bottom corners + a dark line under it
+	local fill = title:FindFirstChild("BottomFill") or Instance.new("Frame")
+	fill.Name = "BottomFill"
+	fill.Size = UDim2.new(1, 0, 0, 20)
+	fill.Position = UDim2.new(0, 0, 1, -20)
+	fill.BorderSizePixel = 0
+	fill.BackgroundColor3 = Color3.new(1, 1, 1)
+	fill.ZIndex = 5
+	fill.Parent = title
+	local fg = fill:FindFirstChildOfClass("UIGradient") or Instance.new("UIGradient", fill)
+	fg.Color = tg.Color
+	local line = title:FindFirstChild("Line") or Instance.new("Frame")
+	line.Name = "Line"
+	line.Size = UDim2.new(1, 0, 0, 5)
+	line.Position = UDim2.new(0, 0, 1, 0)
+	line.BorderSizePixel = 0
+	line.BackgroundColor3 = UIStyle.OUTLINE
+	line.ZIndex = 6
+	line.Parent = title
+	UIStyle.studs(title, 30, 0.55)
+	local badge = title:FindFirstChild("GoldBadge")
+	if badge then
+		badge.AnchorPoint = Vector2.new(0, 0.5)
+		badge.Position = UDim2.new(0, 12, 0.5, 0)
+		badge.Size = UDim2.fromOffset(60, 60)
+	end
+	local text = title:FindFirstChild("Text")
+	if text then
+		text.AnchorPoint = Vector2.new(0, 0.5)
+		text.Position = UDim2.new(0, 86, 0.5, 0)
+		text.Size = UDim2.new(0.55, 0, 0.6, 0)
+		text.TextXAlignment = Enum.TextXAlignment.Left
+		text.Text = "Backpack"
+		text.TextColor3 = Color3.new(1, 1, 1)
+		text.TextStrokeTransparency = 0
+		text.TextStrokeColor3 = UIStyle.OUTLINE
+	end
+
+	-- red studded X square at the right end of the header
+	closeButton:SetAttribute("KeepPlace", true) -- CloseButtonFixer leaves it here
+	closeButton.AnchorPoint = Vector2.new(1, 0)
+	closeButton.Position = UDim2.fromScale(1, 0)
+	closeButton.Size = UDim2.fromOffset(84, HEADER)
+	closeButton.ZIndex = 8
+	closeButton.BackgroundColor3 = Color3.fromRGB(240, 60, 70)
+	closeButton:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(0, 18)
+	local cs = closeButton:FindFirstChildOfClass("UIStroke")
+	if cs then
+		cs.Enabled = false
+	end
+	UIStyle.studs(closeButton, 26, 0.5)
+	closeButton.Label.Size = UDim2.fromScale(0.6, 0.6)
+	closeButton.Label.Position = UDim2.fromScale(0.5, 0.55)
+	for _, d in ipairs(closeButton:GetDescendants()) do
+		if d:IsA("GuiObject") then
+			d.ZIndex = math.max(d.ZIndex, 9)
+		end
+	end
+
+	-- everything below the header moves down to make room for it
+	local top = HEADER + 16
+	search.Position = UDim2.fromOffset(205, top)
+	tabs.Position = UDim2.fromOffset(20, top)
+	tabs.Size = UDim2.new(0, 170, 1, -(top + 78))
+	local content = main.Content
+	content.Position = UDim2.fromOffset(205, top + 52)
+	content.Size = UDim2.new(1, -225, 1, -(top + 52 + 76))
+
+	-- search box, grid tray, counter, sort button
+	search.BackgroundColor3 = Color3.fromRGB(60, 64, 80)
+	search.TextColor3 = Color3.new(1, 1, 1)
+	search.PlaceholderColor3 = Color3.fromRGB(170, 176, 196)
+	content.BackgroundColor3 = UIStyle.BODY_DARK
+	UIStyle.studs(content, 36, 0.9)
+	main.Count.BackgroundColor3 = Color3.fromRGB(50, 54, 68)
+	UIStyle.studs(main.Count, 30, 0.8)
+	UIStyle.studs(sortButton, 30, 0.6)
+
+	-- empty slots: dark sockets
+	emptyTemplate.BackgroundColor3 = Color3.fromRGB(36, 39, 52)
+	local es = emptyTemplate:FindFirstChildOfClass("UIStroke")
+	if es then
+		es.Color = Color3.fromRGB(62, 66, 84)
+	end
+	UIStyle.studs(emptyTemplate, 22, 0.9)
+	sizeCells()
+end
 
 main.Visible = false
 updateCount()

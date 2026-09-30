@@ -23,6 +23,9 @@
         },
         "MonsterModel": {
           "$path": "src/ReplicatedStorage/MonsterRNG/MonsterModel.luau"
+        },
+        "UIStyle": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/UIStyle.luau"
         }
       }
     },

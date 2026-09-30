@@ -964,6 +964,10 @@ Config.StallIcons = {
 --------------------------------------------------------------------
 Config.CashImage = "rbxassetid://83763596751604"
 Config.RiftShardImage = "rbxassetid://75633089538163"
+-- Stud texture for the cartoony studded windows (assets/ui/studs_tile.png
+-- uploaded to Roblox). Leave "" until it's uploaded: windows still get the
+-- new look, just without the studs.
+Config.UIStudsImage = ""
 
 -- duration in seconds (0 = instant)
 Config.Potions = {

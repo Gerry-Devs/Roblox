@@ -24,8 +24,8 @@ local function isCloseButton(b)
 end
 
 local function fix(b)
-	if fixed[b] or not isCloseButton(b) then
-		return
+	if fixed[b] or not isCloseButton(b) or b:GetAttribute("KeepPlace") then
+		return -- KeepPlace: the window placed its own X (e.g. in a header bar)
 	end
 	local window = b.Parent
 	if not window or not window:IsA("GuiObject") then

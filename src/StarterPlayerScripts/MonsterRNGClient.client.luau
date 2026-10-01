@@ -1038,9 +1038,20 @@ local function clearHeldVisual()
 		heldVisualPart:Destroy()
 		heldVisualPart = nil
 	end
+	-- any leftover held model (never leave one stuck on the character)
+	local character = player.Character
+	if character then
+		for _, c in ipairs(character:GetChildren()) do
+			if c.Name == "HeldItem" then
+				c:Destroy()
+			end
+		end
+	end
 end
 
+local holdToken -- a newer startHolding / stopHolding cancels an older one
 local function stopHolding()
+	holdToken = nil
 	heldItem = nil
 	player:SetAttribute("HeldKind", nil)
 	player:SetAttribute("HeldUid", nil)
@@ -1049,8 +1060,30 @@ local function stopHolding()
 	setHoldPose(false)
 end
 
+
+-- the saved entry for this egg / monster (local copy first, the server if needed)
+local function findHeldEntry(kind, uid)
+	local function find(p)
+		for _, e in ipairs((p and (kind == "egg" and p.eggs or p.monsters)) or {}) do
+			if e.uid == uid then
+				return e
+			end
+		end
+		return nil
+	end
+	local e = find(profile)
+	if not e then
+		pcall(function()
+			e = find(remotes.GetProfile:InvokeServer())
+		end)
+	end
+	return e
+end
+
 local function startHolding(kind, uid, color)
 	stopHolding()
+	local token = {}
+	holdToken = token
 	local torso = getCharacterTorso()
 	if not torso then
 		showToast("Your character isn't ready yet.", Color3.fromRGB(255, 166, 111))
@@ -1060,6 +1093,13 @@ local function startHolding(kind, uid, color)
 	heldItem = { kind = kind, uid = uid }
 	player:SetAttribute("HeldKind", kind)
 	player:SetAttribute("HeldUid", uid)
+
+	-- look it up BEFORE building anything: this can wait on the server,
+	-- and if it was placed / cancelled meanwhile nothing is left behind
+	local entry = findHeldEntry(kind, uid)
+	if holdToken ~= token or not torso.Parent then
+		return
+	end
 
 	local part = Instance.new("Part")
 	part.Name = "HeldItem"
@@ -1079,40 +1119,24 @@ local function startHolding(kind, uid, color)
 	weld.Part0 = torso
 	weld.Part1 = part
 	weld.Parent = part
+	heldVisualPart = part
+	heldWeld = weld
 
 	if kind == "monster" then
 		-- a small version of the monster's own model
 		part.Transparency = 1
-		local monsterId, finish
-		pcall(function()
-			local p = game:GetService("ReplicatedStorage").MonsterRNG.Remotes.GetProfile:InvokeServer()
-			for _, e in ipairs(p.monsters or {}) do
-				if e.uid == uid then
-					monsterId, finish = e.monsterId, e.finish
-				end
-			end
-		end)
-		require(game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("MonsterModel")).Build(part, 1.8, { monsterId = monsterId, groundOffset = 0.9, finish = finish })
+		require(game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("MonsterModel")).Build(part, 1.8, { monsterId = entry and entry.monsterId, groundOffset = 0.9, finish = entry and entry.finish })
 	end
 	if kind == "egg" then
 		-- same blocky studded egg as in the pen (small)
 		part.Transparency = 1
-		require(game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("EggModel")).Build(part, 2.3, color, nil, (function()
-			local rarityKey
-			pcall(function()
-				local p = game:GetService("ReplicatedStorage").MonsterRNG.Remotes.GetProfile:InvokeServer()
-				for _, e in ipairs(p.eggs or {}) do
-					if e.uid == uid then
-						rarityKey = e.rarity
-					end
-				end
-			end)
-			return rarityKey
-		end)())
+		require(game:GetService("ReplicatedStorage"):WaitForChild("MonsterRNG"):WaitForChild("EggModel")).Build(part, 2.3, color, nil, entry and entry.rarity)
+	end
+	if holdToken ~= token then
+		part:Destroy()
+		return
 	end
 
-	heldVisualPart = part
-	heldWeld = weld
 	setHoldPose(true)
 	holdHintLabel.Text = kind == "monster" and "Click anywhere to equip it" or "Click inside your pen to place it"
 	holdHintFrame.Visible = true

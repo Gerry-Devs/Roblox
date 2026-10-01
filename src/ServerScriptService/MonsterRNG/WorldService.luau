@@ -2482,6 +2482,17 @@ local function animatePetBody(model, body, homePosition, bodySize, penState)
 			end
 
 			if penState.nearby then
+				-- far outside the pen (you warped home from a biome): jump
+				-- straight in instead of walking all the way back
+				local center = model.Parent and model.Parent:GetAttribute("BasePosition") or homePosition
+				local cur = body.Position
+				if math.abs(cur.X - center.X) > PEN_HALF_X + 15 or math.abs(cur.Z - center.Z) > PEN_HALF_Z + 15 then
+					local margin = 4 + bodySize * 0.6
+					local hx, hz = math.max(1, PEN_HALF_X - margin), math.max(1, PEN_HALF_Z - margin)
+					wanderTarget = Vector3.new(center.X + math.random(-hx * 10, hx * 10) / 10, homePosition.Y, center.Z + math.random(-hz * 10, hz * 10) / 10)
+					nextWanderAt = now + math.random(2, 4)
+					body.CFrame = CFrame.new(wanderTarget) * (body.CFrame - body.CFrame.Position)
+				end
 				if now >= nextWanderAt then
 					-- wander anywhere INSIDE the pen fence (never outside it)
 					local center = model.Parent and model.Parent:GetAttribute("BasePosition") or homePosition

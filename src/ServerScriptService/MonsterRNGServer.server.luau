@@ -3005,6 +3005,12 @@ do
 			return "Egg skip used."
 		end
 	end
+	-- guild: making a guild (uses the form the player filled in)
+	if (Config.Guild.createProductId or 0) ~= 0 then
+		handlers[Config.Guild.createProductId] = function(player, profile)
+			return GuildService.CreatePaid(player, profile)
+		end
+	end
 	-- guild: +member slots (only when a product id is set in Config.Guild)
 	if (Config.Guild.slotProductId or 0) ~= 0 then
 		handlers[Config.Guild.slotProductId] = function(player, profile)

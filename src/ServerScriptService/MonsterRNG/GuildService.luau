@@ -356,7 +356,8 @@ function A.get(player, profile)
 		guild = publicView(g),
 		myRole = g and roleOf(g, player.UserId) or nil,
 		invites = getInvites(player.UserId),
-		createFree = (G.createProductId or 0) == 0,
+		createFree = (G.createProductId or 0) == 0 or (profile.guildCredits or 0) > 0,
+		createProductId = G.createProductId,
 		slotsForSale = (G.slotProductId or 0) ~= 0,
 	}
 end
@@ -413,27 +414,30 @@ function A.browse(player, profile, arg)
 	return { success = true, list = out }
 end
 
-function A.create(player, profile, arg)
+-- checks the create form; returns the cleaned form or an error result
+local function checkForm(player, profile, arg)
 	if profile.guildId and loadGuild(profile.guildId) then
-		return { success = false, message = "Leave your guild first." }
-	end
-	if (G.createProductId or 0) ~= 0 then
-		return { success = false, message = "Creating a guild costs Robux.", productId = G.createProductId }
+		return nil, { success = false, message = "Leave your guild first." }
 	end
 	arg = type(arg) == "table" and arg or {}
 	local name = clean(arg.name, G.nameMax)
 	if #name < G.nameMin then
-		return { success = false, message = "The name needs at least " .. G.nameMin .. " letters." }
+		return nil, { success = false, message = "The name needs at least " .. G.nameMin .. " letters." }
 	end
 	local desc = clean(arg.desc, G.descMax)
 	local fName = filtered(name, player.UserId)
 	if not fName then
-		return { success = false, message = "That name isn't allowed. Try another one." }
+		return nil, { success = false, message = "That name isn't allowed. Try another one." }
 	end
 	local fDesc = filtered(desc, player.UserId)
 	if not fDesc then
-		return { success = false, message = "That description isn't allowed." }
+		return nil, { success = false, message = "That description isn't allowed." }
 	end
+	return { name = fName, desc = fDesc, icon = validIcon(arg.icon), imageId = imageFrom(arg.imageId), open = arg.open ~= false }
+end
+
+local function makeGuild(player, profile, form)
+	local fName = form.name
 	local id = HttpService:GenerateGUID(false):gsub("-", ""):sub(1, 16)
 	-- reserve the name (unique across every server)
 	local taken = false
@@ -450,10 +454,10 @@ function A.create(player, profile, arg)
 	local g = {
 		id = id,
 		name = fName,
-		desc = fDesc,
-		icon = validIcon(arg.icon),
-		imageId = imageFrom(arg.imageId),
-		open = arg.open ~= false,
+		desc = form.desc,
+		icon = form.icon,
+		imageId = form.imageId,
+		open = form.open,
 		owner = player.UserId,
 		maxMembers = G.baseMembers,
 		created = os.time(),
@@ -473,6 +477,53 @@ function A.create(player, profile, arg)
 	deps.sync(player)
 	task.spawn(deps.DataService.Save, player)
 	return { success = true, message = "Guild \"" .. fName .. "\" created!" }
+end
+
+-- the form a player filled in before paying for the create product
+local pendingCreate = {}
+Players.PlayerRemoving:Connect(function(p)
+	pendingCreate[p] = nil
+end)
+
+function A.create(player, profile, arg)
+	local form, err = checkForm(player, profile, arg)
+	if not form then
+		return err
+	end
+	local paid = (G.createProductId or 0) ~= 0
+	local credits = profile.guildCredits or 0
+	if paid and credits <= 0 then
+		-- check the name is free before the player pays
+		if dsGet(store, "n_" .. string.lower(form.name)) then
+			return { success = false, message = "That name is already taken." }
+		end
+		pendingCreate[player] = form
+		return { success = false, message = "Buy the guild to finish making it!", productId = G.createProductId }
+	end
+	local r = makeGuild(player, profile, form)
+	if r.success and paid then
+		profile.guildCredits = math.max(0, credits - 1)
+	end
+	return r
+end
+
+-- called by ProcessReceipt when the create product is bought. The player
+-- always gets a guild ticket; it's used right away on the form they filled
+-- in. If that fails (name taken meanwhile...), the ticket stays and the
+-- next CREATE GUILD is free.
+function GuildService.CreatePaid(player, profile)
+	profile.guildCredits = (profile.guildCredits or 0) + 1
+	local form = pendingCreate[player]
+	pendingCreate[player] = nil
+	if form and not (profile.guildId and loadGuild(profile.guildId)) then
+		local ok, r = pcall(makeGuild, player, profile, form)
+		if ok and r and r.success then
+			profile.guildCredits -= 1
+			guildEvent:FireClient(player, { kind = "changed" })
+			return r.message
+		end
+	end
+	return "Guild ticket bought! Press CREATE GUILD again (it's free now)."
 end
 
 local function joinGuild(player, profile, id, viaInvite)

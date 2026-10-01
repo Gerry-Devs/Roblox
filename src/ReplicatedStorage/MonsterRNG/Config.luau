@@ -1515,7 +1515,7 @@ end
 -- Guilds (the Guild stall in town)
 --------------------------------------------------------------------
 Config.Guild = {
-	createProductId = 0, -- 0 = creating a guild is FREE for now (put a product id here later)
+	createProductId = 3715742515, -- developer product to make a guild (0 = free)
 	baseMembers = 10,
 	slotStep = 5, -- +5 members each time the owner buys more slots
 	maxMembers = 50,

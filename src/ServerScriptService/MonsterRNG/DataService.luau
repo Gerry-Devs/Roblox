@@ -160,6 +160,7 @@ local function newProfile()
 		autoSell = nil, -- Auto Sell settings (saved; always starts OFF on join)
 		pvp = { credits = 0, points = 0, season = "", wins = 0, losses = 0 }, -- PvP credits + this season's points
 		guildId = nil, -- the guild this player is in
+		guildCredits = 0, -- paid guild creates not used yet (Robux never lost)
 		lastOnline = nil, -- when this save was last written (for offline earnings)
 		quests = nil, -- daily quests (QuestService)
 	}
@@ -305,6 +306,7 @@ local function sanitize(data)
 	if type(data.guildId) == "string" then
 		profile.guildId = data.guildId
 	end
+	profile.guildCredits = math.clamp(math.floor(tonumber(data.guildCredits) or 0), 0, 5)
 	-- developer product receipts already granted (so a purchase is never given twice)
 	if type(data.receipts) == "table" then
 		local keep, n = {}, 0

@@ -316,7 +316,25 @@ local function pageBrowse(viewOnly, myGuildId)
 end
 
 local function pageCreate()
-	small(content, (state.data and state.data.createFree) and "Making a guild is FREE right now!" or "Making a guild costs Robux.", UDim2.new(1, 0, 0, 20), UDim2.fromOffset(0, 50), { TextColor3 = Color3.fromRGB(160, 255, 170), TextXAlignment = Enum.TextXAlignment.Left })
+	local d = state.data or {}
+	local paid = (d.createProductId or 0) ~= 0
+	local priceText = small(
+		content,
+		d.createFree and (paid and "You have a guild ticket: making a guild is FREE!" or "Making a guild is FREE right now!") or "Making a guild costs Robux.",
+		UDim2.new(1, 0, 0, 20),
+		UDim2.fromOffset(0, 50),
+		{ TextColor3 = d.createFree and Color3.fromRGB(160, 255, 170) or GOLD, TextXAlignment = Enum.TextXAlignment.Left }
+	)
+	if paid and not d.createFree then
+		task.spawn(function()
+			local ok, info = pcall(function()
+				return game:GetService("MarketplaceService"):GetProductInfo(d.createProductId, Enum.InfoType.Product)
+			end)
+			if ok and info and info.PriceInRobux and priceText and priceText.Parent then
+				priceText.Text = "Making a guild costs R$ " .. tostring(info.PriceInRobux) .. "."
+			end
+		end)
+	end
 	guildForm(78, {}, "CREATE GUILD", function(form)
 		local r = call("create", form)
 		if r then

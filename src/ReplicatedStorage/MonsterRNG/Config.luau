@@ -1272,7 +1272,7 @@ Config.DailyRewards = {
 --   egg = a random egg of at least that rarity
 --------------------------------------------------------------------
 Config.Playtime = {
-	afkAfter = 120,
+	afkAfter = 300, -- 5 min
 	milestones = {
 		{ minutes = 30, cashPct = 5, potions = { luck = 1 } },
 		{ minutes = 60, egg = "Rare", shards = 50 },

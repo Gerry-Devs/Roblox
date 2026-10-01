@@ -911,8 +911,8 @@ end
 
 local savedShoulderC0 = {}
 
--- Arms forward and slightly lowered, hands angled in, like carrying
--- something in front. Changes the shoulder joints' C0 (animations still
+-- Both arms straight up, hands in a bit, like lifting something over
+-- the head. Changes the shoulder joints' C0 (animations still
 -- play on top, so walking looks natural).
 local function setJointPose(on)
 	local character = player.Character
@@ -923,15 +923,15 @@ local function setJointPose(on)
 	local rightArm, leftArm = character:FindFirstChild("RightUpperArm"), character:FindFirstChild("LeftUpperArm")
 	if rightArm and leftArm then
 		joints = {
-			{ rightArm:FindFirstChild("RightShoulder"), CFrame.fromEulerAnglesYXZ(math.rad(65), math.rad(20), 0) },
-			{ leftArm:FindFirstChild("LeftShoulder"), CFrame.fromEulerAnglesYXZ(math.rad(65), math.rad(-20), 0) },
+			{ rightArm:FindFirstChild("RightShoulder"), CFrame.fromEulerAnglesYXZ(math.rad(165), 0, math.rad(-12)) },
+			{ leftArm:FindFirstChild("LeftShoulder"), CFrame.fromEulerAnglesYXZ(math.rad(165), 0, math.rad(12)) },
 		}
 	else
 		local torso = character:FindFirstChild("Torso")
 		if torso then
 			joints = {
-				{ torso:FindFirstChild("Right Shoulder"), CFrame.Angles(0, 0, math.rad(70)) },
-				{ torso:FindFirstChild("Left Shoulder"), CFrame.Angles(0, 0, math.rad(-70)) },
+				{ torso:FindFirstChild("Right Shoulder"), CFrame.Angles(0, 0, math.rad(165)) },
+				{ torso:FindFirstChild("Left Shoulder"), CFrame.Angles(0, 0, math.rad(-165)) },
 			}
 		end
 	end
@@ -1111,8 +1111,8 @@ local function startHolding(kind, uid, color)
 	part.CanQuery = false
 	part.Anchored = false
 	part.Massless = true
-	-- held low in front of the chest, between the hands
-	part.CFrame = torso.CFrame * CFrame.new(0, -0.7, -2.1)
+	-- lifted over the head, resting on the raised hands
+	part.CFrame = torso.CFrame * CFrame.new(0, kind == "egg" and 3.7 or 3.5, -0.5)
 	part.Parent = player.Character
 
 	local weld = Instance.new("WeldConstraint")

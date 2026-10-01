@@ -206,6 +206,11 @@ local popPad = Instance.new("UIPadding")
 popPad.PaddingTop, popPad.PaddingBottom = UDim.new(0, 10), UDim.new(0, 10)
 popPad.PaddingLeft, popPad.PaddingRight = UDim.new(0, 12), UDim.new(0, 12)
 popPad.Parent = popup
+-- its own scale on top of the window's: the window gets small on phones,
+-- the info should stay easy to read
+local popScale = Instance.new("UIScale")
+popScale.Name = "PopScale"
+popScale.Parent = popup
 local popupFor
 local function closePopup()
 	popup.Visible = false
@@ -283,7 +288,6 @@ local function showPopup(kind, item, card, rarity, rarityColor, odds)
 			popDivider(nxt())
 			popLine(nxt(), "\u{2B50} " .. sk.name, 17, Color3.fromRGB(255, 215, 90), Enum.Font.GothamBlack, Enum.TextXAlignment.Left)
 			popLine(nxt(), Config.FormatSkill(sk.stat, v), 16, Color3.fromRGB(255, 240, 190), nil, nil, true)
-			popLine(nxt(), sk.text .. " (when equipped)", 13, Color3.fromRGB(190, 195, 215), nil, nil, true)
 		end
 	end
 	popDivider(nxt())
@@ -311,14 +315,28 @@ local function showPopup(kind, item, card, rarity, rarityColor, odds)
 	popup.Visible = true
 	task.defer(function()
 		local scale = mainScale.Scale > 0 and mainScale.Scale or 1
-		local pw, ph = popup.AbsoluteSize.X, popup.AbsoluteSize.Y
+		local camera = workspace.CurrentCamera
+		local vp = camera and camera.ViewportSize or Vector2.new(1280, 720)
+		local inset = game:GetService("GuiService"):GetGuiInset().Y
+		-- size of the popup at scale 1
+		local cur = scale * popScale.Scale
+		local baseW, baseH = popup.AbsoluteSize.X / cur, popup.AbsoluteSize.Y / cur
+		-- phones: close to full size; computers: a bit bigger than the window
+		local want = vp.Y < 500 and math.max(0.85, scale * 1.3) or scale * 1.15
+		-- never taller than the screen
+		local eff = math.min(want, (vp.Y - inset - 16) / math.max(baseH, 1))
+		popScale.Scale = math.max(eff / scale, 1)
+		eff = scale * popScale.Scale
+		local pw, ph = baseW * eff, baseH * eff
 		local mainPos, mainSize = main.AbsolutePosition, main.AbsoluteSize
 		local cp, cs = card.AbsolutePosition, card.AbsoluteSize
 		local x = cp.X + cs.X + 8
 		if x + pw > mainPos.X + mainSize.X then
 			x = cp.X - pw - 8
 		end
-		local y = math.clamp(cp.Y, mainPos.Y, math.max(mainPos.Y, mainPos.Y + mainSize.Y - ph))
+		x = math.clamp(x, 8, math.max(8, vp.X - pw - 8))
+		-- next to the card, kept on the screen
+		local y = math.clamp(cp.Y, 8, math.max(8, vp.Y - inset - ph - 8))
 		popup.Position = UDim2.fromOffset((x - mainPos.X) / scale, (y - mainPos.Y) / scale)
 	end)
 end

@@ -4,9 +4,13 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 --------------------------------------------------------------------
--- Attack menu: pets don't attack on their own any more. Tap (or click)
--- an enemy to open this window, then send ALL your pets, pick ONE pet
--- to send, or call them back.
+-- Attack menu: pets don't attack on their own any more. How a tap on an
+-- enemy works depends on the COMBAT setting:
+--   MENU:  opens this window: send ALL pets, pick ONE pet, or STOP
+--   QUICK: sends all your pets right away (tap it again to stop);
+--          hold on the enemy to open the window instead
+--   AUTO:  like QUICK, and your pets also go after the nearest enemy
+--          on their own (unlocked at Rebirth 3)
 --------------------------------------------------------------------
 
 local player = Players.LocalPlayer
@@ -191,19 +195,56 @@ local function petName(entry)
 	return "Lv " .. (entry.level or 1) .. " " .. Config.BuildDisplayName(monster and monster.name or "Pet", entry.size, entry.finish)
 end
 
+local function orderOn(enemy, mode, uid, quiet)
+	local ok, r = pcall(function()
+		return attackRemote:InvokeServer(enemy and enemy:GetAttribute("EnemyId"), mode, uid)
+	end)
+	if ok and r then
+		-- only say something when it didn't work (no "X pets are attacking!")
+		if not r.success and not quiet then
+			say(r.message, Color3.fromRGB(255, 170, 90))
+		end
+		return r.success
+	end
+	return false
+end
 local function order(mode, uid)
 	if not selected and mode ~= "recall" then
 		return
 	end
-	local ok, r = pcall(function()
-		return attackRemote:InvokeServer(selected and selected:GetAttribute("EnemyId"), mode, uid)
-	end)
-	if ok and r then
-		-- only say something when it didn't work (no "X pets are attacking!")
-		if not r.success then
-			say(r.message, Color3.fromRGB(255, 170, 90))
+	return orderOn(selected, mode, uid)
+end
+
+-- COMBAT setting (Settings window sets the CombatMode attribute right away)
+local function combatMode()
+	local m = player:GetAttribute("CombatMode") or (profile and profile.settings and profile.settings.combat) or Config.CombatModes.default
+	if m == "auto" and ((profile and profile.rebirths) or 0) < Config.CombatModes.autoRebirths then
+		m = "quick"
+	end
+	return Config.CombatModes.names[m] and m or Config.CombatModes.default
+end
+
+-- is any of my pets fighting this enemy?
+local function petsOn(enemy)
+	local pets = myPetsFolder()
+	local id = enemy and enemy:GetAttribute("EnemyId")
+	if not pets or not id then
+		return false
+	end
+	for _, pet in ipairs(pets:GetChildren()) do
+		if pet:GetAttribute("AttackTarget") == id then
+			return true
 		end
-		return r.success
+	end
+	return false
+end
+local function anyPetFighting()
+	local pets = myPetsFolder()
+	for _, pet in ipairs(pets and pets:GetChildren() or {}) do
+		local t = pet:GetAttribute("AttackTarget")
+		if t and t ~= 0 then
+			return true
+		end
 	end
 	return false
 end
@@ -403,9 +444,70 @@ local function enemyAtScreen(pos)
 	return far, false
 end
 
+-- QUICK / AUTO: a tap sends every pet (or stops them if they're already
+-- on it). A small arrow flashes over the enemy so you see it worked.
+local flashToken
+local function quickAttack(enemy)
+	if petsOn(enemy) then
+		orderOn(enemy, "stop")
+		say("Your pets stopped attacking.", Color3.fromRGB(200, 215, 240))
+		return
+	end
+	if orderOn(enemy, "all") then
+		local root = enemy:FindFirstChild("Root")
+		local ok, cf, size = pcall(enemy.GetBoundingBox, enemy)
+		if root and not main.Visible then
+			marker.Adornee = root
+			marker.StudsOffset = Vector3.new(0, ok and (cf.Position.Y + size.Y / 2 - root.Position.Y + 0.6) or 6, 0)
+			marker.Enabled = true
+			local token = {}
+			flashToken = token
+			task.delay(1.2, function()
+				if flashToken == token and not main.Visible then
+					marker.Enabled = false
+					marker.Adornee = nil
+				end
+			end)
+		end
+	end
+end
+
+-- AUTO: when none of your pets is fighting, send them all at the nearest
+-- enemy close to you (in the same area)
+task.spawn(function()
+	local waitUntil = 0
+	while true do
+		task.wait(1)
+		if combatMode() == "auto" and enemiesFolder and os.clock() >= waitUntil and not anyPetFighting() then
+			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			local here = hrp and Config.GetBiomeAt(hrp.Position.X, hrp.Position.Z)
+			local best, bestD
+			if here then
+				for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+					local root = enemy:FindFirstChild("Root")
+					if root and enemy:IsA("Model") and not enemy:GetAttribute("Dead") then
+						local d = distanceTo(enemy)
+						local area = Config.GetBiomeAt(root.Position.X, root.Position.Z)
+						if d <= Config.Combat.orderRange and area and area.key == here.key and (not bestD or d < bestD) then
+							best, bestD = enemy, d
+						end
+					end
+				end
+			end
+			if best then
+				-- quiet: no message spam (resting in the pen, no pets...)
+				if not orderOn(best, "auto", nil, true) then
+					waitUntil = os.clock() + 4
+				end
+			end
+		end
+	end
+end)
+
 -- only a real tap/click: dragging to turn the camera never opens the menu
 local pressStart = {}
 local TAP_MOVE, TAP_TIME = 14, 0.45
+local HOLD_TIME = 1.5 -- QUICK / AUTO: holding on an enemy opens the window
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
@@ -423,7 +525,9 @@ end)
 UserInputService.InputEnded:Connect(function(input)
 	local p = pressStart[input]
 	pressStart[input] = nil
-	if not p or os.clock() - p.t > TAP_TIME then
+	local mode = combatMode()
+	local held = p and os.clock() - p.t
+	if not p or held > (mode == "menu" and TAP_TIME or HOLD_TIME) then
 		return
 	end
 	local pos = Vector2.new(input.Position.X, input.Position.Y)
@@ -439,5 +543,9 @@ UserInputService.InputEnded:Connect(function(input)
 		say("Get closer to attack that enemy!", Color3.fromRGB(255, 170, 90))
 		return
 	end
-	open(enemy)
+	if mode == "menu" or held > TAP_TIME then
+		open(enemy)
+	else
+		quickAttack(enemy)
+	end
 end)

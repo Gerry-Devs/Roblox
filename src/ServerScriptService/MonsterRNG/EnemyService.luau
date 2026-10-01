@@ -1019,6 +1019,14 @@ function EnemyService.Start(d)
 			return { success = false, message = "You have no pets that can fight right now." }
 		end
 
+		-- AUTO combat (Settings): the client picks the nearest enemy and
+		-- sends everyone; only for players with enough rebirths
+		if mode == "auto" then
+			if (profile.rebirths or 0) < Config.CombatModes.autoRebirths then
+				return { success = false, message = "Auto attack unlocks at Rebirth " .. Config.CombatModes.autoRebirths .. "." }
+			end
+			mode = "all"
+		end
 		local sent = 0
 		if mode == "all" then
 			for petUid in pairs(ready) do

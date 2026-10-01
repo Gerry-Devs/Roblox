@@ -1153,6 +1153,13 @@ saveSettingsRemote.OnServerInvoke = function(player, settings)
 			profile.settings[k] = settings[k]
 		end
 	end
+	-- combat mode (AUTO needs enough rebirths)
+	local cm = settings.combat
+	if type(cm) == "string" and Config.CombatModes.names[cm] then
+		if cm ~= "auto" or (profile.rebirths or 0) >= Config.CombatModes.autoRebirths then
+			profile.settings.combat = cm
+		end
+	end
 	return true
 end
 
@@ -2075,6 +2082,13 @@ require(script:FindFirstChild("MonsterRNG") and script.MonsterRNG.PvpService or 
 	DataService = DataService,
 	sync = sync,
 	getRemote = getRemote,
+})
+-- play-time milestone rewards
+require(game:GetService("ServerScriptService").MonsterRNG.PlaytimeService).Start({
+	DataService = DataService,
+	sync = sync,
+	getRemote = getRemote,
+	updateLeaderstats = updateLeaderstats,
 })
 -- enemies + combat
 EnemyService.Start({ sync = sync, updateLeaderstats = updateLeaderstats, fx = combatFxRemote })

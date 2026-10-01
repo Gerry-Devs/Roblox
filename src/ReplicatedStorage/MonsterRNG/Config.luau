@@ -1265,6 +1265,38 @@ Config.DailyRewards = {
 }
 
 --------------------------------------------------------------------
+-- Play-time milestones (per session: they start over when you rejoin).
+-- Only time you're active counts: no input / movement for afkAfter
+-- seconds pauses the timer until you're back.
+--   cashPct = % of the cash needed for your next rebirth
+--   egg = a random egg of at least that rarity
+--------------------------------------------------------------------
+Config.Playtime = {
+	afkAfter = 120,
+	milestones = {
+		{ minutes = 30, cashPct = 5, potions = { luck = 1 } },
+		{ minutes = 60, egg = "Rare", shards = 50 },
+		{ minutes = 90, cashPct = 10, potions = { damage = 1, health = 1 } },
+		{ minutes = 120, egg = "Epic", potions = { luck = 2 } },
+		{ minutes = 180, shards = 200, potions = { cash = 2 } },
+		{ minutes = 240, egg = "Legendary" },
+		{ minutes = 300, cashPct = 25, potions = { luck = 2, level = 2 } },
+		{ minutes = 360, egg = "Legendary", shards = 400 },
+		{ minutes = 480, egg = "Mythic", shards = 1000, potions = { luck = 3 } },
+	},
+}
+
+-- Combat setting: "menu" (tap opens the attack window), "quick" (tap
+-- sends all your pets), "auto" (pets attack the nearest enemy on their
+-- own; unlocked at autoRebirths)
+Config.CombatModes = {
+	order = { "menu", "quick", "auto" },
+	names = { menu = "MENU", quick = "QUICK", auto = "AUTO" },
+	default = "quick",
+	autoRebirths = 3,
+}
+
+--------------------------------------------------------------------
 -- Combat. Pets that follow you fight enemies near you automatically.
 -- Enemy HP = 110-120% of a same-level pet, enemy damage = 90%.
 --------------------------------------------------------------------

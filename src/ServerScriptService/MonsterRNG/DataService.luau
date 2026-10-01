@@ -241,6 +241,9 @@ local function sanitize(data)
 				profile.settings[k] = s[k]
 			end
 		end
+		if type(s.combat) == "string" and Config.CombatModes.names[s.combat] then
+			profile.settings.combat = s.combat
+		end
 	end
 	profile.quests = require(script.Parent:WaitForChild("QuestService")).Sanitize(data.quests)
 	if type(data.lastOnline) == "number" then

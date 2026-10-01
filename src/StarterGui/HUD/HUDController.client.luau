@@ -31,6 +31,7 @@ local rebirthRemote = remotes:WaitForChild("Rebirth")
 local claimDailyRemote = remotes:WaitForChild("ClaimDaily")
 local saveSettingsRemote = remotes:WaitForChild("SaveSettings")
 local closeAllBridge = monsterFolder:WaitForChild("ClientBridge"):WaitForChild("CloseAll")
+local notifyBridge = monsterFolder:WaitForChild("ClientBridge"):WaitForChild("Notify")
 
 --------------------------------------------------------------------
 -- HUD: cash + Rift Shards, the Shop / PvP / Index / Rebirth buttons,
@@ -66,6 +67,8 @@ if settings.miniDice == nil then settings.miniDice = true end
 if settings.music == nil then settings.music = true end
 if settings.particles == nil then settings.particles = true end
 if settings.shadows == nil then settings.shadows = true end
+settings.combat = settings.combat or Config.CombatModes.default
+player:SetAttribute("CombatMode", settings.combat) -- AttackMenu follows this
 -- graphics: particles (fire, smoke, sparkles...) and shadows can lag weaker devices
 local function isFx(d)
 	return d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") or d:IsA("Sparkles")
@@ -722,7 +725,88 @@ for _, row in ipairs(sb:GetChildren()) do
 	end
 end
 
+-- COMBAT row: MENU / QUICK / AUTO (made from the Graphics row)
+local combatButtons = {}
+do
+	local ok, err = pcall(function()
+		local src = sb:FindFirstChild("Graphics")
+		if not src or sb:FindFirstChild("Combat") then
+			return
+		end
+		local row = src:Clone()
+		row.Name = "Combat"
+		local maxOrder = 0
+		for _, c in ipairs(sb:GetChildren()) do
+			if c:IsA("GuiObject") then
+				maxOrder = math.max(maxOrder, c.LayoutOrder)
+			end
+		end
+		row.LayoutOrder = maxOrder + 1
+		for _, d in ipairs(row:GetDescendants()) do
+			if d:IsA("LuaSourceContainer") then
+				d:Destroy()
+			end
+		end
+		local lbl = row:FindFirstChild("Label")
+		if lbl and lbl:IsA("TextLabel") then
+			lbl.Text = "Combat"
+		end
+		local options = row:FindFirstChild("Options")
+		local template
+		for _, q in ipairs(Config.Graphics.order) do
+			local b = options and options:FindFirstChild(q)
+			if b then
+				template = template or b:Clone()
+				b:Destroy()
+			end
+		end
+		if not template then
+			row:Destroy()
+			return
+		end
+		for i, mode in ipairs(Config.CombatModes.order) do
+			local b = template:Clone()
+			b.Name = mode
+			b.LayoutOrder = i
+			local name = Config.CombatModes.names[mode]
+			if b:IsA("TextButton") and b.Text ~= "" then
+				b.Text = name
+			end
+			for _, d in ipairs(b:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					d.Text = name
+				end
+			end
+			b.Parent = options
+			combatButtons[mode] = b
+		end
+		row.Parent = sb
+		-- the body scrolls to fit the new row
+		if sb:IsA("ScrollingFrame") then
+			sb.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		end
+	end)
+	if not ok then
+		warn("Combat setting row failed: " .. tostring(err))
+	end
+end
+
 refreshers.SettingsPanel = function()
+	local autoLocked = ((profile and profile.rebirths) or 0) < Config.CombatModes.autoRebirths
+	for mode, b in pairs(combatButtons) do
+		b.BackgroundColor3 = settings.combat == mode and GOLD or Color3.fromRGB(58, 62, 76)
+		if mode == "auto" then
+			local name = autoLocked and ("\u{1F512} R" .. Config.CombatModes.autoRebirths) or Config.CombatModes.names.auto
+			if b:IsA("TextButton") and b.Text ~= "" then
+				b.Text = name
+			end
+			for _, d in ipairs(b:GetDescendants()) do
+				if d:IsA("TextLabel") then
+					d.Text = name
+				end
+			end
+		end
+	end
 	for _, q in ipairs(Config.Graphics.order) do
 		local b = sb.Graphics.Options:FindFirstChild(q)
 		if b then
@@ -756,6 +840,18 @@ for _, q in ipairs(Config.Graphics.order) do
 	b.Activated:Connect(function()
 		settings.graphics = q
 		applyGraphics()
+		saveSettings()
+	end)
+end
+for mode, b in pairs(combatButtons) do
+	bounce(b)
+	b.Activated:Connect(function()
+		if mode == "auto" and ((profile and profile.rebirths) or 0) < Config.CombatModes.autoRebirths then
+			notifyBridge:Fire("Auto attack unlocks at Rebirth " .. Config.CombatModes.autoRebirths .. "!", RED)
+			return
+		end
+		settings.combat = mode
+		player:SetAttribute("CombatMode", mode)
 		saveSettings()
 	end)
 end

@@ -170,4 +170,23 @@ function RollService.Roll(profile)
 	return rarity, egg, wilds, wheelIndex
 end
 
+-- a reward egg: a random egg of at least this rarity (normal odds above
+-- it, so it's usually that rarity). Size / finish roll like normal.
+function RollService.GiveEgg(profile, minRarityKey)
+	local rarity = chooseRarity(0, getTier(minRarityKey or "Common"), 0)
+	local monster = chooseMonster(rarity.key)
+	local size = chooseVariant(Config.SizeVariants, 0)
+	local finish = chooseVariant(Config.FinishVariants, 0)
+	local egg = {
+		uid = HttpService:GenerateGUID(false),
+		monsterId = monster.id,
+		size = size.key,
+		finish = finish.key,
+		rarity = rarity.key,
+		kg = Config.RollKg(monster.id, size.key),
+	}
+	table.insert(profile.eggs, egg)
+	return egg
+end
+
 return RollService

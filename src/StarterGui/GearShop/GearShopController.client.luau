@@ -18,8 +18,8 @@ local closeAllBridge = bridge:WaitForChild("CloseAll")
 
 --------------------------------------------------------------------
 -- Gear Shop (Kurt). Your own stock, restocked every 5 minutes: each
--- gear is rolled with its chance, 1 of each that hits. Paid with Rift
--- Shards; bought gears go to the backpack (ITEMS). Gears: Config.Gears.
+-- gear is rolled with its chance (each hit rolls again, up to 5). Paid
+-- with Cash (Config.GearPrice); bought gears go to the backpack (ITEMS).
 --------------------------------------------------------------------
 
 local gui = script.Parent
@@ -88,10 +88,10 @@ local closeBtn = mk("TextButton", {
 corner(closeBtn, UDim.new(0, 12))
 stroke(closeBtn, 3)
 
--- header: your shards + restock timer
+-- header: your cash + restock timer
 local header = mk("Frame", { Size = UDim2.new(1, -40, 0, 34), Position = UDim2.fromOffset(20, 44), BackgroundTransparency = 1 }, main)
-mk("ImageLabel", { Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 1, Image = Config.RiftShardImage, ScaleType = Enum.ScaleType.Fit }, header)
-local shardText = label(header, "0", UDim2.fromOffset(160, 28), UDim2.fromOffset(38, 2), { TextXAlignment = Enum.TextXAlignment.Left })
+mk("ImageLabel", { Size = UDim2.fromOffset(32, 32), BackgroundTransparency = 1, Image = Config.CashImage, ScaleType = Enum.ScaleType.Fit }, header)
+local cashText = label(header, "0", UDim2.fromOffset(160, 28), UDim2.fromOffset(38, 2), { TextXAlignment = Enum.TextXAlignment.Left })
 local timerText = label(header, "", UDim2.fromOffset(280, 26), UDim2.new(1, -280, 0, 4), { TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Color3.fromRGB(255, 235, 150) })
 
 local well = mk("Frame", { Size = UDim2.new(1, -40, 1, -100), Position = UDim2.fromOffset(20, 84), BackgroundColor3 = NAVY }, main)
@@ -131,11 +131,12 @@ render = function()
 			c:Destroy()
 		end
 	end
-	shardText.Text = Config.FormatNumber((profile and profile.riftShards) or 0)
+	cashText.Text = "$" .. Config.FormatNumber((profile and profile.cash) or 0)
 	for i, gear in ipairs(Config.Gears) do
 		local color = Color3.fromRGB(gear.color[1], gear.color[2], gear.color[3])
 		local inStock = shop and shop.items and (shop.items[gear.key] or 0) > 0
-		local canAfford = ((profile and profile.riftShards) or 0) >= gear.price
+		local price = Config.GearPrice(profile, gear)
+		local canAfford = ((profile and profile.cash) or 0) >= price
 		local row = mk("Frame", { Name = gear.key, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 74), BackgroundColor3 = Color3.fromRGB(35, 62, 125) }, list)
 		corner(row, UDim.new(0, 12))
 		stroke(row, 2)
@@ -158,15 +159,15 @@ render = function()
 			stockText, stockColor = "NOT IN STOCK", Color3.fromRGB(170, 180, 200)
 		end
 		label(row, stockText, UDim2.fromOffset(170, 18), UDim2.new(1, -176, 0, 8), { TextColor3 = stockColor })
-		-- buy button with shard price
+		-- buy button with the cash price
 		local btn = mk("TextButton", {
 			Size = UDim2.fromOffset(150, 38), Position = UDim2.new(1, -160, 0, 30), BackgroundColor3 = (inStock and canAfford) and GREEN or GRAY,
 			Text = "", AutoButtonColor = inStock,
 		}, row)
 		corner(btn, UDim.new(0, 10))
 		stroke(btn, 3)
-		mk("ImageLabel", { Size = UDim2.fromOffset(26, 26), Position = UDim2.new(0, 10, 0.5, -13), BackgroundTransparency = 1, Image = Config.RiftShardImage, ScaleType = Enum.ScaleType.Fit }, btn)
-		label(btn, inStock and ("BUY " .. gear.price) or tostring(gear.price), UDim2.new(1, -46, 0.7, 0), UDim2.new(0, 40, 0.15, 0))
+		mk("ImageLabel", { Size = UDim2.fromOffset(26, 26), Position = UDim2.new(0, 10, 0.5, -13), BackgroundTransparency = 1, Image = Config.CashImage, ScaleType = Enum.ScaleType.Fit }, btn)
+		label(btn, Config.FormatNumber(price), UDim2.new(1, -46, 0.7, 0), UDim2.new(0, 40, 0.15, 0))
 		btn.Activated:Connect(function()
 			if not inStock then
 				notify:Fire(gear.name .. " isn't in stock. Wait for the next restock!", RED)

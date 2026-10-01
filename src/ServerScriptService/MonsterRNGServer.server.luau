@@ -1665,10 +1665,11 @@ buyGearRemote.OnServerInvoke = function(player, key)
 	if (profile.gearStock.items[key] or 0) <= 0 then
 		return { success = false, message = gear.name .. " is sold out. Wait for the next restock!", shop = gearShopState(profile) }
 	end
-	if (profile.riftShards or 0) < gear.price then
-		return { success = false, message = "You need " .. gear.price .. " Rift Shards.", shop = gearShopState(profile) }
+	local price = Config.GearPrice(profile, gear)
+	if (profile.cash or 0) < price then
+		return { success = false, message = "You need $" .. Config.FormatNumber(price) .. " Cash.", shop = gearShopState(profile) }
 	end
-	profile.riftShards -= gear.price
+	profile.cash -= price
 	profile.gearStock.items[key] -= 1
 	if profile.gearStock.items[key] <= 0 then
 		profile.gearStock.items[key] = nil

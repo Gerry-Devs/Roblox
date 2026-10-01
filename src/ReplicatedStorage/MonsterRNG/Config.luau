@@ -1450,18 +1450,26 @@ Config.Gifting = {
 -- Gear Shop (Kurt). Every GearRestockSeconds each player gets a new
 -- stock: each gear is rolled with its chance; every hit rolls again for
 -- one more (same chance), up to GearMaxStock of each.
--- Bought with Rift Shards; goes to the backpack (ITEMS) to use later.
+-- Bought with Cash: cashPct = % of the cash for your next rebirth, so
+-- prices grow as you rebirth. Goes to the backpack (ITEMS) to use later.
 --------------------------------------------------------------------
 Config.GearRestockSeconds = 300
 Config.GearMaxStock = 5
 Config.Gears = {
-	{ key = "speedBoots", name = "Speed Boots", imageId = "rbxassetid://117951493575646", price = 20, chance = 0.5, duration = 180, boost = true, color = { 90, 200, 255 }, text = "+40% walk speed for 3 min" },
-	{ key = "tauntTotem", name = "Taunt Totem", imageId = "rbxassetid://85760759986031", price = 45, chance = 0.3, duration = 30, color = { 235, 90, 70 }, text = "Enemies attack it instead of your pets (30s)" },
-	{ key = "healingSpring", name = "Healing Spring", imageId = "rbxassetid://131193150650112", price = 35, chance = 0.2, duration = 60, color = { 80, 220, 160 }, text = "Your pets near it heal fast (60s)" },
-	{ key = "campfire", name = "Campfire", imageId = "rbxassetid://115564759046466", price = 60, chance = 0.05, duration = 300, boost = true, color = { 255, 150, 50 }, text = "Defeated pets recover 2x faster (5 min)" },
-	{ key = "warpRemote", name = "Warp Remote", imageId = "rbxassetid://80619965977171", price = 25, chance = 0.4, item = true, color = { 120, 190, 255 }, text = "Warp to any biome you unlocked (WARP menu)" },
-	{ key = "reviveFeather", name = "Revive Feather", imageId = "rbxassetid://112794123950752", price = 90, chance = 0.04, color = { 255, 215, 90 }, text = "Instantly revives one defeated pet" },
+	{ key = "speedBoots", name = "Speed Boots", imageId = "rbxassetid://117951493575646", cashPct = 2, chance = 0.5, duration = 180, boost = true, color = { 90, 200, 255 }, text = "+40% walk speed for 3 min" },
+	{ key = "tauntTotem", name = "Taunt Totem", imageId = "rbxassetid://85760759986031", cashPct = 4.5, chance = 0.3, duration = 30, color = { 235, 90, 70 }, text = "Enemies attack it instead of your pets (30s)" },
+	{ key = "healingSpring", name = "Healing Spring", imageId = "rbxassetid://131193150650112", cashPct = 3.5, chance = 0.2, duration = 60, color = { 80, 220, 160 }, text = "Your pets near it heal fast (60s)" },
+	{ key = "campfire", name = "Campfire", imageId = "rbxassetid://115564759046466", cashPct = 6, chance = 0.05, duration = 300, boost = true, color = { 255, 150, 50 }, text = "Defeated pets recover 2x faster (5 min)" },
+	{ key = "warpRemote", name = "Warp Remote", imageId = "rbxassetid://80619965977171", cashPct = 2.5, chance = 0.75, item = true, color = { 120, 190, 255 }, text = "Warp to any biome you unlocked (WARP menu)" },
+	{ key = "reviveFeather", name = "Revive Feather", imageId = "rbxassetid://112794123950752", cashPct = 9, chance = 0.04, color = { 255, 215, 90 }, text = "Instantly revives one defeated pet" },
 }
+-- a gear's price in cash for this player (rounded to 2 digits)
+function Config.GearPrice(profile, gear)
+	local cost = Config.GetRebirthCost(profile and profile.rebirths or 0)
+	local v = math.max(1000, cost * (gear.cashPct or 1) / 100)
+	local mag = 10 ^ math.max(0, math.floor(math.log10(v)) - 1)
+	return math.floor(v / mag + 0.5) * mag
+end
 function Config.GetGear(key)
 	for _, g in ipairs(Config.Gears) do
 		if g.key == key then

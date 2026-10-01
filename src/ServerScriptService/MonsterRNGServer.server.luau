@@ -2016,22 +2016,23 @@ game:BindToClose(function()
 		DataService.Save(player)
 	end
 end)
--- Lift pose (holding an egg / monster over the head): bend the arm joints on the
+-- Lift pose (holding an egg / monster against the chest): bend the arm joints on the
 -- server so it shows in the real game and for everyone (players' screens
 -- keep the arms still while it's on: see HoldPoseClient)
 do
 	local holdPoseRemote = getRemote("HoldPose", "RemoteEvent")
 	local R = math.rad
-	-- lifting it over the head: both arms straight up, hands in a bit
+	-- lifting it against the chest: upper arms forward and in, elbows
+	-- bent up so the forearms hug it close to the body
 	local R15 = {
-		{ "RightUpperArm", "RightShoulder", CFrame.fromEulerAnglesYXZ(R(165), 0, R(-12)) },
-		{ "LeftUpperArm", "LeftShoulder", CFrame.fromEulerAnglesYXZ(R(165), 0, R(12)) },
-		{ "RightLowerArm", "RightElbow", CFrame.Angles(R(15), 0, 0) },
-		{ "LeftLowerArm", "LeftElbow", CFrame.Angles(R(15), 0, 0) },
+		{ "RightUpperArm", "RightShoulder", CFrame.fromEulerAnglesYXZ(R(45), R(28), 0) },
+		{ "LeftUpperArm", "LeftShoulder", CFrame.fromEulerAnglesYXZ(R(45), R(-28), 0) },
+		{ "RightLowerArm", "RightElbow", CFrame.Angles(R(55), 0, 0) },
+		{ "LeftLowerArm", "LeftElbow", CFrame.Angles(R(55), 0, 0) },
 	}
 	local R6 = {
-		{ "Torso", "Right Shoulder", CFrame.Angles(0, 0, R(165)) },
-		{ "Torso", "Left Shoulder", CFrame.Angles(0, 0, R(-165)) },
+		{ "Torso", "Right Shoulder", CFrame.Angles(0, 0, R(80)) },
+		{ "Torso", "Left Shoulder", CFrame.Angles(0, 0, R(-80)) },
 	}
 	local function apply(player, on)
 		local character = player.Character

@@ -635,7 +635,7 @@ local function updateScale()
 	end
 	-- phones: never shrink below a comfortable tap size
 	local isTouch = game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled
-	local s = math.clamp(camera.ViewportSize.Y / 720, isTouch and 0.62 or 0.6, 1)
+	local s = math.min(camera.ViewportSize.Y / 720, 1)
 	local DOCK_SCALE = 0.72 -- size of the EGGS / PETS buttons
 	local PANEL_SCALE = 0.8 -- size of the info panels
 	dock:SetAttribute("BaseScale", s * DOCK_SCALE)

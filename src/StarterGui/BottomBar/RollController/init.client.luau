@@ -1293,20 +1293,20 @@ end
 local function updateScale()
 	local camera = workspace.CurrentCamera
 	if camera and camera.ViewportSize.X > 0 then
-		local s = math.clamp(camera.ViewportSize.X / 1000, 0.55, 1)
+		local s = math.min(camera.ViewportSize.X / 1000, 1)
 		local BAR_SCALE = 0.65 -- size of the Backpack / Roll / Upgrade buttons (PC)
 		local MOBILE_BAR_SCALE = 0.6 -- size on phones / tablets
 		local UIS = game:GetService("UserInputService")
 		if UIS.TouchEnabled and not UIS.KeyboardEnabled then
 			-- phones: size from the short side of the screen so it stays easy to tap
 			local v = camera.ViewportSize
-			barScale.Scale = math.clamp(math.min(v.X / 1000, v.Y / 480), 0.6, 1) * MOBILE_BAR_SCALE
+			barScale.Scale = math.min(v.X / 1000, v.Y / 480, 1) * MOBILE_BAR_SCALE
 		else
 			barScale.Scale = s * BAR_SCALE
 		end
 		-- roll + Auto/Hide fit the screen height too
 		local v = camera.ViewportSize
-		stageScale.Scale = math.clamp(math.min(v.X / 1000, v.Y / 720), 0.5, 1) * ((hideRoll or player:GetAttribute("HudHidden")) and MINI_SCALE or 1)
+		stageScale.Scale = math.min(v.X / 1000, v.Y / 720, 1) * ((hideRoll or player:GetAttribute("HudHidden")) and MINI_SCALE or 1)
 		-- phones: AUTO / HIDE sit a little higher
 		local rollOptions = stage:FindFirstChild("RollOptions")
 		if rollOptions then

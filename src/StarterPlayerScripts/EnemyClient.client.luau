@@ -373,7 +373,7 @@ stackLayout.Padding = UDim.new(0, 2)
 stackLayout.Parent = stack
 local function fitStack()
 	local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	stackScale.Scale = math.clamp(math.min(v.X / 1100, v.Y / 700), 0.6, 1)
+	stackScale.Scale = math.min(v.X / 1100, v.Y / 700, 1)
 end
 fitStack()
 if workspace.CurrentCamera then

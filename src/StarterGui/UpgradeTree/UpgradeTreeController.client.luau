@@ -727,8 +727,9 @@ end)
 --------------------------------------------------------------------
 -- move + zoom
 --------------------------------------------------------------------
+local centerY = 0 -- the tree's middle sits between the header and CLOSE (set by fitScreen)
 applyOffset = function()
-	canvas.Position = UDim2.new(0.5, offset.X * zoom.Scale, 0.5, offset.Y * zoom.Scale)
+	canvas.Position = UDim2.new(0.5, offset.X * zoom.Scale, 0.5, centerY + offset.Y * zoom.Scale)
 end
 local dragStart, offsetStart
 local mouseDrag = false
@@ -920,17 +921,28 @@ local chromeScales = {}
 for _, o in ipairs({ top, pageTitle, closeBtn, info, tip, msg }) do
 	chromeScales[o] = mk("UIScale", {}, o)
 end
+-- One layout for every screen: everything (header, hexes, CLOSE) is
+-- designed for a DESIGN_W x DESIGN_H screen and scaled by the same
+-- amount, so a small phone looks exactly like a big one, only smaller.
+-- The header starts under Roblox's top bar (this gui ignores the inset).
+local DESIGN_W, DESIGN_H = 1000, 700
 fitScreen = function()
 	local v = workspace.CurrentCamera.ViewportSize
-	local small = math.clamp(math.min(v.Y / 760, v.X / 1100), 0.5, 1)
-	zoom.Scale = math.clamp(v.Y / 620, 0.62, 1) -- phones: hexes big enough to tap
+	local inset = game:GetService("GuiService"):GetGuiInset().Y
+	local s = math.min((v.Y - inset) / DESIGN_H, v.X / DESIGN_W, 1.15)
+	zoom.Scale = s
 	for _, sc in pairs(chromeScales) do
-		sc.Scale = small
+		sc.Scale = s
 	end
-	top.Position = UDim2.new(0.5, 0, 0, math.floor(12 * small))
+	local topY = inset + math.floor(6 * s)
+	top.Position = UDim2.new(0.5, 0, 0, topY)
 	pageTitle.AnchorPoint = Vector2.new(0.5, 0)
-	pageTitle.Position = UDim2.new(0.5, 0, 0, math.floor((12 + 54) * small))
-	closeBtn.Position = UDim2.new(0.5, 0, 1, -math.floor(18 * small))
+	pageTitle.Position = UDim2.new(0.5, 0, 0, topY + math.floor(54 * s))
+	closeBtn.Position = UDim2.new(0.5, 0, 1, -math.floor(14 * s))
+	-- the hexes fill the space between the title and CLOSE
+	local areaTop = topY + (54 + 34 + 4) * s
+	local areaBottom = v.Y - (14 + 56 + 4) * s
+	centerY = math.floor((areaTop + areaBottom) / 2 - v.Y / 2)
 end
 workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
 	if dim.Visible then

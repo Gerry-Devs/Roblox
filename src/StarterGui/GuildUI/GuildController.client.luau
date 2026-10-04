@@ -560,7 +560,7 @@ local function open(anchorPart)
 	local cam = workspace.CurrentCamera
 	if cam and cam.ViewportSize.Y > 0 then
 		local touch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
-		mainScale.Scale = math.clamp(math.min((cam.ViewportSize.Y - 60) / 560, (cam.ViewportSize.X - 30) / 740), 0.45, 1) * (touch and 0.95 or 1)
+		mainScale.Scale = math.min((cam.ViewportSize.Y - 60) / 560, (cam.ViewportSize.X - 30) / 740, 1) * (touch and 0.95 or 1)
 	end
 	openedAt = anchorPart
 	main.Visible = true

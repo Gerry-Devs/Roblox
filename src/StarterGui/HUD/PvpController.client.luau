@@ -413,7 +413,7 @@ do
 	end
 	local function fit()
 		local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-		local k = math.clamp(math.min(v.Y / 720, v.X / 1100), 0.55, 1)
+		local k = math.min(v.Y / 720, v.X / 1100, 1)
 		for _, sc in pairs(scales) do
 			sc.Scale = k
 			sc:SetAttribute("Base", k)

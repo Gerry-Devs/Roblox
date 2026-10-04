@@ -252,7 +252,7 @@ end
 
 local function fit()
 	local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	mainScale.Scale = math.clamp(math.min(vp.Y / 560, vp.X / 760), 0.55, 1)
+	mainScale.Scale = math.min(vp.Y / 560, vp.X / 760, 1)
 end
 local function open()
 	closeAllBridge:Fire("playtime")

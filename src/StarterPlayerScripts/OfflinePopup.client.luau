@@ -51,7 +51,7 @@ remote.OnClientEvent:Connect(function(data)
 		local vp = cam and cam.ViewportSize or Vector2.new(1280, 720)
 		local inset = game:GetService("GuiService"):GetGuiInset().Y
 		local w, h = panel.Size.X.Offset, panel.Size.Y.Offset
-		fitScale = math.clamp(math.min((vp.X - 40) / w, (vp.Y - inset * 2 - 30) / h), 0.3, 1)
+		fitScale = math.min((vp.X - 40) / w, (vp.Y - inset * 2 - 30) / h, 1)
 		scale.Scale = fitScale
 	end
 	fit()

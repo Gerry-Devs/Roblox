@@ -27,7 +27,7 @@ local function baseScale()
 		return 1
 	end
 	local v = camera.ViewportSize
-	return math.clamp(math.min(v.X / 1000, v.Y / 650), 0.55, 1)
+	return math.min(v.X / 1000, v.Y / 650, 1)
 end
 
 local function show(biome)

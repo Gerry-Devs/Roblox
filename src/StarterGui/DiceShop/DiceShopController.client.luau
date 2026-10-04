@@ -132,7 +132,7 @@ local function open(anchorPart)
 	closeAllBridge:Fire("dice")
 	local camera = workspace.CurrentCamera
 	if camera and camera.ViewportSize.Y > 0 then
-		mainScale.Scale = math.clamp(math.min(camera.ViewportSize.Y / 620, camera.ViewportSize.X / 720), 0.55, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
+		mainScale.Scale = math.min(camera.ViewportSize.Y / 620, camera.ViewportSize.X / 720, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
 	end
 	openedAt = anchorPart
 	main.Visible = true

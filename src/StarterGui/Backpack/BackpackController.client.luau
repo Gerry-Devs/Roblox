@@ -903,7 +903,7 @@ local function open()
 	-- shrink on small screens so the whole window fits
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
 	if viewport and viewport.Y > 0 then
-		mainScale.Scale = math.clamp(math.min(viewport.Y / 640, viewport.X / 860), 0.55, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
+		mainScale.Scale = math.min(viewport.Y / 640, viewport.X / 860, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
 	end
 	main.Visible = true
 	renderGrid()

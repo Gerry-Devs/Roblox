@@ -185,7 +185,7 @@ local function updateUIScale()
 	if viewportWidth <= 0 then
 		return
 	end
-	uiScale.Scale = math.clamp(viewportWidth / BASE_UI_WIDTH, 0.55, 1)
+	uiScale.Scale = math.min(viewportWidth / BASE_UI_WIDTH, 1)
 end
 
 updateUIScale()

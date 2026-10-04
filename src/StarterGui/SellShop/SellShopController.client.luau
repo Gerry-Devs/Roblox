@@ -124,7 +124,7 @@ local function open(stallPart)
 	closeAllBridge:Fire("sell")
 	local camera = workspace.CurrentCamera
 	if camera and camera.ViewportSize.Y > 0 then
-		mainScale.Scale = math.clamp(math.min(camera.ViewportSize.Y / 600, camera.ViewportSize.X / 700), 0.55, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
+		mainScale.Scale = math.min(camera.ViewportSize.Y / 600, camera.ViewportSize.X / 700, 1) * ((game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").KeyboardEnabled) and 0.88 or 1)
 	end
 	openedAt = stallPart
 	main.Visible = true

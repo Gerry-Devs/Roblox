@@ -341,7 +341,7 @@ local function open(enemy)
 	-- shrink on small screens so the whole window fits
 	local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
 	if viewport and viewport.Y > 0 then
-		mainScale.Scale = math.clamp(math.min(viewport.Y / 560, viewport.X / 760), 0.55, 1)
+		mainScale.Scale = math.min(viewport.Y / 560, viewport.X / 760, 1)
 	end
 	refreshEnemy()
 	refreshList()

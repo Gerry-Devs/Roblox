@@ -204,7 +204,7 @@ end
 local function uiScale()
 	local camera = workspace.CurrentCamera
 	local v = camera and camera.ViewportSize or Vector2.new(1280, 720)
-	return math.clamp(math.min(v.Y / 720, v.X / 1100), 0.55, 1) * (isTouch and 1.05 or 1)
+	return math.min(v.Y / 720, v.X / 1100, 1) * (isTouch and 1.05 or 1)
 end
 
 --------------------------------------------------------------------
@@ -781,14 +781,43 @@ do
 			combatButtons[mode] = b
 		end
 		row.Parent = sb
-		-- the body scrolls to fit the new row
-		if sb:IsA("ScrollingFrame") then
-			sb.AutomaticCanvasSize = Enum.AutomaticSize.Y
-		end
 	end)
 	if not ok then
 		warn("Combat setting row failed: " .. tostring(err))
 	end
+end
+
+-- the window grows to fit every row (Combat, Tag... were added later);
+-- WindowAnimator then shrinks the whole window to fit phone screens
+do
+	local list = sb:FindFirstChildOfClass("UIListLayout")
+	local baseW = settingsPanel.Size.X.Offset
+	local top = sb.Position.Y.Offset
+	local bottomPad = math.max(16, -(sb.Size.Y.Offset) - top)
+	local function fitRows()
+		if not list then
+			return
+		end
+		-- AbsoluteContentSize is in screen pixels: undo the window's scale
+		local scale = settingsPanel.AbsoluteSize.X / math.max(1, settingsPanel.Size.X.Offset)
+		if scale <= 0 then
+			return
+		end
+		local h = math.ceil(list.AbsoluteContentSize.Y / scale)
+		local want = top + h + bottomPad
+		if math.abs(settingsPanel.Size.Y.Offset - want) > 1 then
+			settingsPanel.Size = UDim2.new(settingsPanel.Size.X.Scale, baseW, 0, want)
+		end
+	end
+	if list then
+		list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fitRows)
+	end
+	settingsPanel:GetPropertyChangedSignal("Visible"):Connect(function()
+		if settingsPanel.Visible then
+			task.defer(fitRows)
+		end
+	end)
+	task.defer(fitRows)
 end
 
 refreshers.SettingsPanel = function()

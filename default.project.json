@@ -18,6 +18,9 @@
         "EggModel": {
           "$path": "src/ReplicatedStorage/MonsterRNG/EggModel.luau"
         },
+        "LootModel": {
+          "$path": "src/ReplicatedStorage/MonsterRNG/LootModel.luau"
+        },
         "MonsterMesh": {
           "$path": "src/ReplicatedStorage/MonsterRNG/MonsterMesh.luau"
         },

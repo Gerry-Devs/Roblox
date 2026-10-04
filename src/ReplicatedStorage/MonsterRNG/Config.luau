@@ -1300,6 +1300,15 @@ Config.CombatModes = {
 -- Combat. Pets that follow you fight enemies near you automatically.
 -- Enemy HP = 110-120% of a same-level pet, enemy damage = 90%.
 --------------------------------------------------------------------
+-- Loot on the ground (Rift Shards / potions from enemies): it flies out
+-- of the enemy and lands around it; walk within pickupRange studs and it
+-- flies into your backpack. Gone after lifetime seconds.
+Config.Loot = {
+	lifetime = 90,
+	pickupRange = 8,
+	pickupCheck = 40, -- server: max distance from where the enemy died
+}
+
 Config.Combat = {
 	petBaseHealth = 100,
 	petHealthPerLevel = 0.15, -- +15% per level
@@ -1329,8 +1338,7 @@ Config.Combat = {
 	shardChance = 0.35,
 	potionChance = 0.04,
 	warpRemoteChance = 0, -- Warp Remotes are sold in the Gear Shop now (not dropped)
-	giftCardChance = 0.0015, -- ~1 in 670 kills; only drops for Rebirth 3+
-	giftCardMinRebirth = 3,
+	-- (Gift Cards are sold in the Gear Shop now, Rebirth 3+, not dropped)
 	potionWeights = { luck = 25, health = 20, damage = 20, cash = 20, level = 13, revive = 8 }, -- revive: ~1 in 330 kills
 }
 Config.RarityPower = { 1, 1.2, 1.45, 1.75, 2.1, 2.5 }
@@ -1461,6 +1469,7 @@ Config.Gears = {
 	{ key = "healingSpring", name = "Healing Spring", imageId = "rbxassetid://131193150650112", cashPct = 3.5, chance = 0.2, duration = 60, color = { 80, 220, 160 }, text = "Your pets near it heal fast (60s)" },
 	{ key = "campfire", name = "Campfire", imageId = "rbxassetid://115564759046466", cashPct = 6, chance = 0.05, duration = 300, boost = true, color = { 255, 150, 50 }, text = "Defeated pets recover 2x faster (5 min)" },
 	{ key = "warpRemote", name = "Warp Remote", imageId = "rbxassetid://80619965977171", cashPct = 0.75, chance = 0.75, item = true, color = { 120, 190, 255 }, text = "Warp to any biome you unlocked (WARP menu)" },
+	{ key = "giftCard", name = "Gift Card", imageId = Config.Items.giftCard.imageId, cashPct = 20, chance = 0.03, item = true, minRebirth = 3, color = { 255, 120, 200 }, text = "Gift pets / items to a player (Rebirth 3+)" },
 	{ key = "reviveFeather", name = "Revive Feather", imageId = "rbxassetid://112794123950752", cashPct = 9, chance = 0.04, color = { 255, 215, 90 }, text = "Instantly revives one defeated pet" },
 }
 -- a gear's price in cash for this player (rounded to 2 digits)

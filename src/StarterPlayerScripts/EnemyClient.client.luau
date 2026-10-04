@@ -501,17 +501,7 @@ end
 fxRemote.OnClientEvent:Connect(function(data)
 	if data.kind == "kill" then
 		local lines = { { "+" .. Config.FormatNumber(data.xp) .. " XP", Color3.fromRGB(140, 220, 255) } }
-		for _, d in ipairs(data.drops or {}) do
-			if d.kind == "shards" then
-				table.insert(lines, { "+" .. d.amount .. " Rift Shards", Color3.fromRGB(190, 140, 255), Config.RiftShardImage })
-			elseif d.kind == "potion" then
-				local p = Config.GetPotion(d.key)
-				table.insert(lines, { (p and p.name or "Potion") .. "!", Color3.fromRGB(255, 205, 93), p and p.imageId })
-			elseif d.kind == "item" then
-				local it = Config.Items[d.key]
-				table.insert(lines, { (it and it.name or "Item") .. "!", Color3.fromRGB(255, 205, 93), it and it.imageId })
-			end
-		end
+		-- (drops fly out as loot to pick up: LootClient)
 		for _, lu in ipairs(data.levelUps or {}) do
 			table.insert(lines, { lu.name .. " reached Lv " .. lu.level .. "!", Color3.fromRGB(120, 255, 140) })
 		end

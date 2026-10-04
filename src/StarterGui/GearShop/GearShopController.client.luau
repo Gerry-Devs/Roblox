@@ -136,7 +136,8 @@ render = function()
 		local color = Color3.fromRGB(gear.color[1], gear.color[2], gear.color[3])
 		local inStock = shop and shop.items and (shop.items[gear.key] or 0) > 0
 		local price = Config.GearPrice(profile, gear)
-		local canAfford = ((profile and profile.cash) or 0) >= price
+		local locked = gear.minRebirth and ((profile and profile.rebirths) or 0) < gear.minRebirth
+		local canAfford = ((profile and profile.cash) or 0) >= price and not locked
 		local row = mk("Frame", { Name = gear.key, LayoutOrder = i, Size = UDim2.new(1, 0, 0, 74), BackgroundColor3 = Color3.fromRGB(35, 62, 125) }, list)
 		corner(row, UDim.new(0, 12))
 		stroke(row, 2)
@@ -167,8 +168,12 @@ render = function()
 		corner(btn, UDim.new(0, 10))
 		stroke(btn, 3)
 		mk("ImageLabel", { Size = UDim2.fromOffset(26, 26), Position = UDim2.new(0, 10, 0.5, -13), BackgroundTransparency = 1, Image = Config.CashImage, ScaleType = Enum.ScaleType.Fit }, btn)
-		label(btn, Config.FormatNumber(price), UDim2.new(1, -46, 0.7, 0), UDim2.new(0, 40, 0.15, 0))
+		label(btn, locked and ("\u{1F512} REBIRTH " .. gear.minRebirth) or Config.FormatNumber(price), UDim2.new(1, -46, 0.7, 0), UDim2.new(0, 40, 0.15, 0))
 		btn.Activated:Connect(function()
+			if locked then
+				notify:Fire(gear.name .. " unlocks at Rebirth " .. gear.minRebirth .. "!", RED)
+				return
+			end
 			if not inStock then
 				notify:Fire(gear.name .. " isn't in stock. Wait for the next restock!", RED)
 				return

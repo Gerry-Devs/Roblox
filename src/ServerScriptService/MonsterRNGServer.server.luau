@@ -1665,6 +1665,9 @@ buyGearRemote.OnServerInvoke = function(player, key)
 	if (profile.gearStock.items[key] or 0) <= 0 then
 		return { success = false, message = gear.name .. " is sold out. Wait for the next restock!", shop = gearShopState(profile) }
 	end
+	if gear.minRebirth and (profile.rebirths or 0) < gear.minRebirth then
+		return { success = false, message = gear.name .. " unlocks at Rebirth " .. gear.minRebirth .. ".", shop = gearShopState(profile) }
+	end
 	local price = Config.GearPrice(profile, gear)
 	if (profile.cash or 0) < price then
 		return { success = false, message = "You need $" .. Config.FormatNumber(price) .. " Cash.", shop = gearShopState(profile) }

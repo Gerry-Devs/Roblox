@@ -1,6 +1,7 @@
 -- EnemyService: spawns enemies in every biome, runs the fights between
 -- players' following pets and enemies, and hands out XP + loot.
 -- Balance lives in Config.Combat / Config.EnemySpawns / Config.EnemySizes.
+local addLoot -- (loot on the ground, below)
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -473,6 +474,44 @@ local function moveEnemy(e, dt, now)
 end
 
 --------------------------------------------------------------------
+-- loot on the ground (Rift Shards / potions). Each player has their own
+-- loot; it's given when they walk up to it (the client sends PickupLoot)
+-- and disappears after Config.Loot.lifetime seconds.
+--------------------------------------------------------------------
+local lootByPlayer = {} -- player -> { [id] = { kind, key, amount, pos, at } }
+local nextLootId = 0
+addLoot = function(player, drop, pos)
+	nextLootId += 1
+	drop.id = nextLootId
+	local list = lootByPlayer[player] or {}
+	lootByPlayer[player] = list
+	list[drop.id] = { kind = drop.kind, key = drop.key, amount = drop.amount, pos = pos, at = os.clock() }
+end
+local function pickupLoot(player, id)
+	local list = lootByPlayer[player]
+	local loot = list and type(id) == "number" and list[id]
+	if not loot then
+		return nil
+	end
+	local profile = DataService.Get(player)
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not profile or not hrp then
+		return nil
+	end
+	-- the loot lands a few studs from where the enemy died
+	if (hrp.Position - loot.pos).Magnitude > (Config.Loot.pickupCheck or 40) then
+		return nil
+	end
+	list[id] = nil
+	if loot.kind == "shards" then
+		profile.riftShards = (profile.riftShards or 0) + (loot.amount or 1)
+	elseif loot.kind == "potion" then
+		profile.potions[loot.key] = (profile.potions[loot.key] or 0) + 1
+	end
+	return loot
+end
+
+--------------------------------------------------------------------
 -- rewards
 --------------------------------------------------------------------
 local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
@@ -513,35 +552,23 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 		if rng:NextNumber() < Config.GetUpgradeBonus(profile.upgrades, "shardSurge") / 100 then
 			n *= 2
 		end
-		profile.riftShards = (profile.riftShards or 0) + n
 		table.insert(drops, { kind = "shards", amount = n })
 	end
 	if rng:NextNumber() < C.potionChance * bonus * potionChanceBonus then
 		local key = weightedPick(C.potionWeights)
-		profile.potions[key] = (profile.potions[key] or 0) + 1
 		table.insert(drops, { kind = "potion", key = key })
 	end
-	if rng:NextNumber() < C.warpRemoteChance * bonus then
-		profile.items.warpRemote = (profile.items.warpRemote or 0) + 1
-		table.insert(drops, { kind = "item", key = "warpRemote" })
-	end
-	-- Gift Card: very rare, only for Rebirth 3+
-	if (profile.rebirths or 0) >= (C.giftCardMinRebirth or 3) and rng:NextNumber() < C.giftCardChance * bonus then
-		profile.items.giftCard = (profile.items.giftCard or 0) + 1
-		table.insert(drops, { kind = "item", key = "giftCard" })
-	end
+	-- (Warp Remote / Gift Card: bought in the Gear Shop now, not dropped)
 	-- Soul Harvest skill: chance every drop comes twice
 	if #drops > 0 and rng:NextNumber() * 100 < Config.Skill(profile, "doubleLoot") then
 		for _, dr in ipairs(table.clone(drops)) do
-			if dr.kind == "shards" then
-				profile.riftShards += dr.amount
-			elseif dr.kind == "potion" then
-				profile.potions[dr.key] = (profile.potions[dr.key] or 0) + 1
-			elseif dr.kind == "item" then
-				profile.items[dr.key] = (profile.items[dr.key] or 0) + 1
-			end
-			table.insert(drops, dr)
+			table.insert(drops, table.clone(dr))
 		end
+	end
+	-- the drops fly out onto the ground; they're only given when the
+	-- player walks over to them (PickupLoot)
+	for _, dr in ipairs(drops) do
+		addLoot(player, dr, pos)
 	end
 	profile.enemyKills[e.monsterId] = (profile.enemyKills[e.monsterId] or 0) + 1
 	require(script.Parent:WaitForChild("QuestService")).Add(profile, "kills", 1)
@@ -959,6 +986,36 @@ function EnemyService.Start(d)
 	-- Attack menu: tap an enemy, then send ALL your pets, ONE pet, or call
 	-- them back. mode = "all" | "one" (uid) | "stop" (this enemy) | "recall"
 	local remotes = ReplicatedStorage:WaitForChild("MonsterRNG"):WaitForChild("Remotes")
+	local pickupRemote = remotes:FindFirstChild("PickupLoot") or Instance.new("RemoteEvent")
+	pickupRemote.Name = "PickupLoot"
+	pickupRemote.Parent = remotes
+	local pendingSync = {}
+	pickupRemote.OnServerEvent:Connect(function(player, id)
+		if pickupLoot(player, id) and not pendingSync[player] then
+			-- several pickups at once: one profile update
+			pendingSync[player] = true
+			task.delay(0.25, function()
+				pendingSync[player] = nil
+				if player.Parent then
+					deps.sync(player)
+				end
+			end)
+		end
+	end)
+	-- old loot nobody picked up is gone
+	task.spawn(function()
+		while true do
+			task.wait(10)
+			local now = os.clock()
+			for player, list in pairs(lootByPlayer) do
+				for id, loot in pairs(list) do
+					if now - loot.at > (Config.Loot.lifetime or 90) + 5 then
+						list[id] = nil
+					end
+				end
+			end
+		end
+	end)
 	local attackRemote = remotes:FindFirstChild("AttackEnemy") or Instance.new("RemoteFunction")
 	attackRemote.Name = "AttackEnemy"
 	attackRemote.Parent = remotes
@@ -1046,6 +1103,7 @@ function EnemyService.Start(d)
 	end
 
 	Players.PlayerRemoving:Connect(function(player)
+		lootByPlayer[player] = nil
 		attackOrders[player] = nil
 		lastOrderAt[player] = nil
 		for _, e in ipairs(enemies) do

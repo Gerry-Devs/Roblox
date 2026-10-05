@@ -18,6 +18,7 @@ local GROUND_Y = 1
 local deps
 local folder
 local enemies = {}
+local onBossDown -- (world bosses, below)
 local onHitSkills -- (defined below, used in the combat tick)
 local enemyById = {} -- EnemyId attribute -> enemy (players pick enemies by this id)
 local nextEnemyId = 0
@@ -159,19 +160,30 @@ end
 -- enemy model: ball body (like the pets) with angry eyes, brows,
 -- feet and horns (level 11+). Animated on each client.
 --------------------------------------------------------------------
-local function createEnemy(biome, def)
-	local monsterId = def.monsters[rng:NextInteger(1, #def.monsters)]
+-- opts (world bosses / their helpers): { boss = def, monsterId, level,
+-- pos, finish = key }
+local function createEnemy(biome, def, opts)
+	opts = opts or {}
+	local boss = opts.boss
+	local monsterId = opts.monsterId or def.monsters[rng:NextInteger(1, #def.monsters)]
 	local monster = Config.GetMonster(monsterId)
 	local rarity = Config.GetRarity(monster.rarity)
-	local level = rng:NextInteger(def.min, def.max)
-	local size = rollFrom(Config.EnemySizes)
-	local finish = rollFrom(Config.EnemyFinishes)
+	local level = opts.level or rng:NextInteger(def.min, def.max)
+	local size = (not boss) and rollFrom(Config.EnemySizes) or nil
+	local finish = (not boss) and rollFrom(Config.EnemyFinishes) or nil
+	if boss and opts.finish then
+		finish = { key = opts.finish, mult = 1 }
+	end
 	local mult = (size and size.mult or 1) * (finish and finish.mult or 1)
 	local baseHp, baseDmg = Config.BaseCombatStats(level)
 	local C = Config.Combat
 	local levelBoost = 1 + (C.enemyLevelScaling or 0) * (level - 1)
 	local maxHp = math.floor(baseHp * rng:NextNumber(C.enemyHealthMin, C.enemyHealthMax) * mult * levelBoost)
 	local dmg = math.max(1, math.floor(baseDmg * C.enemyDamage * mult * (1 + (levelBoost - 1) * 0.5) + 0.5))
+	if boss then
+		maxHp = math.floor(maxHp * Config.WorldBosses.hpMult)
+		dmg = math.floor(dmg * Config.WorldBosses.dmgMult)
+	end
 
 	local color, material = rgb(rarity.color), Enum.Material.SmoothPlastic
 	if finish and finish.key == "Gold" then
@@ -181,9 +193,9 @@ local function createEnemy(biome, def)
 	elseif finish and finish.key == "Rainbow" then
 		color, material = Color3.fromHSV(rng:NextNumber(), 0.8, 1), Enum.Material.Neon
 	end
-	local s = 4 * (size and size.scale or 1) * (1 + (rarity.tier - 1) * 0.06)
-	local name = (size and (size.key .. " ") or "") .. (finish and (finish.key .. " ") or "") .. monster.name
-	local pos = randomPoint(biome, s * 0.5 + 2)
+	local s = boss and Config.WorldBosses.size or 4 * (size and size.scale or 1) * (1 + (rarity.tier - 1) * 0.06)
+	local name = boss and boss.name:upper() or ((size and (size.key .. " ") or "") .. (finish and (finish.key .. " ") or "") .. monster.name)
+	local pos = opts.pos or randomPoint(biome, s * 0.5 + 2)
 	local y = GROUND_Y + s * 0.68
 
 	local model = Instance.new("Model")
@@ -205,19 +217,22 @@ local function createEnemy(biome, def)
 	-- name + health bar
 	local bb = Instance.new("BillboardGui")
 	bb.Name = "EnemyBar"
-	bb.Size = UDim2.fromOffset(80, 22)
+	bb.Size = boss and UDim2.fromOffset(240, 46) or UDim2.fromOffset(80, 22)
 	bb.StudsOffset = Vector3.new(0, s * 1.35 + 1, 0) -- above the model's head
-	bb.MaxDistance = 90
+	bb.MaxDistance = boss and 400 or 90
 	bb.LightInfluence = 0
 	bb.Parent = root
 	local label = Instance.new("TextLabel")
 	label.Name = "NameLabel"
 	label.Size = UDim2.fromScale(1, 0.52)
 	label.BackgroundTransparency = 1
-	label.Text = "Lv " .. level .. " " .. name
+	label.Text = boss and ("\u{1F451} " .. name .. "  Lv " .. level) or ("Lv " .. level .. " " .. name)
+	if boss then
+		label.TextColor3 = rgb(boss.color)
+	end
 	label.TextScaled = true
 	label.Font = Enum.Font.LuckiestGuy
-	label.TextColor3 = finish and color or Color3.new(1, 1, 1)
+	label.TextColor3 = boss and rgb(boss.color) or (finish and color or Color3.new(1, 1, 1))
 	label.TextStrokeTransparency = 0
 	label.TextStrokeColor3 = Color3.fromRGB(10, 15, 35)
 	label.Parent = bb
@@ -249,6 +264,9 @@ local function createEnemy(biome, def)
 	model:SetAttribute("Hits", 0)
 	model:SetAttribute("Attacks", 0)
 	model:SetAttribute("Moving", false)
+	if boss then
+		model:SetAttribute("Boss", boss.name)
+	end
 	nextEnemyId += 1
 	model:SetAttribute("EnemyId", nextEnemyId)
 	model.PrimaryPart = root
@@ -261,7 +279,8 @@ local function createEnemy(biome, def)
 		model = model, root = root, biome = biome, def = def, monsterId = monsterId, name = name,
 		level = level, hp = maxHp, maxHp = maxHp, dmg = dmg, mult = mult, size = s, y = y,
 		home = pos, wanderTarget = pos, nextWander = 0, nextAttack = 0, lastHitAt = 0,
-		speed = size and size.key == "Titanic" and 5 or 7, damageBy = {}, dead = false,
+		speed = boss and 6 or (size and size.key == "Titanic" and 5 or 7), damageBy = {}, dead = false,
+		boss = boss,
 	}
 end
 
@@ -445,7 +464,7 @@ local function moveEnemy(e, dt, now)
 	end
 	if not target then
 		-- out of the fight for a while: heal back up
-		if now - e.lastHitAt > 8 and e.hp < e.maxHp then
+		if not e.boss and now - e.lastHitAt > 8 and e.hp < e.maxHp then
 			e.hp = e.maxHp
 			e.damageBy = {}
 			e.model:SetAttribute("Health", e.maxHp)
@@ -507,6 +526,8 @@ local function pickupLoot(player, id)
 		profile.riftShards = (profile.riftShards or 0) + (loot.amount or 1)
 	elseif loot.kind == "potion" then
 		profile.potions[loot.key] = (profile.potions[loot.key] or 0) + 1
+	elseif loot.kind == "item" and type(loot.key) == "string" and Config.Items[loot.key] then
+		profile.items[loot.key] = (profile.items[loot.key] or 0) + 1
 	end
 	return loot
 end
@@ -563,6 +584,17 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 		table.insert(drops, { kind = "potion", key = key })
 	end
 	-- (Warp Remote / Gift Card: bought in the Gear Shop now, not dropped)
+	-- world boss: lots of shards, potions, and maybe a Fusion Ticket
+	if e.boss then
+		local n = math.floor((1 + math.floor(e.level / 5)) * 25 * shardAmountBonus + 0.5)
+		table.insert(drops, { kind = "shards", amount = n })
+		for _ = 1, 3 do
+			table.insert(drops, { kind = "potion", key = weightedPick(C.potionWeights) })
+		end
+		if rng:NextNumber() < Config.WorldBosses.fusionTicketChance then
+			table.insert(drops, { kind = "item", key = "fusionTicket" })
+		end
+	end
 	-- Soul Harvest skill: chance every drop comes twice
 	if #drops > 0 and rng:NextNumber() * 100 < Config.Skill(profile, "doubleLoot") then
 		for _, dr in ipairs(table.clone(drops)) do
@@ -602,6 +634,16 @@ local function killEnemy(e)
 	task.delay(0.7, function()
 		e.model:Destroy()
 	end)
+	if e.boss or e.minion then
+		local idx = table.find(enemies, e)
+		if idx then
+			table.remove(enemies, idx)
+		end
+		if e.boss and onBossDown then
+			onBossDown(e, true)
+		end
+		return
+	end
 	task.delay(Config.Combat.respawnTime, function()
 		local idx = table.find(enemies, e)
 		if idx then
@@ -893,12 +935,280 @@ local function combatTick(now)
 	end
 end
 
+--------------------------------------------------------------------
+-- World bosses (Config.WorldBosses): each server rolls its own boss
+-- right after night. Specials hit every pet near the boss.
+--------------------------------------------------------------------
+local bossRemote -- RemoteEvent "WorldBoss" (announcements + attack effects)
+local currentBoss
+
+-- a boss special hits one pet (same rules as a normal enemy hit)
+local function bossHitPet(e, player, profile, entry, amount, now)
+	local st = petHealth[entry.uid]
+	if not st or entry.defeated or dyingPets[entry.uid] then
+		return
+	end
+	local hit = amount * (1 - Config.Skill(profile, "armor") / 100)
+	if rng:NextNumber() * 100 < Config.Skill(profile, "block") then
+		hit = 0
+	end
+	st.hp -= hit
+	st.lastHit = now
+	if st.hp <= 0 and rng:NextNumber() * 100 < Config.Skill(profile, "revive") then
+		st.hp = st.max * 0.5
+	end
+	if st.hp <= 0 then
+		petHealth[entry.uid] = nil
+		dyingPets[entry.uid] = true
+		local pen = WorldService.GetPen(player)
+		local petModel = pen and pen.pets:FindFirstChild(entry.uid)
+		if petModel then
+			petModel:SetAttribute("Health", 0)
+			petModel:SetAttribute("Dying", true)
+		end
+		task.delay(2, function()
+			dyingPets[entry.uid] = nil
+			entry.defeated = true
+			entry.defeatedAt = os.time()
+			WorldService.UpdateBase(player, profile)
+			deps.sync(player)
+		end)
+		local monster = Config.GetMonster(entry.monsterId)
+		deps.fx:FireClient(player, { kind = "defeated", name = Config.BuildDisplayName(monster and monster.name or "Pet", entry.size, entry.finish), recoverIn = Config.GetReviveTime(entry.level) })
+	end
+end
+
+-- every pet (of any player) within radius of the boss
+local function petsNear(e, radius)
+	local out = {}
+	for _, player in ipairs(Players:GetPlayers()) do
+		local profile = DataService.Get(player)
+		local pen = WorldService.GetPen(player)
+		if profile and pen and not pen.state.nearby then
+			for _, entry in ipairs(profile.base) do
+				if entry.kind == "monster" and not entry.defeated then
+					local model = pen.pets:FindFirstChild(entry.uid)
+					local body = model and model:FindFirstChild("MonsterBody")
+					if body and flatDistance(body.Position, e.root.Position) <= radius then
+						table.insert(out, { player = player, profile = profile, entry = entry })
+					end
+				end
+			end
+		end
+	end
+	return out
+end
+
+-- attack effects for everyone in the boss's biome
+local function bossFx(e, data)
+	data.position = e.root.Position
+	data.boss = e.boss.name
+	data.color = e.boss.color
+	for _, player in ipairs(Players:GetPlayers()) do
+		if playerInBiome(player, e.biome) then
+			bossRemote:FireClient(player, data)
+		end
+	end
+end
+
+local function bossSpecials(e, now)
+	if e.dead or not e.boss then
+		return
+	end
+	local W = Config.WorldBosses
+	-- the ultimate: warned 2 s before, then a big critical hit around it
+	if now >= (e.nextUltimate or 0) and e.engaged then
+		e.nextUltimate = now + W.ultimateEvery
+		e.nextSpecial = now + W.attackEvery
+		local radius = e.size * 2.5
+		bossFx(e, { kind = "warn", name = e.boss.ultimate, radius = radius, time = 2 })
+		task.delay(2, function()
+			if e.dead then
+				return
+			end
+			e.model:SetAttribute("Attacks", (e.model:GetAttribute("Attacks") or 0) + 1)
+			e.model:SetAttribute("CritAt", workspace:GetServerTimeNow())
+			bossFx(e, { kind = "ultimate", name = e.boss.ultimate, radius = radius })
+			for _, t in ipairs(petsNear(e, radius)) do
+				bossHitPet(e, t.player, t.profile, t.entry, e.dmg * 4, os.clock())
+			end
+		end)
+		return
+	end
+	if now < (e.nextSpecial or 0) or not e.engaged then
+		return
+	end
+	e.nextSpecial = now + W.attackEvery
+	e.special = ((e.special or 0) % 3) + 1
+	e.model:SetAttribute("Attacks", (e.model:GetAttribute("Attacks") or 0) + 1)
+	if e.special == 1 then
+		-- slam: every pet near it
+		local radius = e.size * 1.6
+		bossFx(e, { kind = "slam", name = e.boss.slam, radius = radius })
+		for _, t in ipairs(petsNear(e, radius)) do
+			bossHitPet(e, t.player, t.profile, t.entry, e.dmg * 1.5, now)
+		end
+	elseif e.special == 2 then
+		-- beam: the pet it's fighting, hard
+		local player = e.engaged
+		local profile = player and DataService.Get(player)
+		local victim
+		for _, entry in ipairs(profile and profile.base or {}) do
+			if entry.uid == e.targetPet then
+				victim = entry
+			end
+		end
+		if victim then
+			local pen = WorldService.GetPen(player)
+			local model = pen and pen.pets:FindFirstChild(victim.uid)
+			local body = model and model:FindFirstChild("MonsterBody")
+			bossFx(e, { kind = "beam", name = e.boss.beam, target = body and body.Position })
+			bossHitPet(e, player, profile, victim, e.dmg * 3, now)
+		end
+	else
+		-- summon: up to 3 helpers around it (they don't come back when beaten)
+		bossFx(e, { kind = "summon", name = e.boss.summon })
+		local def = Config.EnemySpawns[e.biome.key]
+		local alive = 0
+		for _, m in ipairs(enemies) do
+			if m.minion and m.bossOf == e and not m.dead then
+				alive += 1
+			end
+		end
+		for _ = 1, math.max(0, 3 - alive) do
+			local a = rng:NextNumber(0, math.pi * 2)
+			local at = clampToBiome(e.biome, e.root.Position + Vector3.new(math.cos(a) * 12, 0, math.sin(a) * 12))
+			local m = createEnemy(e.biome, def, { level = def.max, pos = Vector3.new(at.X, 0, at.Z) })
+			m.minion = true
+			m.bossOf = e
+			enemyById[m.id] = m
+			table.insert(enemies, m)
+		end
+	end
+end
+
+local function removeBoss(e, beaten)
+	if not e or e.removed then
+		return
+	end
+	e.removed = true
+	if not e.dead then
+		-- it leaves (time's up)
+		e.dead = true
+		enemyById[e.id] = nil
+		e.model:SetAttribute("Dead", true)
+		task.delay(0.7, function()
+			e.model:Destroy()
+		end)
+		local idx = table.find(enemies, e)
+		if idx then
+			table.remove(enemies, idx)
+		end
+	end
+	-- its helpers go too
+	for i = #enemies, 1, -1 do
+		local m = enemies[i]
+		if m.minion and m.bossOf == e then
+			m.dead = true
+			enemyById[m.id] = nil
+			if m.model.Parent then
+				m.model:Destroy()
+			end
+			table.remove(enemies, i)
+		end
+	end
+	if currentBoss == e then
+		currentBoss = nil
+	end
+	if bossRemote then
+		bossRemote:FireAllClients({ kind = beaten and "defeated" or "left", boss = e.boss.name, biome = e.biome.name, color = e.boss.color })
+	end
+end
+onBossDown = function(e, beaten)
+	removeBoss(e, beaten)
+end
+
+-- spawn this server's boss (biomeKey = nil: its own weighted roll)
+function EnemyService.SpawnBoss(biomeKey)
+	if currentBoss and not currentBoss.dead then
+		return currentBoss
+	end
+	local W = Config.WorldBosses
+	if not biomeKey then
+		local total = 0
+		for _, b in pairs(W.list) do
+			total += b.weight
+		end
+		local pick = rng:NextNumber() * total
+		for key, b in pairs(W.list) do
+			pick -= b.weight
+			biomeKey = key
+			if pick <= 0 then
+				break
+			end
+		end
+	end
+	local bossDef = W.list[biomeKey]
+	local def = Config.EnemySpawns[biomeKey]
+	local biome
+	for _, b in ipairs(Config.Biomes) do
+		if b.key == biomeKey then
+			biome = b
+		end
+	end
+	if not bossDef or not def or not biome then
+		return nil
+	end
+	local e = createEnemy(biome, def, { boss = bossDef, monsterId = bossDef.rig, level = def.max + 5, finish = bossDef.finish, pos = randomPoint(biome, W.size * 0.5 + 4) })
+	e.expires = os.clock() + W.lifetime
+	e.nextSpecial = os.clock() + W.attackEvery
+	e.nextUltimate = os.clock() + W.ultimateEvery
+	enemyById[e.id] = e
+	table.insert(enemies, e)
+	currentBoss = e
+	if bossRemote then
+		bossRemote:FireAllClients({ kind = "spawn", boss = bossDef.name, biome = biome.name, color = bossDef.color, minutes = math.floor(W.lifetime / 60) })
+	end
+	return e
+end
+
 function EnemyService.ResetPet(uid)
 	petHealth[uid] = nil
 end
 
 function EnemyService.Start(d)
 	deps = d
+	do
+		local r = ReplicatedStorage:WaitForChild("MonsterRNG"):WaitForChild("Remotes")
+		bossRemote = r:FindFirstChild("WorldBoss") or Instance.new("RemoteEvent")
+		bossRemote.Name = "WorldBoss"
+		bossRemote.Parent = r
+	end
+	-- world boss schedule (this server's own): right after night, every hour
+	task.spawn(function()
+		local W = Config.WorldBosses
+		local lastHour = -1
+		if RunService:IsStudio() then
+			-- Studio: one right away, to test
+			task.delay(20, function()
+				EnemyService.SpawnBoss()
+			end)
+		end
+		while true do
+			task.wait(2)
+			local t = os.time()
+			local hour = math.floor(t / 3600)
+			if hour ~= lastHour and t - hour * 3600 >= W.spawnAt then
+				lastHour = hour
+				if not (currentBoss and not currentBoss.dead) then
+					pcall(EnemyService.SpawnBoss)
+				end
+			end
+			if currentBoss and not currentBoss.dead and os.clock() > (currentBoss.expires or math.huge) then
+				removeBoss(currentBoss, false)
+			end
+		end
+	end)
 	folder = Workspace:FindFirstChild("Enemies")
 	if folder then
 		folder:ClearAllChildren()
@@ -952,6 +1262,9 @@ function EnemyService.Start(d)
 		if combatAcc >= 0.2 then
 			combatAcc = 0
 			combatTick(now)
+			if currentBoss then
+				pcall(bossSpecials, currentBoss, now)
+			end
 		end
 	end)
 

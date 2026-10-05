@@ -228,9 +228,37 @@ local function buildPotion(key)
 	return model
 end
 
+-- Fusion Ticket: a golden ticket with a purple stripe
+local function buildTicket()
+	local model, root = newModel("TicketLoot")
+	local gold = C3(255, 205, 60)
+	part(model, "Ticket", Enum.PartType.Block, V(2.2, 1.3, 0.12), CF() * CFrame.Angles(0, 0, R(-12)), gold)
+	part(model, "Stripe", Enum.PartType.Block, V(0.5, 1.32, 0.14), CF(0.55, 0.1, 0) * CFrame.Angles(0, 0, R(-12)), C3(170, 100, 255))
+	local sign = part(model, "Sign", Enum.PartType.Block, V(1.2, 0.9, 0.02), CF(-0.35, -0.05, -0.08) * CFrame.Angles(0, 0, R(-12)), Color3.new(1, 1, 1), nil, 1)
+	local sg = Instance.new("SurfaceGui")
+	sg.Face = Enum.NormalId.Front
+	sg.LightInfluence = 0
+	sg.PixelsPerStud = 100
+	sg.Parent = sign
+	local t = Instance.new("TextLabel")
+	t.Size = UDim2.fromScale(1, 1)
+	t.BackgroundTransparency = 1
+	t.Text = "FUSE"
+	t.TextScaled = true
+	t.Font = Enum.Font.LuckiestGuy
+	t.TextColor3 = C3(120, 60, 200)
+	t.Parent = sg
+	glow(root, C3(200, 140, 255), 7)
+	sparkles(root, C3(230, 190, 255), 5)
+	return model
+end
+
 function LootModel.Build(kind, key)
 	if kind == "shards" then
 		return buildShard()
+	end
+	if kind == "item" then
+		return buildTicket()
 	end
 	return buildPotion(key)
 end

@@ -55,6 +55,10 @@ local function lootText(d)
 	if d.kind == "shards" then
 		return "+" .. (d.amount or 1) .. " Rift Shard" .. ((d.amount or 1) == 1 and "" or "s"), Color3.fromRGB(150, 190, 255), Config.RiftShardImage
 	end
+	if d.kind == "item" then
+		local it = Config.Items[d.key]
+		return "+1 " .. (it and it.name or "Item"), Color3.fromRGB(230, 190, 255), it and it.imageId
+	end
 	local p = Config.GetPotion(d.key)
 	return "+1 " .. (p and p.name or "Potion"), Color3.fromRGB(255, 215, 90), p and p.imageId
 end

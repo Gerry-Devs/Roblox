@@ -1647,6 +1647,35 @@ Config.EnemySpawns = {
 	atlantis = { min = 26, max = 30, count = 18, monsters = { "leviathan", "crab", "void-dragon" } },
 }
 
+--------------------------------------------------------------------
+-- World bosses: right after night ends (minute 3 of every hour) each
+-- server picks ITS OWN boss (its own random roll): one boss, in one
+-- biome; harder biomes are rarer. Everyone can hit it and everyone who
+-- did gets loot. It leaves after 10 minutes if nobody beats it.
+-- rig = which monster model it uses for now (swap for your own later)
+-- attacks: slam (hits every pet near it), beam (one pet, hard),
+-- summon (3 helpers), and an ULTIMATE every 30 s (warned 2 s before;
+-- a big critical hit on every pet near it)
+--------------------------------------------------------------------
+Config.WorldBosses = {
+	lifetime = 600,
+	spawnAt = 180, -- seconds into the hour (night ends at 180)
+	hpMult = 60, -- x a normal enemy of its level
+	dmgMult = 3,
+	size = 14,
+	attackEvery = 6,
+	ultimateEvery = 30,
+	fusionTicketChance = 0.3,
+	list = {
+		forest = { name = "Treant", rig = "gaia-colossus", finish = nil, weight = 30, color = { 90, 200, 90 }, slam = "Root Slam", beam = "Thorn Shot", summon = "Sapling Call", ultimate = "Forest Wrath" },
+		desert = { name = "Pharaoh", rig = "hollow-king", finish = "Gold", weight = 22, color = { 255, 205, 60 }, slam = "Sand Slam", beam = "Curse Beam", summon = "Mummy Rise", ultimate = "Sandstorm" },
+		volcanic = { name = "Lava Hound", rig = "flame-fox", finish = nil, weight = 17, color = { 255, 110, 40 }, slam = "Magma Stomp", beam = "Fire Breath", summon = "Ember Pups", ultimate = "Eruption" },
+		tundra = { name = "Frost Titan", rig = "frost-yeti", finish = "Diamond", weight = 13, color = { 150, 225, 255 }, slam = "Ice Quake", beam = "Frost Beam", summon = "Snow Golems", ultimate = "Blizzard" },
+		candy = { name = "Candy King", rig = "candy-puff", finish = "Rainbow", weight = 10, color = { 255, 140, 220 }, slam = "Sugar Crash", beam = "Lollipop Zap", summon = "Gummy Guards", ultimate = "Sugar Rush" },
+		atlantis = { name = "Mermaid Queen", rig = "leviathan", finish = nil, weight = 8, color = { 90, 200, 255 }, slam = "Tidal Slam", beam = "Trident Beam", summon = "Sea Guards", ultimate = "Tsunami" },
+	},
+}
+
 function Config.GetReviveTime(level)
 	local C = Config.Combat
 	return math.min(C.reviveMax, C.reviveBase + C.revivePerLevel * math.max(1, level or 1))

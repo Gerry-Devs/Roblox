@@ -315,10 +315,19 @@ local indexPanel = panels:WaitForChild("IndexPanel")
 local indexBody = indexPanel.Body
 local indexTab = "pets"
 local indexRarity = "all" -- rarity filter ("all" or a rarity key)
+local indexVariant = "any" -- "any", "Normal", a size or a finish (pets only)
+local SIZE_KEYS, FINISH_KEYS = {}, {}
+for _, v in ipairs(Config.SizeVariants) do
+	SIZE_KEYS[v.key] = true
+end
+for _, v in ipairs(Config.FinishVariants) do
+	FINISH_KEYS[v.key] = true
+end
 
 -- left column (like the Backpack): PETS / ENEMIES, then a rarity filter
 local SIDE_W = 140
 local rarityTabs = {}
+local variantTabs = {}
 local filterTitle
 do
 	local ok, err = pcall(function()
@@ -404,6 +413,61 @@ do
 			bounce(b)
 			b.Activated:Connect(function()
 				indexRarity = e.key
+				refreshers.IndexPanel()
+			end)
+		end
+		-- VARIANT: which pets you got as Normal / each size / each finish
+		local vhead = Instance.new("TextLabel")
+		vhead.Name = "VariantHeader"
+		vhead.LayoutOrder = #entries + 1
+		vhead.Size = UDim2.new(1, 0, 0, 22)
+		vhead.BackgroundTransparency = 1
+		vhead.Text = "VARIANT"
+		vhead.Font = Enum.Font.LuckiestGuy
+		vhead.TextScaled = true
+		vhead.TextXAlignment = Enum.TextXAlignment.Left
+		vhead.TextColor3 = GOLD
+		vhead.TextStrokeTransparency = 0
+		vhead.Parent = list
+		local variants = { { key = "any", name = "Any", color = Color3.fromRGB(255, 205, 60) }, { key = "Normal", name = "Normal", color = Color3.fromRGB(220, 225, 235) } }
+		local VCOL = {
+			Big = Color3.fromRGB(150, 220, 255), Huge = Color3.fromRGB(190, 150, 255), Titan = Color3.fromRGB(255, 170, 60), Gigantic = Color3.fromRGB(255, 90, 90),
+			Gold = Color3.fromRGB(255, 205, 60), Silver = Color3.fromRGB(215, 225, 240), Diamond = Color3.fromRGB(150, 230, 255), Rainbow = Color3.fromRGB(255, 130, 220), Galaxy = Color3.fromRGB(170, 110, 255),
+		}
+		for _, list2 in ipairs({ Config.SizeVariants, Config.FinishVariants }) do
+			for _, v in ipairs(list2) do
+				if v.key ~= "Normal" then
+					table.insert(variants, { key = v.key, name = v.key, color = VCOL[v.key] or Color3.new(1, 1, 1) })
+				end
+			end
+		end
+		for i, e in ipairs(variants) do
+			local b = Instance.new("TextButton")
+			b.Name = "Variant_" .. e.key
+			b.LayoutOrder = #entries + 1 + i
+			b.Size = UDim2.new(1, 0, 0, 32)
+			b.Text = ""
+			b.AutoButtonColor = false
+			b:SetAttribute("NoStuds", true)
+			b.Parent = list
+			local lbl = Instance.new("TextLabel")
+			lbl.Name = "Label"
+			lbl.Size = UDim2.new(1, -30, 0.62, 0)
+			lbl.AnchorPoint = Vector2.new(0, 0.5)
+			lbl.Position = UDim2.new(0, 22, 0.5, 0)
+			lbl.BackgroundTransparency = 1
+			lbl.Text = e.name:upper()
+			lbl.Font = Enum.Font.LuckiestGuy
+			lbl.TextScaled = true
+			lbl.TextXAlignment = Enum.TextXAlignment.Left
+			lbl.TextColor3 = e.color
+			lbl.TextStrokeTransparency = 0
+			lbl.ZIndex = b.ZIndex + 2
+			lbl.Parent = b
+			variantTabs[e.key] = { button = b, color = e.color }
+			bounce(b)
+			b.Activated:Connect(function()
+				indexVariant = e.key
 				refreshers.IndexPanel()
 			end)
 		end
@@ -611,6 +675,17 @@ refreshers.IndexPanel = function()
 	for key, t in pairs(rarityTabs) do
 		styled("sideTab", t.button, key == indexRarity, t.color)
 	end
+	for key, t in pairs(variantTabs) do
+		styled("sideTab", t.button, key == indexVariant, t.color)
+		t.button.Visible = indexTab == "pets" -- enemies have no variants
+	end
+	local variantHeader = indexBody.Tabs:FindFirstChild("RarityList") and indexBody.Tabs.RarityList:FindFirstChild("VariantHeader")
+	if variantHeader then
+		variantHeader.Visible = indexTab == "pets"
+	end
+	local variant = indexTab == "pets" and indexVariant ~= "any" and indexVariant or nil
+	local vSize = variant and (variant == "Normal" or SIZE_KEYS[variant]) and variant or "Normal"
+	local vFinish = variant and (variant == "Normal" or (FINISH_KEYS[variant] and not SIZE_KEYS[variant])) and variant or "Normal"
 
 	local list = table.clone(Config.Monsters)
 	table.sort(list, function(a, b)
@@ -631,7 +706,7 @@ refreshers.IndexPanel = function()
 	end
 	if filterTitle then
 		local r = indexRarity ~= "all" and Config.GetRarity(indexRarity)
-		filterTitle.Text = (r and r.name:upper() or "ALL") .. (indexTab == "pets" and " PETS" or " ENEMIES")
+		filterTitle.Text = (r and r.name:upper() or "ALL") .. (variant and (" " .. variant:upper()) or "") .. (indexTab == "pets" and " PETS" or " ENEMIES")
 		filterTitle.TextColor3 = r and Color3.fromRGB(r.color[1], r.color[2], r.color[3]) or GOLD
 	end
 	local found = 0
@@ -643,6 +718,19 @@ refreshers.IndexPanel = function()
 			count = profile and profile.enemyKills and profile.enemyKills[monster.id]
 		end
 		local discovered = count ~= nil
+		local knownMonster = discovered -- you have the monster (maybe not this variant)
+		-- a variant filter: found = you got this monster as that size / finish
+		if variant and discovered then
+			local rec = profile and profile.indexStats and profile.indexStats[monster.id]
+			if variant == "Normal" then
+				discovered = rec ~= nil and rec.sizes and rec.sizes.Normal == true and rec.finishes and rec.finishes.Normal == true
+			elseif SIZE_KEYS[variant] then
+				discovered = rec ~= nil and rec.sizes and rec.sizes[variant] == true
+			else
+				discovered = rec ~= nil and rec.finishes and rec.finishes[variant] == true
+			end
+			discovered = discovered == true
+		end
 		if discovered then
 			found += 1
 		end
@@ -659,10 +747,11 @@ refreshers.IndexPanel = function()
 		card.Fallback.Visible = icon == ""
 		card.Fallback.BackgroundColor3 = discovered and color:Lerp(Color3.new(0, 0, 0), 0.35) or Color3.fromRGB(30, 34, 52)
 		card.Fallback.Letter.Text = discovered and string.sub(monster.name, 1, 1) or "?"
-		card.ItemName.Text = discovered and monster.name or "???"
+		card.ItemName.Text = discovered and (variant and Config.BuildDisplayName(monster.name, vSize, vFinish) or monster.name)
+			or (knownMonster and monster.name or "???")
 		if discovered then
 			-- pets you found: the monster's odds (the card color is its rarity)
-			card.Info.Text = indexTab == "pets" and Config.FormatOdds(Config.GetOdds(monster.id, "Normal", "Normal")) or ("Defeated " .. Config.FormatNumber(count))
+			card.Info.Text = indexTab == "pets" and Config.FormatOdds(Config.GetOdds(monster.id, vSize, vFinish)) or ("Defeated " .. Config.FormatNumber(count))
 			if indexTab == "pets" then
 				-- tap for the full info (sizes / finishes / biggest kg)
 				local hit = Instance.new("TextButton")
@@ -676,6 +765,10 @@ refreshers.IndexPanel = function()
 					showIndexInfo(monster)
 				end)
 			end
+		elseif knownMonster and variant then
+			-- you have it, but not as this variant yet: how rare that is
+			card.Info.Text = Config.FormatOdds(Config.GetOdds(monster.id, vSize, vFinish))
+			card.ItemName.TextTransparency = 0.35
 		else
 			card.Info.Text = rarity.name:upper()
 		end

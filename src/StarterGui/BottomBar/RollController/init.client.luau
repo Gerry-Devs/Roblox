@@ -750,6 +750,18 @@ local function makeCard(parent)
 	shine.BackgroundTransparency = 0.25
 	shine.Parent = egg
 	Instance.new("UICorner", shine).CornerRadius = UDim.new(0.5, 0)
+	-- glow ring behind the egg (Gold / Rainbow / ... eggs)
+	local aura = Instance.new("Frame")
+	aura.Name = "Aura"
+	aura.AnchorPoint = Vector2.new(0.5, 0.5)
+	aura.Position = UDim2.fromScale(0.5, 0.5)
+	aura.Size = UDim2.fromOffset(130, 130)
+	aura.BackgroundTransparency = 0.55
+	aura.Visible = false
+	aura.Parent = card
+	Instance.new("UICorner", aura).CornerRadius = UDim.new(0.5, 0)
+	local auraGrad = Instance.new("UIGradient")
+	auraGrad.Parent = aura
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
 	icon.Size = UDim2.fromOffset(120, 120)
@@ -758,6 +770,10 @@ local function makeCard(parent)
 	icon.BackgroundTransparency = 1
 	icon.ScaleType = Enum.ScaleType.Fit
 	icon.Parent = card
+	-- the finish colors the egg picture (off for Normal eggs)
+	local finishGrad = Instance.new("UIGradient")
+	finishGrad.Enabled = false
+	finishGrad.Parent = icon
 	local wildText = Instance.new("TextLabel")
 	wildText.Name = "Wild"
 	wildText.Size = UDim2.fromScale(0.9, 0.4)
@@ -796,7 +812,59 @@ local function makeCard(parent)
 	name.TextStrokeTransparency = 0
 	name.TextStrokeColor3 = OUTLINE
 	name.Parent = card
-	return { frame = card, scale = scale, egg = egg, icon = icon, wild = wildText, odds = odds, name = name, stroke = st }
+	return { frame = card, scale = scale, egg = egg, icon = icon, wild = wildText, odds = odds, name = name, stroke = st, aura = aura, auraGrad = auraGrad, finishGrad = finishGrad }
+end
+
+-- finish looks on the rolled egg: the picture's color (multiplied onto
+-- it) and the glow ring color. Rainbow / Galaxy turn all the time.
+local function CS(...)
+	local list, colors = {}, { ... }
+	for i, col in ipairs(colors) do
+		table.insert(list, ColorSequenceKeypoint.new((i - 1) / (#colors - 1), col))
+	end
+	return ColorSequence.new(list)
+end
+local FINISH_LOOKS = {
+	Gold = { tint = CS(Color3.fromRGB(255, 240, 150), Color3.fromRGB(255, 200, 60), Color3.fromRGB(255, 225, 110)), glow = Color3.fromRGB(255, 200, 50) },
+	Silver = { tint = CS(Color3.fromRGB(250, 252, 255), Color3.fromRGB(190, 200, 215), Color3.fromRGB(235, 240, 250)), glow = Color3.fromRGB(215, 225, 240) },
+	Diamond = { tint = CS(Color3.fromRGB(225, 250, 255), Color3.fromRGB(140, 220, 255), Color3.fromRGB(200, 245, 255)), glow = Color3.fromRGB(150, 230, 255) },
+	Rainbow = {
+		tint = CS(Color3.fromRGB(255, 120, 120), Color3.fromRGB(255, 230, 110), Color3.fromRGB(120, 255, 140), Color3.fromRGB(120, 200, 255), Color3.fromRGB(220, 130, 255)),
+		spin = 120,
+	},
+	Galaxy = { tint = CS(Color3.fromRGB(160, 110, 255), Color3.fromRGB(90, 120, 255), Color3.fromRGB(255, 120, 220)), spin = 40 },
+}
+local spinning = {} -- gradients that turn (Rainbow / Galaxy cards)
+RunService.RenderStepped:Connect(function(dt)
+	for g, speed in pairs(spinning) do
+		if g.Parent then
+			g.Rotation = (g.Rotation + speed * dt) % 360
+		else
+			spinning[g] = nil
+		end
+	end
+end)
+local function paintFinish(c, r)
+	local size = Config.GetSizeVariant(r.size or "Normal")
+	local s = 1 + ((size and size.scale or 1) - 1) * 0.47 -- Gigantic about 1.75x
+	c.icon.Size = UDim2.fromOffset(120 * s, 120 * s)
+	c.name.Position = UDim2.new(0.5, 0, 0.5, 68 + (s - 1) * 58)
+	c.odds.Position = UDim2.new(0.5, -6, 0.5, -64 - (s - 1) * 58)
+	local look = FINISH_LOOKS[r.finish or "Normal"]
+	c.finishGrad.Enabled = look ~= nil
+	c.aura.Visible = look ~= nil
+	spinning[c.finishGrad], spinning[c.auraGrad] = nil, nil
+	if look then
+		c.finishGrad.Color = look.tint
+		c.finishGrad.Rotation = 45
+		c.aura.Size = UDim2.fromOffset(132 * s, 132 * s)
+		c.aura.BackgroundColor3 = look.glow or Color3.new(1, 1, 1)
+		c.auraGrad.Color = look.glow and ColorSequence.new(Color3.new(1, 1, 1)) or look.tint
+		if look.spin then
+			spinning[c.finishGrad] = look.spin
+			spinning[c.auraGrad] = look.spin
+		end
+	end
 end
 
 local function paintCard(c, r)
@@ -804,6 +872,7 @@ local function paintCard(c, r)
 		return
 	end
 	c.shown = r
+	paintFinish(c, r)
 	local color = colorFromTable(r.color)
 	c.egg.BackgroundColor3 = color
 	local img = r.key ~= "WILD" and getEggImage(r) or ""
@@ -817,6 +886,7 @@ local function paintCard(c, r)
 end
 
 local function setCardFade(c, t)
+	c.aura.BackgroundTransparency = 0.55 + t * 0.45
 	c.egg.BackgroundTransparency = t
 	c.stroke.Transparency = t
 	c.icon.ImageTransparency = t
@@ -1154,6 +1224,7 @@ local function rollOnce(isRetry)
 		end
 		local d = table.clone(r)
 		d.eggName = Config.EggDisplayName(egg)
+		d.size, d.finish = egg.size, egg.finish
 		d.oddsLabel = Config.FormatOdds(Config.GetEggOdds(r.key, egg.size, egg.finish)):gsub("^1 in ", "1 / ")
 		return d
 	end

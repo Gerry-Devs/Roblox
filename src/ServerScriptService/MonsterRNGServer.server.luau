@@ -2229,6 +2229,15 @@ require(script:FindFirstChild("MonsterRNG") and script.MonsterRNG.PvpService or 
 	sync = sync,
 	getRemote = getRemote,
 })
+-- first-time tutorial: finished or skipped
+getRemote("TutorialDone", "RemoteEvent").OnServerEvent:Connect(function(player)
+	local profile = DataService.Get(player)
+	if profile and not profile.tutorialDone then
+		profile.tutorialDone = true
+		sync(player)
+	end
+end)
+
 -- Inspect: tap a player to see their rebirths, cash/s, Index, pen and
 -- their 6 best pets
 local inspectRemote = getRemote("InspectPlayer", "RemoteFunction")

@@ -163,6 +163,7 @@ local function newProfile()
 		autoSell = nil, -- Auto Sell settings (saved; always starts OFF on join)
 		pvp = { credits = 0, points = 0, season = "", wins = 0, losses = 0 }, -- PvP credits + this season's points
 		guildId = nil, -- the guild this player is in
+		tutorialDone = false, -- the first-time tutorial was finished / skipped
 		indexStats = {}, -- Index: per monster { maxKg, sizes = {Big = true}, finishes = {Gold = true} }
 		guildCredits = 0, -- paid guild creates not used yet (Robux never lost)
 		lastOnline = nil, -- when this save was last written (for offline earnings)
@@ -177,6 +178,7 @@ local function sanitize(data)
 	end
 
 	profile.owned = copyOwned(data.owned)
+	profile.tutorialDone = data.tutorialDone == true
 	-- Index records (sizes / finishes collected, biggest kg)
 	if type(data.indexStats) == "table" then
 		for id, st in pairs(data.indexStats) do
@@ -453,6 +455,7 @@ end
 function DataService.PublicProfile(profile)
 	return {
 		indexStats = profile.indexStats,
+		tutorialDone = profile.tutorialDone,
 		friendBonus = profile.friendBonus,
 		inGroup = profile.inGroup,
 		owned = copyOwned(profile.owned),

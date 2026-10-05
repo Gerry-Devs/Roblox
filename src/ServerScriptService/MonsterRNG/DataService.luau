@@ -181,7 +181,12 @@ local function sanitize(data)
 	if type(data.indexStats) == "table" then
 		for id, st in pairs(data.indexStats) do
 			if type(id) == "string" and type(st) == "table" then
-				local rec = { maxKg = tonumber(st.maxKg) or 0, sizes = {}, finishes = {} }
+				local rec = { maxKg = tonumber(st.maxKg) or 0, sizes = {}, finishes = {}, grades = {} }
+				for k, v in pairs(type(st.grades) == "table" and st.grades or {}) do
+					if type(k) == "string" and v == true then
+						rec.grades[k] = true
+					end
+				end
 				for k, v in pairs(type(st.sizes) == "table" and st.sizes or {}) do
 					if type(k) == "string" and v == true then
 						rec.sizes[k] = true
@@ -438,6 +443,8 @@ function DataService.RecordIndex(profile, entry)
 	profile.indexStats = profile.indexStats or {}
 	local rec = profile.indexStats[entry.monsterId] or { maxKg = 0, sizes = {}, finishes = {} }
 	profile.indexStats[entry.monsterId] = rec
+	rec.grades = rec.grades or {}
+	rec.grades[entry.grade or "E"] = true
 	rec.sizes[entry.size or "Normal"] = true
 	rec.finishes[entry.finish or "Normal"] = true
 	rec.maxKg = math.max(rec.maxKg or 0, tonumber(entry.kg) or 0)

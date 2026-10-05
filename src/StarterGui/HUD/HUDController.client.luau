@@ -558,7 +558,7 @@ local indexInfo = Instance.new("Frame")
 indexInfo.Name = "IndexInfo"
 indexInfo.AnchorPoint = Vector2.new(0.5, 0.5)
 indexInfo.Position = UDim2.fromScale(0.5, 0.52)
-indexInfo.Size = UDim2.fromOffset(330, 0)
+indexInfo.Size = UDim2.fromOffset(560, 0)
 indexInfo.AutomaticSize = Enum.AutomaticSize.Y
 indexInfo.BackgroundColor3 = Color3.fromRGB(24, 26, 36)
 indexInfo.Visible = false
@@ -614,7 +614,7 @@ indexPanel:GetPropertyChangedSignal("Visible"):Connect(function()
 		closeIndexInfo()
 	end
 end)
-local function infoText(order, text, size, color, font, align)
+local function infoText(order, text, size, color, font, align, parent)
 	local l = Instance.new("TextLabel")
 	l.LayoutOrder = order
 	l.Size = UDim2.new(1, 0, 0, size + 6)
@@ -627,17 +627,17 @@ local function infoText(order, text, size, color, font, align)
 	l.TextXAlignment = align or Enum.TextXAlignment.Left
 	l.TextWrapped = true
 	l.ZIndex = 42
-	l.Parent = indexInfoBody
+	l.Parent = parent or indexInfoBody
 	return l
 end
 -- one size / finish row: name, its odds, got it?
-local function infoRow(order, name, chanceText, got)
+local function infoRow(order, name, chanceText, got, parent, nameColor)
 	local row = Instance.new("Frame")
 	row.LayoutOrder = order
 	row.Size = UDim2.new(1, 0, 0, 22)
 	row.BackgroundColor3 = got and Color3.fromRGB(40, 70, 50) or Color3.fromRGB(38, 40, 52)
 	row.ZIndex = 42
-	row.Parent = indexInfoBody
+	row.Parent = parent or indexInfoBody
 	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
 	local function cell(text, x, w, color, align)
 		local l = Instance.new("TextLabel")
@@ -653,7 +653,7 @@ local function infoRow(order, name, chanceText, got)
 		l.ZIndex = 43
 		l.Parent = row
 	end
-	cell(name, 0, 0.42, VARIANT_COLORS[name] or Color3.new(1, 1, 1), Enum.TextXAlignment.Left)
+	cell(name, 0, 0.42, nameColor or VARIANT_COLORS[name] or Color3.new(1, 1, 1), Enum.TextXAlignment.Left)
 	cell(chanceText, 0.38, 0.42, Color3.fromRGB(200, 210, 230), Enum.TextXAlignment.Center)
 	cell(got and "\u{2713}" or "\u{2014}", 0.78, 0.22, got and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(120, 125, 140), Enum.TextXAlignment.Right)
 end
@@ -690,13 +690,46 @@ local function showIndexInfo(monster)
 	infoText(nxt(), rarity.name:upper() .. "  \u{2022}  " .. Config.FormatOdds(Config.GetOdds(monster.id, "Normal", "Normal")), 15, color:Lerp(Color3.new(1, 1, 1), 0.25))
 	local count = (profile and profile.owned and profile.owned[monster.id]) or 0
 	infoText(nxt(), "Owned: " .. count .. "     Biggest: " .. ((rec.maxKg or 0) > 0 and Config.FormatKg(rec.maxKg) or "-"), 15, Color3.fromRGB(230, 235, 245))
-	infoText(nxt(), "SIZES", 16, GOLD, Enum.Font.GothamBlack)
-	for _, v in ipairs(Config.SizeVariants) do
-		infoRow(nxt(), v.key, variantOdds(Config.SizeVariants, v.key), rec.sizes and rec.sizes[v.key])
+	-- two columns: sizes + finishes on the left, grades on the right
+	local cols = Instance.new("Frame")
+	cols.LayoutOrder = nxt()
+	cols.Size = UDim2.fromScale(1, 0)
+	cols.AutomaticSize = Enum.AutomaticSize.Y
+	cols.BackgroundTransparency = 1
+	cols.ZIndex = 41
+	cols.Parent = indexInfoBody
+	local function column(x)
+		local c = Instance.new("Frame")
+		c.Position = UDim2.new(x, x > 0 and 6 or 0, 0, 0)
+		c.Size = UDim2.new(0.5, -6, 0, 0)
+		c.AutomaticSize = Enum.AutomaticSize.Y
+		c.BackgroundTransparency = 1
+		c.ZIndex = 41
+		c.Parent = cols
+		local l = Instance.new("UIListLayout")
+		l.SortOrder = Enum.SortOrder.LayoutOrder
+		l.Padding = UDim.new(0, 3)
+		l.Parent = c
+		return c
 	end
-	infoText(nxt(), "FINISHES", 16, GOLD, Enum.Font.GothamBlack)
+	local leftCol, rightCol = column(0), column(0.5)
+	local lo = 0
+	local function ln()
+		lo += 1
+		return lo
+	end
+	infoText(ln(), "SIZES", 16, GOLD, Enum.Font.GothamBlack, nil, leftCol)
+	for _, v in ipairs(Config.SizeVariants) do
+		infoRow(ln(), v.key, variantOdds(Config.SizeVariants, v.key), rec.sizes and rec.sizes[v.key], leftCol)
+	end
+	infoText(ln(), "FINISHES", 16, GOLD, Enum.Font.GothamBlack, nil, leftCol)
 	for _, v in ipairs(Config.FinishVariants) do
-		infoRow(nxt(), v.key, variantOdds(Config.FinishVariants, v.key), rec.finishes and rec.finishes[v.key])
+		infoRow(ln(), v.key, variantOdds(Config.FinishVariants, v.key), rec.finishes and rec.finishes[v.key], leftCol)
+	end
+	-- grades (rolled when an egg hatches): their odds + the ones you got
+	infoText(1, "GRADES", 16, GOLD, Enum.Font.GothamBlack, nil, rightCol)
+	for i, g in ipairs(Config.Grades) do
+		infoRow(1 + i, "Grade " .. g.key, Config.FormatOdds(1 / Config.GradeChance(g.key)), rec.grades and rec.grades[g.key], rightCol, Config.GradeColor(g.key))
 	end
 	indexInfo.Visible = true
 end

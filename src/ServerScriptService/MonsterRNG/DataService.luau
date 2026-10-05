@@ -281,6 +281,11 @@ local function sanitize(data)
 	end
 	if type(data.daily) == "table" and type(data.daily.streak) == "number" and type(data.daily.lastDay) == "number" then
 		profile.daily = { streak = math.clamp(math.floor(data.daily.streak), 0, 7), lastDay = math.floor(data.daily.lastDay) }
+		-- a streak lost today (missed a day): Streak Save can bring it back
+		if type(data.daily.lost) == "number" and type(data.daily.lostDay) == "number" then
+			profile.daily.lost = math.clamp(math.floor(data.daily.lost), 1, 7)
+			profile.daily.lostDay = math.floor(data.daily.lostDay)
+		end
 	end
 	if type(data.giftDaily) == "table" and type(data.giftDaily.day) == "number" and type(data.giftDaily.count) == "number" then
 		profile.giftDaily = { day = math.floor(data.giftDaily.day), count = math.max(0, math.floor(data.giftDaily.count)) }

@@ -495,6 +495,10 @@ end
 -- Developer products
 --------------------------------------------------------------------
 Config.Products = {
+	-- daily login: missed a day? buy this to keep your streak (id 0 = not made yet)
+	streakSave = { id = 0, name = "Streak Save", text = "Keep your daily login streak", imageId = "" },
+	-- the whole server gets +luck for a while (id 0 = not made yet)
+	serverLuck = { id = 0, name = "Server Luck", text = "+100% luck for EVERYONE in the server for 15 minutes", imageId = "", luck = 2, minutes = 15 },
 	hatchAll = { id = 3715373678, name = "Hatch All", text = "Hatch every egg in your pen right now", imageId = "rbxassetid://130974608848145" },
 	eggSkipImageId = "rbxassetid://92696344635446",
 	-- skip an egg's timer: the smallest one that covers the time left
@@ -1722,8 +1726,22 @@ function Config.GlobalBoost(key, now)
 		return 1
 	end
 	local m, e = holder:GetAttribute("GB_" .. key .. "_m"), holder:GetAttribute("GB_" .. key .. "_e")
+	local mult = 1
 	if type(m) == "number" and type(e) == "number" and e > (now or os.time()) then
-		return math.clamp(m, 1, Config.GlobalBoostMax)
+		mult = m
+	end
+	-- Server Luck (shop product): this server only, on top of the Dev's luck event
+	if key == "luck" then
+		mult *= Config.ServerLuck(now)
+	end
+	return math.clamp(mult, 1, Config.GlobalBoostMax)
+end
+-- Server Luck bought by someone in this server (x luck until SL_e)
+function Config.ServerLuck(now)
+	local holder = game:GetService("ReplicatedStorage"):FindFirstChild("MonsterRNG")
+	local m, e = holder and holder:GetAttribute("SL_m"), holder and holder:GetAttribute("SL_e")
+	if type(m) == "number" and type(e) == "number" and e > (now or os.time()) then
+		return math.max(1, m)
 	end
 	return 1
 end

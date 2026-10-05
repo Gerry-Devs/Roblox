@@ -165,6 +165,28 @@ for i, pack in ipairs(Config.Products.cash) do
 	end)
 end
 
+-- BOOSTS: Server Luck (everyone in the server) -----------------------
+local LUCKY = { Color3.fromRGB(90, 210, 120), Color3.fromRGB(20, 90, 70) }
+local boostGrid = section("BOOSTS", Color3.fromRGB(80, 200, 140))
+do
+	local p = Config.Products.serverLuck
+	local _, btn = card(boostGrid, 1, "serverLuck", p.name, p.text, p.imageId, "LUCK", LUCKY)
+	btn.Activated:Connect(function()
+		if (p.id or 0) == 0 then
+			monsterFolder.ClientBridge.Notify:Fire("Server Luck is coming soon!", Color3.fromRGB(120, 230, 140))
+			return
+		end
+		confirmBridge:Fire({ kind = "product", id = p.id, title = p.name, desc = p.text, image = p.imageId, fallback = "LUCK" })
+	end)
+	if (p.id or 0) ~= 0 then
+		fetchPrice("product", p.id, function(price)
+			btn.Text = "\u{E002} " .. price
+		end)
+	else
+		btn.Text = "SOON"
+	end
+end
+
 local function render()
 	for key, c in pairs(cards) do
 		local owned = Config.HasPass(profile, key)

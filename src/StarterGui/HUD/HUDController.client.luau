@@ -1410,6 +1410,49 @@ local function styleDailyCards()
 	db.Timer.TextStrokeTransparency = 0
 end
 
+-- STREAK SAVE: shows (next to CLAIM) on the day you lost a streak
+local saveStreakBtn = db.ClaimButton:Clone()
+saveStreakBtn.Name = "SaveStreakButton"
+saveStreakBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 40)
+saveStreakBtn.Visible = false
+saveStreakBtn.Parent = db
+bounce(saveStreakBtn)
+local function lostStreak()
+	local d = profile and profile.daily
+	if d and d.lost and d.lostDay == utcDay() then
+		return d.lost
+	end
+	return nil
+end
+saveStreakBtn.Activated:Connect(function()
+	local lost = lostStreak()
+	if not lost then
+		return
+	end
+	local product = Config.Products.streakSave
+	if (product.id or 0) == 0 then
+		notifyBridge:Fire("Streak Save is coming soon!", Color3.fromRGB(255, 170, 60))
+		return
+	end
+	monsterFolder.ClientBridge.ConfirmPurchase:Fire({
+		kind = "product",
+		id = product.id,
+		title = product.name,
+		desc = "Get your " .. lost .. "-day streak back!",
+		image = product.imageId,
+	})
+end)
+task.spawn(function() -- (the server makes these remotes; don't hold up the HUD)
+	remotes:WaitForChild("StreakLost").OnClientEvent:Connect(function(d)
+		notifyBridge:Fire("You missed a day! Your " .. tostring(d and d.lost or "") .. "-day login streak was lost. Open Daily Rewards to save it!", Color3.fromRGB(255, 120, 80))
+	end)
+	remotes:WaitForChild("ServerLuck").OnClientEvent:Connect(function(d)
+		if type(d) == "table" then
+			notifyBridge:Fire("\u{1F340} " .. tostring(d.name) .. " bought SERVER LUCK! Everyone gets x" .. tostring(d.luck) .. " luck for " .. tostring(d.minutes) .. " minutes!", Color3.fromRGB(120, 230, 140))
+		end
+	end)
+end)
+
 refreshers.DailyPanel = function()
 	styleDailyCards()
 	local day, claimable = dailyState()
@@ -1435,6 +1478,12 @@ refreshers.DailyPanel = function()
 	end
 	db.ClaimButton.BackgroundColor3 = claimable and GREEN or GRAY
 	db.ClaimButton.Label.Text = claimable and "CLAIM" or "CLAIMED"
+	-- lost a streak today: SAVE STREAK sits right of CLAIM
+	local lost = lostStreak()
+	saveStreakBtn.Visible = lost ~= nil
+	saveStreakBtn.Label.Text = lost and ("SAVE " .. lost .. "-DAY STREAK") or ""
+	db.ClaimButton.Position = UDim2.new(0.5, lost and -120 or 0, 1, -4)
+	saveStreakBtn.Position = UDim2.new(0.5, 120, 1, -4)
 end
 
 bounce(db.ClaimButton)

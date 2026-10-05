@@ -234,7 +234,56 @@ end)
 task.spawn(function()
 	local backpack = player:WaitForChild("PlayerGui"):WaitForChild("Backpack")
 	local bpMain = backpack:WaitForChild("Main")
-	local b = bpMain:FindFirstChild("AutoSellButton") or button(bpMain, "AUTO SELL", UDim2.fromOffset(180, 52), UDim2.new(1, -392, 1, -64), GREEN)
-	b.Name = "AutoSellButton"
+	-- a copy of SORT (same green background, gradient, studs and font),
+	-- just with its own text; it sits left of SORT
+	local b = bpMain:FindFirstChild("AutoSellButton")
+	if not b then
+		local sort = bpMain:WaitForChild("SortButton", 10)
+		if sort then
+			-- wait for the Backpack script to finish styling SORT (studs)
+			local t0 = os.clock()
+			while not sort:FindFirstChild("Studs") and os.clock() - t0 < 3 do
+				task.wait(0.1)
+			end
+			b = sort:Clone()
+			b.Name = "AutoSellButton"
+			b.Position = UDim2.new(1, -392, 1, -64)
+			local icon = b:FindFirstChild("Icon")
+			if icon and icon:IsA("GuiObject") then
+				icon.Visible = false
+			end
+			local l = b:FindFirstChild("Label")
+			if l and l:IsA("TextLabel") then
+				l.Text = "AUTO SELL"
+				l.AnchorPoint = Vector2.new(0.5, 0.5)
+				l.Position = UDim2.fromScale(0.5, 0.5)
+				l.Size = UDim2.new(1, -20, l.Size.Y.Scale, l.Size.Y.Offset)
+			end
+			b.Parent = bpMain
+			-- the same little bounce as SORT
+			local sc = b:FindFirstChildOfClass("UIScale")
+			if sc then
+				local TweenService = game:GetService("TweenService")
+				local function to(v, t)
+					TweenService:Create(sc, TweenInfo.new(t), { Scale = v }):Play()
+				end
+				b.MouseEnter:Connect(function()
+					to(1.06, 0.1)
+				end)
+				b.MouseLeave:Connect(function()
+					to(1, 0.1)
+				end)
+				b.MouseButton1Down:Connect(function()
+					to(0.94, 0.06)
+				end)
+				b.MouseButton1Up:Connect(function()
+					to(1, 0.1)
+				end)
+			end
+		else
+			b = button(bpMain, "AUTO SELL", UDim2.fromOffset(180, 52), UDim2.new(1, -392, 1, -64), GREEN)
+			b.Name = "AutoSellButton"
+		end
+	end
 	b.Activated:Connect(open)
 end)

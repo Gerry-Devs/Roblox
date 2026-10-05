@@ -40,6 +40,8 @@ local buyDiceRemote = getRemote("BuyDice", "RemoteFunction")
 local unlockBiomeRemote = getRemote("UnlockBiome", "RemoteFunction")
 local rebirthRemote = getRemote("Rebirth", "RemoteFunction")
 local claimDailyRemote = getRemote("ClaimDaily", "RemoteFunction")
+local streakLostRemote = getRemote("StreakLost", "RemoteEvent")
+local checkDailyStreak -- (daily rewards, below)
 local saveSettingsRemote = getRemote("SaveSettings", "RemoteFunction")
 local usePotionRemote = getRemote("UsePotion", "RemoteFunction")
 local EnemyService = require(game.ServerScriptService.MonsterRNG:WaitForChild("EnemyService"))
@@ -438,6 +440,14 @@ Players.PlayerAdded:Connect(function(player)
 	cashValue.Parent = leaderstats
 
 	WorldService.CreateBase(player, profile)
+	-- daily login streak: missed a day -> it starts over (Streak Save can keep it)
+	task.spawn(function()
+		task.wait(6)
+		if player.Parent and DataService.Get(player) == profile and checkDailyStreak(profile) then
+			sync(player)
+			streakLostRemote:FireClient(player, { lost = profile.daily.lost })
+		end
+	end)
 	-- Offline earnings: what the pen made while you were away
 	task.spawn(function()
 		task.wait(5) -- passes (VIP) and the pen are ready by now
@@ -1224,12 +1234,29 @@ local function utcDay()
 	return math.floor(os.time() / 86400)
 end
 
+-- missed a whole day: the streak is gone (back to day 1). It's remembered
+-- for the rest of today so a Streak Save can bring it back.
+checkDailyStreak = function(profile)
+	local d = profile.daily or { streak = 0, lastDay = -1 }
+	profile.daily = d
+	local today = utcDay()
+	if d.lostDay and d.lostDay ~= today then
+		d.lost, d.lostDay = nil, nil -- the save offer was only for that day
+	end
+	if (d.streak or 0) > 0 and d.lastDay >= 0 and d.lastDay < today - 1 then
+		d.lost, d.lostDay = d.streak, today
+		d.streak = 0
+		return true
+	end
+	return false
+end
+
 claimDailyRemote.OnServerInvoke = function(player)
 	local profile = DataService.Get(player)
 	if not profile then
 		return { success = false, message = "Your profile is still loading." }
 	end
-	profile.daily = profile.daily or { streak = 0, lastDay = -1 }
+	checkDailyStreak(profile)
 	local today = utcDay()
 	if profile.daily.lastDay == today then
 		return { success = false, message = "Already claimed today, come back tomorrow!" }
@@ -1249,7 +1276,8 @@ claimDailyRemote.OnServerInvoke = function(player)
 	for key, n in pairs(reward.items or {}) do
 		profile.items[key] = (profile.items[key] or 0) + n * mult
 	end
-	profile.daily = { streak = streak, lastDay = today }
+	-- (claiming day 1 after a lost streak keeps the save offer for today)
+	profile.daily = { streak = streak, lastDay = today, lost = profile.daily.lost, lostDay = profile.daily.lostDay }
 	updateLeaderstats(player)
 	sync(player)
 	return { success = true, message = "Day " .. streak .. " reward claimed!", profile = DataService.PublicProfile(profile) }
@@ -3252,6 +3280,40 @@ do
 				error("no guild to add slots to") -- not granted: Roblox tries again later
 			end
 			return msg
+		end
+	end
+	-- Streak Save: brings back the daily streak lost today
+	if (Config.Products.streakSave.id or 0) ~= 0 then
+		handlers[Config.Products.streakSave.id] = function(player, profile)
+			checkDailyStreak(profile)
+			local d = profile.daily
+			local today = utcDay()
+			if not d.lost or d.lostDay ~= today then
+				return "Your streak is safe already!"
+			end
+			if d.lastDay == today then
+				-- already claimed day 1 today: today counts as the next day of the old streak
+				d.streak = (d.lost % 7) + 1
+			else
+				d.streak = d.lost
+				d.lastDay = today - 1 -- as if you came yesterday: claim the next day now
+			end
+			d.lost, d.lostDay = nil, nil
+			return "Streak saved! You're on a " .. d.streak .. "-day streak."
+		end
+	end
+	-- Server Luck: everyone in this server gets more luck (buying again adds time)
+	local serverLuckRemote = getRemote("ServerLuck", "RemoteEvent")
+	if (Config.Products.serverLuck.id or 0) ~= 0 then
+		handlers[Config.Products.serverLuck.id] = function(player)
+			local p = Config.Products.serverLuck
+			local holder = ReplicatedStorage:WaitForChild("MonsterRNG")
+			local ends = holder:GetAttribute("SL_e")
+			local from = (type(ends) == "number" and ends > os.time()) and ends or os.time()
+			holder:SetAttribute("SL_m", p.luck)
+			holder:SetAttribute("SL_e", from + p.minutes * 60)
+			serverLuckRemote:FireAllClients({ name = player.DisplayName, luck = p.luck, minutes = p.minutes })
+			return "Server Luck is on! Everyone gets x" .. p.luck .. " luck."
 		end
 	end
 	for _, pack in ipairs(Config.Products.cash) do

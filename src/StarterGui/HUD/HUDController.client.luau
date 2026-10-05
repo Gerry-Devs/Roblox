@@ -530,8 +530,8 @@ refreshers.RebirthPanel = function()
 	local cashCost, shardCost = Config.GetRebirthCost(n)
 	local R = Config.Rebirth
 	rb.Count.Text = "REBIRTHS: " .. n
-	rb.Current.Text = string.format("Now: +%d%% cash  \u{2022}  +%d%% luck", n * R.cashBonus, n * R.luckBonus)
-	rb.Next.Text = string.format("After: +%d%% cash  \u{2022}  +%d%% luck", (n + 1) * R.cashBonus, (n + 1) * R.luckBonus)
+	rb.Current.Text = string.format("Now: +%d%% cash  \u{2022}  +%d%% luck  \u{2022}  +%d%% shards", n * R.cashBonus, n * R.luckBonus, n * R.shardBonus)
+	rb.Next.Text = string.format("After: +%d%% cash  \u{2022}  +%d%% luck  \u{2022}  +%d%% shards", (n + 1) * R.cashBonus, (n + 1) * R.luckBonus, (n + 1) * R.shardBonus)
 	rb.Cost.CashCost.Text = Config.FormatNumber(cashCost)
 	rb.Cost.ShardCost.Text = Config.FormatNumber(shardCost)
 	local canCash = (profile and profile.cash or 0) >= cashCost

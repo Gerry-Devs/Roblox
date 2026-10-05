@@ -1241,13 +1241,16 @@ Config.Items = {
 Config.Rebirth = {
 	baseCash = 2500000,
 	baseShards = 100,
-	growth = 3,
+	growth = 2.2, -- the cash cost x2.2 every rebirth
+	shardGrowth = 1.6, -- the shard cost x1.6 every rebirth
 	cashBonus = 25, -- +% cash income per rebirth
 	luckBonus = 10, -- +% luck per rebirth
+	shardBonus = 25, -- +% Rift Shards from enemies per rebirth
 }
 function Config.GetRebirthCost(rebirths)
-	local m = Config.Rebirth.growth ^ (rebirths or 0)
-	return math.floor(Config.Rebirth.baseCash * m), math.floor(Config.Rebirth.baseShards * m)
+	local R = Config.Rebirth
+	local n = rebirths or 0
+	return math.floor(R.baseCash * R.growth ^ n), math.floor(R.baseShards * (R.shardGrowth or R.growth) ^ n)
 end
 
 --------------------------------------------------------------------

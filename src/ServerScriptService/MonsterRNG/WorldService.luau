@@ -2053,9 +2053,21 @@ end
 -- Player pens: open, fenced, side by side
 --------------------------------------------------------------------
 
-local function buildFence(model, position, gateSide)
+-- pen looks from the Index (a finish completed for every monster);
+-- they keep the studs. Rainbow keeps changing color (see the pen loop).
+local PEN_LOOKS = {
+	Silver = { post = Color3.fromRGB(210, 215, 225), rail = Color3.fromRGB(175, 182, 196), floor = Color3.fromRGB(150, 150, 158) },
+	Gold = { post = Color3.fromRGB(255, 200, 50), rail = Color3.fromRGB(235, 170, 35), floor = Color3.fromRGB(190, 140, 60), sparkle = Color3.fromRGB(255, 230, 120) },
+	Diamond = { post = Color3.fromRGB(165, 235, 255), rail = Color3.fromRGB(120, 205, 245), floor = Color3.fromRGB(120, 160, 190), glass = true, sparkle = Color3.fromRGB(200, 245, 255) },
+	Rainbow = { post = Color3.fromRGB(255, 120, 120), rail = Color3.fromRGB(120, 200, 255), floor = Color3.fromRGB(150, 110, 70), rainbow = true },
+	Galaxy = { post = Color3.fromRGB(70, 40, 130), rail = Color3.fromRGB(45, 25, 95), floor = Color3.fromRGB(55, 40, 85), sparkle = Color3.fromRGB(190, 140, 255), neonTop = Color3.fromRGB(170, 110, 255) },
+}
+local function buildFence(model, position, gateSide, halfX, halfZ, lookKey)
 	local postHeight = 5
-	local WOOD = Color3.fromRGB(133, 94, 58)
+	local look = lookKey and PEN_LOOKS[lookKey]
+	local WOOD = look and look.post or Color3.fromRGB(133, 94, 58)
+	local RAIL = look and look.rail or WOOD
+	local postCount = 0
 	local GATE_HALF = 7 -- half-width of the front opening
 	local SPACING = 7 -- distance between posts
 
@@ -2069,6 +2081,31 @@ local function buildFence(model, position, gateSide)
 		local p = makePart(model, "FencePost", Vector3.new(1.2, postHeight, 1.2),
 			CFrame.new(position + Vector3.new(x, postHeight / 2, z)), WOOD, Enum.Material.Plastic)
 		studs(p)
+		postCount += 1
+		if look then
+			if look.glass then
+				p.Transparency = 0.2
+				p.Reflectance = 0.25
+			end
+			if look.neonTop then
+				local cap = makePart(model, "FencePostTop", Vector3.new(1.4, 0.5, 1.4),
+					CFrame.new(position + Vector3.new(x, postHeight + 0.25, z)), look.neonTop, Enum.Material.Neon)
+				cap.CanCollide = false
+			end
+			-- sparkles on every 3rd post
+			if look.sparkle and postCount % 3 == 0 then
+				local e = Instance.new("ParticleEmitter")
+				e.Color = ColorSequence.new(look.sparkle)
+				e.LightEmission = 1
+				e.Rate = 2
+				e.Lifetime = NumberRange.new(0.8, 1.4)
+				e.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(0.4, 0.35), NumberSequenceKeypoint.new(1, 0) })
+				e.Speed = NumberRange.new(0.5, 1.2)
+				e.SpreadAngle = Vector2.new(180, 180)
+				e.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+				e.Parent = p
+			end
+		end
 	end
 
 	-- a straight fence run: posts every SPACING studs and two solid rails
@@ -2085,13 +2122,17 @@ local function buildFence(model, position, gateSide)
 		local rot = math.atan2(-d.Z, d.X)
 		for _, h in ipairs({ 1.6, postHeight - 1.4 }) do
 			local rail = makePart(model, "FenceRail", Vector3.new(length, 1, 0.6),
-				CFrame.new(position + mid + Vector3.new(0, h, 0)) * CFrame.Angles(0, rot, 0), WOOD, Enum.Material.Plastic)
+				CFrame.new(position + mid + Vector3.new(0, h, 0)) * CFrame.Angles(0, rot, 0), RAIL, Enum.Material.Plastic)
+			if look and look.glass then
+				rail.Transparency = 0.2
+				rail.Reflectance = 0.25
+			end
 			rail.CanCollide = true
 			studs(rail)
 		end
 	end
 
-	local X, Z = PEN_HALF_X, PEN_HALF_Z
+	local X, Z = halfX or PEN_HALF_X, halfZ or PEN_HALF_Z
 	local edges = {
 		["-Z"] = { -X, -Z, X, -Z },
 		["+Z"] = { -X, Z, X, Z },
@@ -2177,6 +2218,15 @@ local function createOwnerSign(model, position)
 	return { avatarImage = avatarImage, nameLabel = nameLabel }
 end
 
+local function spawnOffset(gateSide, halfX, halfZ)
+	halfX, halfZ = halfX or PEN_HALF_X, halfZ or PEN_HALF_Z
+	return ({
+		["-Z"] = Vector3.new(0, 1, -halfZ + 6),
+		["+Z"] = Vector3.new(0, 1, halfZ - 6),
+		["-X"] = Vector3.new(-halfX + 6, 1, 0),
+		["+X"] = Vector3.new(halfX - 6, 1, 0),
+	})[gateSide or "-Z"]
+end
 local function createPenSpawn(model, position, gateSide)
 	local spawnPart = Instance.new("SpawnLocation")
 	spawnPart.Name = "PenSpawn"
@@ -2466,6 +2516,11 @@ local function turnToward(cf, look, maxTurn)
 	return CFrame.Angles(0, curYaw + turn, 0), math.abs(diff - turn)
 end
 
+-- this pen's half size (bigger plots from the Index)
+local function penHalf(model)
+	local folder = model.Parent
+	return (folder and folder:GetAttribute("PenHalfX")) or PEN_HALF_X, (folder and folder:GetAttribute("PenHalfZ")) or PEN_HALF_Z
+end
 local function animatePetBody(model, body, homePosition, bodySize, penState)
 	task.spawn(function()
 		local phase = math.random() * math.pi * 2
@@ -2489,9 +2544,10 @@ local function animatePetBody(model, body, homePosition, bodySize, penState)
 				-- straight in instead of walking all the way back
 				local center = model.Parent and model.Parent:GetAttribute("BasePosition") or homePosition
 				local cur = body.Position
-				if math.abs(cur.X - center.X) > PEN_HALF_X + 15 or math.abs(cur.Z - center.Z) > PEN_HALF_Z + 15 then
+				local PHX, PHZ = penHalf(model)
+				if math.abs(cur.X - center.X) > PHX + 15 or math.abs(cur.Z - center.Z) > PHZ + 15 then
 					local margin = 4 + bodySize * 0.6
-					local hx, hz = math.max(1, PEN_HALF_X - margin), math.max(1, PEN_HALF_Z - margin)
+					local hx, hz = math.max(1, PHX - margin), math.max(1, PHZ - margin)
 					wanderTarget = Vector3.new(center.X + math.random(-hx * 10, hx * 10) / 10, homePosition.Y, center.Z + math.random(-hz * 10, hz * 10) / 10)
 					nextWanderAt = now + math.random(2, 4)
 					body.CFrame = CFrame.new(wanderTarget) * (body.CFrame - body.CFrame.Position)
@@ -2500,7 +2556,8 @@ local function animatePetBody(model, body, homePosition, bodySize, penState)
 					-- wander anywhere INSIDE the pen fence (never outside it)
 					local center = model.Parent and model.Parent:GetAttribute("BasePosition") or homePosition
 					local margin = 4 + bodySize * 0.6
-					local hx, hz = math.max(1, PEN_HALF_X - margin), math.max(1, PEN_HALF_Z - margin)
+					local PHX2, PHZ2 = penHalf(model)
+					local hx, hz = math.max(1, PHX2 - margin), math.max(1, PHZ2 - margin)
 					local rx = math.random(-hx * 10, hx * 10) / 10
 					local rz = math.random(-hz * 10, hz * 10) / 10
 					wanderTarget = Vector3.new(center.X + rx, homePosition.Y, center.Z + rz)
@@ -2863,6 +2920,7 @@ function WorldService.UpdateBase(player, profile)
 	if not pen then
 		return
 	end
+	pcall(WorldService.ApplyPenStyle, player, profile)
 	local wanted = {}
 	for index, entry in ipairs(profile.base or {}) do
 		wanted[entry.uid] = { entry = entry, index = index, sig = entrySignature(entry) }
@@ -3072,9 +3130,71 @@ function WorldService.GetPen(player)
 	return pensByPlayer[player]
 end
 
-function WorldService.IsValidPlacement(x, z)
+function WorldService.IsValidPlacement(x, z, player)
 	local margin = Config.PenPlacementMargin
-	return math.abs(x) <= (PEN_HALF_X - margin) and math.abs(z) <= (PEN_HALF_Z - margin)
+	local pen = player and pensByPlayer[player]
+	local hx, hz = (pen and pen.halfX) or PEN_HALF_X, (pen and pen.halfZ) or PEN_HALF_Z
+	return math.abs(x) <= (hx - margin) and math.abs(z) <= (hz - margin)
+end
+
+-- the pen's size + look from the Index: every completed size makes the
+-- plot bigger, a completed finish (Gold...) turns the fence into it.
+-- Only rebuilds when something changed.
+local function rebuildPenEdges(pen, extra, lookKey)
+	for _, c in ipairs(pen.model:GetChildren()) do
+		if c.Name == "FencePost" or c.Name == "FenceRail" or c.Name == "FencePostTop" or c.Name == "PenFloor" then
+			c:Destroy()
+		end
+	end
+	local hx, hz = PEN_HALF_X + extra, PEN_HALF_Z + extra
+	pen.halfX, pen.halfZ = hx, hz
+	local look = lookKey and PEN_LOOKS[lookKey]
+	addStudFloor(pen.model, "PenFloor", Vector3.new(hx * 2, 1, hz * 2), CFrame.new(pen.position.X, pen.position.Y - 0.45, pen.position.Z), look and look.floor or Color3.fromRGB(150, 100, 58))
+	buildFence(pen.model, pen.position, PEN_GATES[pen.index], hx, hz, lookKey)
+	pen.pets:SetAttribute("PenHalfX", hx)
+	pen.pets:SetAttribute("PenHalfZ", hz)
+	if pen.spawnPart then
+		pen.spawnPart.CFrame = CFrame.new(pen.position + spawnOffset(PEN_GATES[pen.index], hx, hz))
+	end
+	pen.lookKey = lookKey
+	-- Rainbow: the fence slowly runs through the colors
+	if lookKey == "Rainbow" then
+		local token = {}
+		pen.rainbowToken = token
+		task.spawn(function()
+			local parts = {}
+			for _, c in ipairs(pen.model:GetChildren()) do
+				if c.Name == "FencePost" or c.Name == "FenceRail" then
+					table.insert(parts, c)
+				end
+			end
+			while pen.rainbowToken == token and pen.model.Parent do
+				local t = os.clock() * 0.08
+				for i, part in ipairs(parts) do
+					if part.Parent then
+						part.Color = Color3.fromHSV((t + i * 0.02) % 1, 0.65, 1)
+					end
+				end
+				task.wait(0.2)
+			end
+		end)
+	else
+		pen.rainbowToken = nil
+	end
+end
+function WorldService.ApplyPenStyle(player, profile)
+	local pen = pensByPlayer[player]
+	if not pen then
+		return
+	end
+	local extra = profile and Config.IndexSizesDone(profile) * Config.IndexRewards.sizeStuds or 0
+	local lookKey = profile and Config.IndexPenFinish(profile) or nil
+	local key = extra .. "|" .. tostring(lookKey)
+	if pen.styleKey == key then
+		return
+	end
+	pen.styleKey = key
+	rebuildPenEdges(pen, extra, lookKey)
 end
 
 function WorldService.RemoveBase(player)
@@ -3084,6 +3204,10 @@ function WorldService.RemoveBase(player)
 			child:Destroy()
 		end
 		pen.model.Name = "Pen_" .. pen.index
+		if pen.styleKey and pen.styleKey ~= "0|nil" then
+			pen.styleKey = nil
+			rebuildPenEdges(pen, 0, nil)
+		end
 		pen.display.nameLabel.Text = "OPEN"
 		pen.display.avatarImage.Image = ""
 		pen.owner = nil
@@ -3118,7 +3242,8 @@ function WorldService.GetProfileIncome(profile)
 	if Config.IsBoostActive(profile, "cash") then
 		rebirthBonus *= 2 -- Cash Potion
 	end
-	return math.floor(income * (profile.incomeBoost or 1) * cashBonus * rebirthBonus * Config.PassCashMultiplier(profile) * Config.GlobalBoost("income"))
+	-- (+ Index rewards and friends in the server)
+	return math.floor(income * (profile.incomeBoost or 1) * cashBonus * rebirthBonus * Config.PassCashMultiplier(profile) * Config.GlobalBoost("income") * Config.ExtraIncomeMultiplier(profile))
 end
 
 function WorldService.GetEntryPower(entry)

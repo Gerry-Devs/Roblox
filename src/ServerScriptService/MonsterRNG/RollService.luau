@@ -110,6 +110,12 @@ function RollService.GetLuck(profile)
 	end
 	m *= math.max(1, Config.GlobalBoost("luck"))
 	m *= math.max(1, Config.SkillLuckMultiplier(profile))
+	-- Index rewards (completed rarities) + the group reward
+	local indexLuck = Config.IndexBonus(profile)
+	m *= 1 + indexLuck / 100
+	if profile.inGroup then
+		m *= 1 + Config.Group.luck / 100
+	end
 	return m
 end
 

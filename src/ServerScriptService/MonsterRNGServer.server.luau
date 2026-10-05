@@ -14,6 +14,7 @@ local remotes = monsterFolder:FindFirstChild("Remotes") or Instance.new("Folder"
 remotes.Name = "Remotes"
 remotes.Parent = monsterFolder
 
+local indexSnapshot, indexAnnounce -- (Index rewards, below)
 local function getRemote(name, className)
 	local remote = remotes:FindFirstChild(name) or Instance.new(className)
 	remote.Name = name
@@ -286,8 +287,101 @@ task.spawn(function()
 	end
 end)
 
+--------------------------------------------------------------------
+-- Index rewards: tell the player when a part of the Index is complete
+--------------------------------------------------------------------
+local indexNotice = getRemote("PurchaseNotice", "RemoteEvent")
+indexSnapshot = function(profile)
+	local snap = { rarities = {}, finishes = {}, sizes = {} }
+	for key in pairs(Config.IndexRewards.rarity) do
+		snap.rarities[key] = Config.IndexRarityDone(profile, key)
+	end
+	for _, f in ipairs(Config.IndexRewards.finishOrder) do
+		snap.finishes[f] = Config.IndexVariantDone(profile, "finishes", f)
+	end
+	for _, sz in ipairs(Config.IndexRewards.sizeOrder) do
+		snap.sizes[sz] = Config.IndexVariantDone(profile, "sizes", sz)
+	end
+	return snap
+end
+indexAnnounce = function(player, profile, before)
+	local after = indexSnapshot(profile)
+	for key, done in pairs(after.rarities) do
+		if done and not before.rarities[key] then
+			local r = Config.IndexRewards.rarity[key]
+			indexNotice:FireClient(player, { text = "INDEX: every " .. Config.GetRarity(key).name .. " pet found! +" .. r.luck .. "% luck, +" .. r.cash .. "% cash forever" })
+		end
+	end
+	for f, done in pairs(after.finishes) do
+		if done and not before.finishes[f] then
+			indexNotice:FireClient(player, { text = "INDEX: every pet as " .. f .. "! Your pen is now " .. f:upper() .. "!" })
+		end
+	end
+	for sz, done in pairs(after.sizes) do
+		if done and not before.sizes[sz] then
+			indexNotice:FireClient(player, { text = "INDEX: every pet as " .. sz .. "! Your pen grew and got +1 egg slot!" })
+		end
+	end
+end
+
+--------------------------------------------------------------------
+-- Group (+5% luck) and friends in the server (+10% income each, max 30%)
+--------------------------------------------------------------------
+local friendCache = {} -- "a:b" -> true / false
+local function areFriends(a, b)
+	local key = math.min(a.UserId, b.UserId) .. ":" .. math.max(a.UserId, b.UserId)
+	if friendCache[key] == nil then
+		local ok, yes = pcall(a.IsFriendsWith, a, b.UserId)
+		friendCache[key] = ok and yes == true
+	end
+	return friendCache[key]
+end
+local function updateFriendBonus()
+	local list = Players:GetPlayers()
+	for _, p in ipairs(list) do
+		local profile = DataService.Get(p)
+		if profile then
+			local n = 0
+			for _, other in ipairs(list) do
+				if other ~= p and areFriends(p, other) then
+					n += 1
+				end
+			end
+			local bonus = math.min(Config.FriendBonus.max, n * Config.FriendBonus.perFriend)
+			if profile.friendBonus ~= bonus then
+				profile.friendBonus = bonus
+				p:SetAttribute("FriendBonus", bonus)
+				pcall(sync, p)
+			end
+		end
+	end
+end
+task.spawn(function()
+	while true do
+		task.wait(15)
+		pcall(updateFriendBonus)
+	end
+end)
+Players.PlayerAdded:Connect(function()
+	task.delay(5, function()
+		pcall(updateFriendBonus)
+	end)
+end)
+Players.PlayerRemoving:Connect(function()
+	task.defer(function()
+		pcall(updateFriendBonus)
+	end)
+end)
+
 Players.PlayerAdded:Connect(function(player)
 	local profile = DataService.Load(player)
+	-- Group reward: +5% luck (Config.Group.id = 0: off for now)
+	task.spawn(function()
+		if (Config.Group.id or 0) ~= 0 then
+			local ok, yes = pcall(player.IsInGroup, player, Config.Group.id)
+			profile.inGroup = ok and yes == true or nil
+		end
+	end)
 	task.spawn(refreshPasses, player, profile)
 
 	local leaderstats = Instance.new("Folder")
@@ -455,11 +549,11 @@ placeEggRemote.OnServerInvoke = function(player, eggUid, x, z)
 		return { success = false, message = "That egg could not be placed." }
 	end
 
-	if not WorldService.IsValidPlacement(x, z) then
+	if not WorldService.IsValidPlacement(x, z, player) then
 		return { success = false, message = "You can only place items inside your own pen." }
 	end
 
-	local eggCap = Config.GetPenEggCap(profile.upgrades)
+	local eggCap = Config.GetPenEggCap(profile.upgrades, profile)
 	if countPlacedByKind(profile, "egg") >= eggCap then
 		return {
 			success = false,
@@ -507,11 +601,11 @@ placeMonsterRemote.OnServerInvoke = function(player, monsterUid, x, z)
 
 	-- monsters can be equipped from anywhere: if the click wasn't inside
 	-- the pen, it just gets a free spot in the pen
-	if not WorldService.IsValidPlacement(x, z) then
+	if not WorldService.IsValidPlacement(x, z, player) then
 		local found = false
 		for _ = 1, 40 do
 			local rx, rz = (math.random() - 0.5) * 40, (math.random() - 0.5) * 36
-			if WorldService.IsValidPlacement(rx, rz) then
+			if WorldService.IsValidPlacement(rx, rz, player) then
 				x, z, found = rx, rz, true
 				break
 			end
@@ -648,8 +742,10 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 			table.remove(profile.base, index)
 			table.insert(profile.monsters, monsterEntry)
 		end
+		local indexBefore = indexSnapshot(profile)
 		profile.owned[egg.monsterId] = (profile.owned[egg.monsterId] or 0) + 1
 		DataService.RecordIndex(profile, monsterEntry)
+		pcall(indexAnnounce, player, profile, indexBefore)
 
 		-- (each step on its own: one failing never leaves the pen out of date)
 		local okMark, errMark = pcall(WorldService.MarkHatched, player, monsterEntry, not fitsInPen, position)

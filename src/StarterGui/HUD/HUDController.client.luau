@@ -225,10 +225,45 @@ local function incomePerSecond()
 	local cashUpgrade = 1 + Config.GetUpgradeBonus(profile.upgrades, "cash") / 100
 	local rebirth = 1 + (profile.rebirths or 0) * Config.Rebirth.cashBonus / 100
 	local potion = Config.IsBoostActive(profile, "cash", workspace:GetServerTimeNow()) and 2 or 1
-	return math.floor(total * (profile.incomeBoost or 1) * cashUpgrade * rebirth * potion * Config.PassCashMultiplier(profile) * Config.GlobalBoost("income", workspace:GetServerTimeNow()))
+	return math.floor(total * (profile.incomeBoost or 1) * cashUpgrade * rebirth * potion * Config.PassCashMultiplier(profile) * Config.GlobalBoost("income", workspace:GetServerTimeNow()) * Config.ExtraIncomeMultiplier(profile))
+end
+
+-- "+20% FRIEND INCOME" under the income (playing with friends)
+local friendLabel
+pcall(function()
+	local income = left:FindFirstChild("Income")
+	friendLabel = Instance.new("TextLabel")
+	friendLabel.Name = "FriendBonus"
+	friendLabel.Size = UDim2.new(0, 200, 0, 22)
+	friendLabel.BackgroundTransparency = 1
+	friendLabel.Font = Enum.Font.LuckiestGuy
+	friendLabel.TextScaled = true
+	friendLabel.TextXAlignment = Enum.TextXAlignment.Left
+	friendLabel.TextColor3 = Color3.fromRGB(120, 220, 255)
+	friendLabel.TextStrokeTransparency = 0
+	friendLabel.TextStrokeColor3 = Color3.fromRGB(10, 15, 35)
+	friendLabel.Visible = false
+	-- right under Income in the list
+	if income then
+		for _, c in ipairs(left:GetChildren()) do
+			if c:IsA("GuiObject") and c ~= income and c.LayoutOrder > income.LayoutOrder then
+				c.LayoutOrder += 1
+			end
+		end
+		friendLabel.LayoutOrder = income.LayoutOrder + 1
+	end
+	friendLabel.Parent = left
+end)
+local function updateFriendLabel()
+	local b = math.min(Config.FriendBonus.max, (profile and profile.friendBonus) or 0)
+	if friendLabel then
+		friendLabel.Visible = b > 0
+		friendLabel.Text = "\u{1F465} +" .. b .. "% FRIEND INCOME"
+	end
 end
 
 local function updateCurrencies()
+	updateFriendLabel()
 	incomeAmount.Text = "+" .. Config.FormatNumber(incomePerSecond()) .. "/s"
 	cashAmount.Text = Config.FormatNumber(profile and profile.cash or 0)
 	shardAmount.Text = Config.FormatNumber(profile and profile.riftShards or 0)
@@ -476,7 +511,12 @@ do
 		indexBody.Well.Size = UDim2.new(1, -(SIDE_W + 12), 1, -44)
 		filterTitle = Instance.new("TextLabel")
 		filterTitle.Name = "FilterTitle"
-		filterTitle.Size = UDim2.new(1, -(SIDE_W + 12 + 230), 0, 30)
+		filterTitle.Size = UDim2.new(1, -(SIDE_W + 12 + 370), 0, 30)
+		-- the counter also shows the Index reward of the page: wider
+		local counter = indexBody:FindFirstChild("Counter")
+		if counter then
+			counter.Size = UDim2.new(0, 360, counter.Size.Y.Scale, counter.Size.Y.Offset)
+		end
 		filterTitle.Position = UDim2.fromOffset(SIDE_W + 14, 6)
 		filterTitle.BackgroundTransparency = 1
 		filterTitle.Font = Enum.Font.LuckiestGuy
@@ -775,7 +815,22 @@ refreshers.IndexPanel = function()
 		styled("rarityCard", card, discovered and color or Color3.fromRGB(70, 75, 90))
 		card.Parent = grid
 	end
-	indexBody.Counter.Text = found .. "/" .. #list .. " found"
+	-- what finishing this page gives (Index rewards)
+	local reward = ""
+	if indexTab == "pets" then
+		if variant and variant ~= "Normal" and #list == #Config.Monsters then
+			reward = SIZE_KEYS[variant] and "  \u{2022}  Reward: bigger pen +1 egg slot" or ("  \u{2022}  Reward: " .. variant:upper() .. " PEN")
+		elseif not variant and indexRarity ~= "all" then
+			local r = Config.IndexRewards.rarity[indexRarity]
+			if r then
+				reward = "  \u{2022}  Reward: +" .. r.luck .. "% luck +" .. r.cash .. "% cash"
+			end
+		end
+		if reward ~= "" and found >= #list then
+			reward ..= " \u{2713}"
+		end
+	end
+	indexBody.Counter.Text = found .. "/" .. #list .. " found" .. reward
 end
 
 for tabName, key in pairs({ PetsTab = "pets", EnemiesTab = "enemies" }) do

@@ -867,8 +867,10 @@ function Config.GetPenMonsterCap(upgrades)
 	return Config.PenMonsterCap + Config.GetUpgradeBonus(upgrades, "monsterCap")
 end
 
-function Config.GetPenEggCap(upgrades)
-	return Config.PenEggCap + Config.GetUpgradeBonus(upgrades, "eggCap")
+function Config.GetPenEggCap(upgrades, profile)
+	-- (+1 egg slot for each size completed in the Index)
+	local index = profile and Config.IndexSizesDone(profile) * Config.IndexRewards.sizeEggSlots or 0
+	return Config.PenEggCap + Config.GetUpgradeBonus(upgrades, "eggCap") + index
 end
 
 -- Hatching: the egg shakes for HatchShakeTime seconds, the monster pops
@@ -1036,6 +1038,101 @@ function Config.FormatOdds(n)
 	end
 	local s = string.format("%.1f", math.floor(v * 10) / 10):gsub("%.0$", "")
 	return "1 in " .. s .. suffixes[i]
+end
+
+--------------------------------------------------------------------
+-- Index collection rewards
+--   * every monster of a rarity found: +luck% and +cash% (forever)
+--   * every monster found as a finish (Gold...): a pen in that finish
+--   * every monster found as a size (Big...): the plot grows +3 studs a
+--     side and +1 egg slot, for each size completed
+--------------------------------------------------------------------
+Config.IndexRewards = {
+	rarity = {
+		Common = { luck = 2, cash = 2 },
+		Uncommon = { luck = 2, cash = 3 },
+		Rare = { luck = 3, cash = 3 },
+		Epic = { luck = 3, cash = 4 },
+		Legendary = { luck = 4, cash = 5 },
+		Mythic = { luck = 5, cash = 5 },
+		Secret = { luck = 5, cash = 6 },
+		Celestial = { luck = 6, cash = 7 },
+		Divine = { luck = 7, cash = 8 },
+		Supreme = { luck = 8, cash = 10 },
+	},
+	sizeStuds = 3, -- plot grows this much on each side per completed size
+	sizeEggSlots = 1, -- + egg slots per completed size
+	-- best first: the pen takes the best finish you completed
+	finishOrder = { "Galaxy", "Rainbow", "Diamond", "Gold", "Silver" },
+	sizeOrder = { "Big", "Huge", "Titan", "Gigantic" },
+}
+-- did the player find every monster of this rarity?
+function Config.IndexRarityDone(profile, rarityKey)
+	local any = false
+	for _, m in ipairs(Config.Monsters) do
+		if m.rarity == rarityKey then
+			any = true
+			if not (profile and profile.owned and profile.owned[m.id] ~= nil) then
+				return false
+			end
+		end
+	end
+	return any
+end
+-- every monster found as this size / finish?
+function Config.IndexVariantDone(profile, field, key)
+	local stats = profile and profile.indexStats
+	if not stats then
+		return false
+	end
+	for _, m in ipairs(Config.Monsters) do
+		local rec = stats[m.id]
+		if not (rec and rec[field] and rec[field][key]) then
+			return false
+		end
+	end
+	return #Config.Monsters > 0
+end
+-- luck% and cash% from completed rarities
+function Config.IndexBonus(profile)
+	local luck, cash = 0, 0
+	for key, r in pairs(Config.IndexRewards.rarity) do
+		if Config.IndexRarityDone(profile, key) then
+			luck += r.luck
+			cash += r.cash
+		end
+	end
+	return luck, cash
+end
+-- the pen's finish (nil = normal wood) and how many sizes are complete
+function Config.IndexPenFinish(profile)
+	for _, f in ipairs(Config.IndexRewards.finishOrder) do
+		if Config.IndexVariantDone(profile, "finishes", f) then
+			return f
+		end
+	end
+	return nil
+end
+function Config.IndexSizesDone(profile)
+	local n = 0
+	for _, sz in ipairs(Config.IndexRewards.sizeOrder) do
+		if Config.IndexVariantDone(profile, "sizes", sz) then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Friends: +10% income for each friend in your server (max +30%).
+-- Group: +5% luck for members of the game's group (0 = off for now).
+Config.FriendBonus = { perFriend = 10, max = 30 }
+Config.Group = { id = 0, luck = 5 }
+
+-- extra income from the Index + friends (server and HUD use the same)
+function Config.ExtraIncomeMultiplier(profile)
+	local _, indexCash = Config.IndexBonus(profile)
+	local friends = math.min(Config.FriendBonus.max, (profile and profile.friendBonus) or 0)
+	return (1 + indexCash / 100) * (1 + friends / 100)
 end
 
 -- Luck (softer): only half of your extra luck counts, so 2x luck rolls

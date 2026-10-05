@@ -443,6 +443,8 @@ end
 function DataService.PublicProfile(profile)
 	return {
 		indexStats = profile.indexStats,
+		friendBonus = profile.friendBonus,
+		inGroup = profile.inGroup,
 		owned = copyOwned(profile.owned),
 		base = copyBase(profile.base),
 		eggs = copyEggs(profile.eggs),

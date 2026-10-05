@@ -1660,11 +1660,17 @@ Config.EnemySpawns = {
 Config.WorldBosses = {
 	lifetime = 600,
 	spawnAt = 180, -- seconds into the hour (night ends at 180)
-	hpMult = 60, -- x a normal enemy of its level
-	dmgMult = 3,
+	hpMult = 30, -- x a normal enemy of its level (nerfed: was 60)
+	dmgMult = 1.5, -- (was 3)
+	levelBonus = 2, -- levels above the biome's strongest enemy (was 5)
+	-- special attacks: x the boss's damage (were 1.5 / 3 / 4)
+	slamDmg = 1,
+	beamDmg = 2,
+	ultimateDmg = 2.5,
+	maxHelpers = 2, -- (was 3)
 	size = 14,
-	attackEvery = 6,
-	ultimateEvery = 30,
+	attackEvery = 8, -- (was 6)
+	ultimateEvery = 40, -- (was 30)
 	fusionTicketChance = 0.3,
 	list = {
 		forest = { name = "Treant", rig = "gaia-colossus", finish = nil, weight = 30, color = { 90, 200, 90 }, slam = "Root Slam", beam = "Thorn Shot", summon = "Sapling Call", ultimate = "Forest Wrath" },

@@ -1030,7 +1030,7 @@ local function bossSpecials(e, now)
 			e.model:SetAttribute("CritAt", workspace:GetServerTimeNow())
 			bossFx(e, { kind = "ultimate", name = e.boss.ultimate, radius = radius })
 			for _, t in ipairs(petsNear(e, radius)) do
-				bossHitPet(e, t.player, t.profile, t.entry, e.dmg * 4, os.clock())
+				bossHitPet(e, t.player, t.profile, t.entry, e.dmg * W.ultimateDmg, os.clock())
 			end
 		end)
 		return
@@ -1046,7 +1046,7 @@ local function bossSpecials(e, now)
 		local radius = e.size * 1.6
 		bossFx(e, { kind = "slam", name = e.boss.slam, radius = radius })
 		for _, t in ipairs(petsNear(e, radius)) do
-			bossHitPet(e, t.player, t.profile, t.entry, e.dmg * 1.5, now)
+			bossHitPet(e, t.player, t.profile, t.entry, e.dmg * W.slamDmg, now)
 		end
 	elseif e.special == 2 then
 		-- beam: the pet it's fighting, hard
@@ -1063,10 +1063,10 @@ local function bossSpecials(e, now)
 			local model = pen and pen.pets:FindFirstChild(victim.uid)
 			local body = model and model:FindFirstChild("MonsterBody")
 			bossFx(e, { kind = "beam", name = e.boss.beam, target = body and body.Position })
-			bossHitPet(e, player, profile, victim, e.dmg * 3, now)
+			bossHitPet(e, player, profile, victim, e.dmg * W.beamDmg, now)
 		end
 	else
-		-- summon: up to 3 helpers around it (they don't come back when beaten)
+		-- summon: up to W.maxHelpers helpers around it (they don't come back when beaten)
 		bossFx(e, { kind = "summon", name = e.boss.summon })
 		local def = Config.EnemySpawns[e.biome.key]
 		local alive = 0
@@ -1075,7 +1075,7 @@ local function bossSpecials(e, now)
 				alive += 1
 			end
 		end
-		for _ = 1, math.max(0, 3 - alive) do
+		for _ = 1, math.max(0, W.maxHelpers - alive) do
 			local a = rng:NextNumber(0, math.pi * 2)
 			local at = clampToBiome(e.biome, e.root.Position + Vector3.new(math.cos(a) * 12, 0, math.sin(a) * 12))
 			local m = createEnemy(e.biome, def, { level = def.max, pos = Vector3.new(at.X, 0, at.Z) })
@@ -1159,7 +1159,7 @@ function EnemyService.SpawnBoss(biomeKey)
 	if not bossDef or not def or not biome then
 		return nil
 	end
-	local e = createEnemy(biome, def, { boss = bossDef, monsterId = bossDef.rig, level = def.max + 5, finish = bossDef.finish, pos = randomPoint(biome, W.size * 0.5 + 4) })
+	local e = createEnemy(biome, def, { boss = bossDef, monsterId = bossDef.rig, level = def.max + W.levelBonus, finish = bossDef.finish, pos = randomPoint(biome, W.size * 0.5 + 4) })
 	e.expires = os.clock() + W.lifetime
 	e.nextSpecial = os.clock() + W.attackEvery
 	e.nextUltimate = os.clock() + W.ultimateEvery

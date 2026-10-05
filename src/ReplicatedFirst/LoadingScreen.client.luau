@@ -187,8 +187,13 @@ corner(tipBox, UDim.new(0, 12))
 stroke(tipBox, 3, Color3.fromRGB(120, 100, 255)).Transparency = 0.2
 local tipText = mk("TextLabel", { Size = UDim2.new(1, -24, 1, -12), Position = UDim2.fromOffset(12, 6), BackgroundTransparency = 1, RichText = true, Text = "", TextScaled = true, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(220, 222, 255), ZIndex = 11 }, tipBox)
 
--- SKIP: top-right corner (away from the tip), shrinks with the screen
-local skip = mk("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 16), Size = UDim2.fromOffset(130, 46), BackgroundColor3 = Color3.fromRGB(88, 96, 122), Text = "", AutoButtonColor = false, Visible = false, ZIndex = 20 }, gui)
+-- SKIP: top-right corner, just UNDER Roblox's top bar (taps on the top
+-- bar row go to Roblox's own buttons, so the old spot didn't work)
+local topInset = 0
+pcall(function()
+	topInset = game:GetService("GuiService"):GetGuiInset().Y
+end)
+local skip = mk("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, math.max(16, topInset + 10)), Size = UDim2.fromOffset(130, 46), BackgroundColor3 = Color3.fromRGB(88, 96, 122), Text = "", AutoButtonColor = false, Visible = false, ZIndex = 20 }, gui)
 corner(skip, UDim.new(0, 14))
 stroke(skip, 4)
 mk("UIGradient", { Rotation = 90, Color = ColorSequence.new(WHITE, Color3.fromRGB(190, 196, 210)) }, skip)
@@ -287,7 +292,7 @@ end
 --------------------------------------------------------------------
 -- closing: the logo zooms, everything fades, the screen slides away
 --------------------------------------------------------------------
-local function close()
+local function close(fast)
 	if finished then
 		return
 	end
@@ -295,8 +300,10 @@ local function close()
 	setProgress(1, "Ready!")
 	status.TextColor3 = Color3.fromRGB(140, 255, 160)
 	-- let the bar fill all the way and show "Ready!" for a moment
-	task.wait(1.4)
-	local info = TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	-- (SKIP: closes right away)
+	task.wait(fast and 0.1 or 1.4)
+	local fadeTime = fast and 0.35 or 0.9
+	local info = TweenInfo.new(fadeTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	TweenService:Create(logoScale, TweenInfo.new(0.9, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 1.4 }):Play()
 	for _, d in ipairs(gui:GetDescendants()) do
 		if d:IsA("TextLabel") or d:IsA("TextButton") then
@@ -312,12 +319,12 @@ local function close()
 			TweenService:Create(d, info, { Transparency = 1 }):Play()
 		end
 	end
-	task.wait(0.95)
+	task.wait(fadeTime + 0.05)
 	alive = false
 	gui:Destroy()
 end
 skip.Activated:Connect(function()
-	task.spawn(close)
+	task.spawn(close, true)
 end)
 skip.MouseEnter:Connect(function()
 	skip.BackgroundColor3 = Color3.fromRGB(110, 120, 150)

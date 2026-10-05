@@ -229,7 +229,7 @@ local function renderEggs()
 		row.Name = "Egg_" .. entry.uid
 		row.LayoutOrder = i
 		row.Visible = true
-		row.ItemName.Text = rarity.name .. " Egg"
+		row.ItemName.Text = Config.EggDisplayName(entry)
 		row.ItemName.TextColor3 = colorFromTable(rarity.color)
 		row.Ball.BackgroundColor3 = colorFromTable(rarity.color)
 		setEggPicture(row, rarity.key)

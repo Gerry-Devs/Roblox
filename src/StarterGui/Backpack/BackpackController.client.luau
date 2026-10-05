@@ -159,7 +159,7 @@ end
 
 local function getDisplayName(kind, item)
 	if kind == "egg" then
-		return getRarity(kind, item).name .. " Egg"
+		return Config.EggDisplayName(item) -- "Gigantic Rainbow Supreme Egg"
 	end
 	local monster = Config.GetMonster(item.monsterId)
 	return monster and Config.BuildDisplayName(monster.name, item.size, item.finish) or "Monster"
@@ -359,11 +359,8 @@ local function createCard(kind, item, order)
 	-- rarity + odds, then $/s + level (monsters) or hatch time (eggs)
 	local odds
 	if kind == "egg" then
-		local total = 0
-		for _, r in ipairs(Config.Rarities) do
-			total += r.weight
-		end
-		odds = math.max(1, math.floor(total / rarity.weight + 0.5))
+		-- the real odds: rarity x size x finish
+		odds = Config.GetEggOdds(rarity.key, item.size, item.finish)
 		local secs = Config.GetEggHatchDuration(item)
 		card.Stats.Text = "Hatch: " .. Config.FormatDuration(secs)
 	else

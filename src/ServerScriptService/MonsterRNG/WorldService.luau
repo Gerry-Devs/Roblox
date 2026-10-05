@@ -2277,7 +2277,9 @@ end
 local function createEggDisplay(parent, entry, index, slotPosition)
 	local rarity = Config.GetRarity(entry.rarity)
 	local bodyColor = Color3.fromRGB(rarity.color[1], rarity.color[2], rarity.color[3])
-	local bodySize = 3.4
+	-- Big / Huge / Titan / Gigantic eggs are bigger (a bit less than the monster)
+	local sizeScale = Config.GetSizeVariant(entry.size or "Normal").scale or 1
+	local bodySize = 3.4 * (1 + (sizeScale - 1) * 0.6)
 
 	-- sit on the pen floor (not floating)
 	do
@@ -2327,7 +2329,7 @@ local function createEggDisplay(parent, entry, index, slotPosition)
 	local ready = os.time() >= entry.readyAt
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "Prompt"
-	prompt.ObjectText = rarity.name .. " Egg"
+	prompt.ObjectText = Config.EggDisplayName(entry)
 	prompt.ActionText = "Hatch"
 	prompt.HoldDuration = 0
 	prompt.MaxActivationDistance = 10
@@ -2341,7 +2343,7 @@ local function createEggDisplay(parent, entry, index, slotPosition)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "MonsterName"
-	billboard.Size = UDim2.fromOffset(170, 46)
+	billboard.Size = UDim2.fromOffset(((entry.size or "Normal") ~= "Normal" or (entry.finish or "Normal") ~= "Normal") and 230 or 170, 46)
 	billboard.StudsOffset = Vector3.new(0, bodySize + 1, 0)
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 25
@@ -2363,9 +2365,10 @@ local function createEggDisplay(parent, entry, index, slotPosition)
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Text = entry.hatching and (rarity.name .. " Egg\nHatching!")
-		or ready and (rarity.name .. " Egg\nReady! Press E")
-		or (rarity.name .. " Egg\nIncubating...")
+	local eggName = Config.EggDisplayName(entry)
+	label.Text = entry.hatching and (eggName .. "\nHatching!")
+		or ready and (eggName .. "\nReady! Press E")
+		or (eggName .. "\nIncubating...")
 	label.TextColor3 = bodyColor
 	label.TextStrokeTransparency = 0.35
 	label.Font = Enum.Font.LuckiestGuy
@@ -2379,7 +2382,7 @@ local function createEggDisplay(parent, entry, index, slotPosition)
 			end
 			if model.Parent then
 				prompt.ActionText = "Hatch"
-				label.Text = rarity.name .. " Egg\nReady! Press E"
+				label.Text = eggName .. "\nReady! Press E"
 			end
 		end)
 	end

@@ -445,7 +445,7 @@ Config.Sounds = {
 Config.Gamepasses = {
 	{ key = "doubleRoll", id = 1999533030, name = "Double Roll", imageId = "rbxassetid://71391623130051", perks = { "Roll 2 eggs at the same time" } },
 	{ key = "doubleCash", id = 1998645039, name = "2x Cash", imageId = "rbxassetid://102064029314139", perks = { "Double cash per second" } },
-	{ key = "vip", id = 1998465046, name = "VIP", imageId = "rbxassetid://81291811946600", perks = { "VIP name tag + chat tag", "+20% cash", "+10% roll speed", "+15% walk speed", "Double daily rewards", "+20% offline earnings" } },
+	{ key = "vip", id = 1998465046, name = "VIP", imageId = "rbxassetid://81291811946600", perks = { "VIP name tag + chat tag", "+20% cash", "+10% roll speed", "+15% walk speed", "Double daily rewards", "+10% offline earnings" } },
 	{ key = "autoSell", id = 1998668994, name = "Auto Sell", imageId = "rbxassetid://119296484955284", perks = { "Sells eggs + monsters for you", "By rarity or by cash/s" } },
 	{ key = "fastRoll", id = 1999971018, name = "Fast Roll", imageId = "rbxassetid://105094275388977", perks = { "Roll 30% faster" } },
 	{ key = "moreDrops", id = 1997943032, name = "More Drops", imageId = "rbxassetid://72855230975729", perks = { "+25% enemy drop chance" } },
@@ -552,7 +552,7 @@ function Config.CritStats(profile)
 end
 
 -- Offline earnings: your pen keeps earning while you're away
-Config.Offline = { baseHours = 2, rate = 0.5, vipBonus = 0.2, minSeconds = 60 }
+Config.Offline = { baseHours = 2, rate = 0.2, vipBonus = 0.1, minSeconds = 60 } -- 20% of income (VIP 30%)
 function Config.OfflineHours(profile)
 	return Config.Offline.baseHours + Config.GetUpgradeBonus(profile and profile.upgrades, "offlineTime")
 end
@@ -1021,16 +1021,52 @@ function Config.FormatDuration(secs)
 end
 
 function Config.FormatOdds(n)
-	local s
-	if n >= 1e6 then
-		s = string.format("%.1fM", n / 1e6)
-	elseif n >= 1e4 then
-		s = string.format("%.1fK", n / 1e3)
-	else
-		s = tostring(n)
+	n = math.max(1, math.floor((n or 1) + 0.5))
+	if n < 10000 then
+		return "1 in " .. tostring(n)
 	end
-	s = s:gsub("%.0([KM])", "%1")
-	return "1 in " .. s
+	-- 12.5K, 583.7B, 1.2T ... (one decimal, no "583728M")
+	local suffixes = { "K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "Oc", "No", "Dc" }
+	local i, v = 0, n
+	while v >= 1000 and i < #suffixes do
+		v /= 1000
+		i += 1
+	end
+	local s = string.format("%.1f", math.floor(v * 10) / 10):gsub("%.0$", "")
+	return "1 in " .. s .. suffixes[i]
+end
+
+-- Luck (softer): only half of your extra luck counts, so 2x luck rolls
+-- like 1.5x and 21x like 11x. Rolls then divide every rarity's odds by it.
+Config.Luck = { soft = 0.5 }
+function Config.SoftLuck(m)
+	return 1 + math.max(0, (m or 1) - 1) * Config.Luck.soft
+end
+
+-- an egg's name with its size + finish: "Gigantic Rainbow Supreme Egg"
+function Config.EggDisplayName(egg)
+	local rarity = Config.GetRarity(egg and egg.rarity or "Common")
+	return Config.BuildDisplayName(rarity.name .. " Egg", egg and egg.size, egg and egg.finish)
+end
+-- the real odds of this egg: its rarity x its size x its finish
+function Config.GetEggOdds(rarityKey, sizeKey, finishKey)
+	local total = 0
+	for _, r in ipairs(Config.Rarities) do
+		total += r.weight
+	end
+	local rarity = Config.GetRarity(rarityKey or "Common")
+	local odds = total / math.max(1e-12, rarity.weight)
+	local function chance(list, key)
+		local t, w = 0, 0
+		for _, v in ipairs(list) do
+			t += v.weight
+			if v.key == (key or "Normal") then
+				w = v.weight
+			end
+		end
+		return (t > 0 and w > 0) and (w / t) or 1
+	end
+	return odds / chance(Config.SizeVariants, sizeKey) / chance(Config.FinishVariants, finishKey)
 end
 
 --------------------------------------------------------------------

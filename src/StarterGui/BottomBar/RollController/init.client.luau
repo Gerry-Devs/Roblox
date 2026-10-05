@@ -498,6 +498,7 @@ local function wheelBurst(color)
 end
 
 -- spins the wheel so slice `index` ends under the pointer (yields ~7s)
+local pendingEggName -- full name of the egg just rolled (for the wheel result)
 local function spinWheel(index)
 	buildWheel()
 	local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
@@ -591,7 +592,7 @@ local function spinWheel(index)
 	wheel.titleScale.Scale = 1.5
 	tween(wheel.titleScale, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
 	wheel.sub.Visible = false
-	wheel.result.Text = "YOU GOT A " .. rarity.name:upper() .. " EGG!"
+	wheel.result.Text = "YOU GOT A " .. (pendingEggName or (rarity.name .. " Egg")):upper() .. "!"
 	wheel.result.TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.3)
 	wheel.result.Visible = true
 	wheel.resultScale.Scale = 0
@@ -712,6 +713,9 @@ local function oddsText(r)
 	if r.key == "WILD" then
 		return "WILD"
 	end
+	if r.oddsLabel then
+		return r.oddsLabel -- the rolled egg: its real odds (rarity x size x finish)
+	end
 	return "1 / " .. Config.FormatNumber(math.max(1, math.floor(totalWeight / r.weight + 0.5)))
 end
 
@@ -808,7 +812,7 @@ local function paintCard(c, r)
 	c.egg.Visible = img == ""
 	c.wild.Visible = r.key == "WILD"
 	c.odds.Text = oddsText(r)
-	c.name.Text = r.key == "WILD" and "WILD!" or (r.name .. " Egg")
+	c.name.Text = r.key == "WILD" and "WILD!" or (r.eggName or (r.name .. " Egg"))
 	c.name.TextColor3 = r.key == "WILD" and color or Color3.new(1, 1, 1)
 end
 
@@ -1142,6 +1146,23 @@ local function rollOnce(isRetry)
 
 	profile = response.profile or profile
 	updatePity()
+	-- the eggs show their size + finish ("Gigantic Rainbow Supreme Egg")
+	-- and their real odds
+	local function decorate(r, egg)
+		if not r or not egg then
+			return r
+		end
+		local d = table.clone(r)
+		d.eggName = Config.EggDisplayName(egg)
+		d.oddsLabel = Config.FormatOdds(Config.GetEggOdds(r.key, egg.size, egg.finish)):gsub("^1 in ", "1 / ")
+		return d
+	end
+	response.rarity = decorate(response.rarity, response.egg)
+	if response.second then
+		response.second = table.clone(response.second)
+		response.second.rarity = decorate(response.second.rarity, response.second.egg)
+	end
+	pendingEggName = response.rarity and response.rarity.eggName
 
 	local mini = hideRoll or player:GetAttribute("HudHidden") == true
 	if mini and player:GetAttribute("MiniRoll") == false then
@@ -1149,7 +1170,7 @@ local function rollOnce(isRetry)
 		if response.wheelIndex then
 			spinWheel(response.wheelIndex) -- the wheel always shows, even in mini mode
 		end
-		feedMessage(((response.wilds or 0) > 0 and ("WILD x" .. response.wilds .. "! ") or "") .. "+1 " .. response.rarity.name .. " Egg" .. (response.second and (" + " .. response.second.rarity.name .. " Egg") or ""), colorFromTable(response.rarity.color))
+		feedMessage(((response.wilds or 0) > 0 and ("WILD x" .. response.wilds .. "! ") or "") .. "+1 " .. (response.rarity.eggName or (response.rarity.name .. " Egg")) .. (response.second and (" + " .. (response.second.rarity.eggName or (response.second.rarity.name .. " Egg"))) or ""), colorFromTable(response.rarity.color))
 	else
 		playReveal(response.rarity, getRollDuration(), response.wilds, response.wheelIndex, response.second)
 	end

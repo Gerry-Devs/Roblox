@@ -9,33 +9,29 @@ local function getTier(rarityName)
 	return Config.GetRarity(rarityName).tier
 end
 
-local function chooseRarity(luck, minimumTier, diceLuck)
-	local totalWeight = 0
-	local weightedRarities = {}
-
+-- Luck divides the odds (like most RNG games): starting from the rarest,
+-- each rarity is tried with chance (its chance x luck). A rarity whose
+-- odds are smaller than your luck can't miss, so everything more common
+-- than it never shows up any more (e.g. 2x luck = no more Commons).
+-- luckMult is already softened by Config.Luck.soft (see RollService.Roll).
+local function chooseRarity(luckMult, minimumTier)
+	local list, total = {}, 0
 	for _, rarity in ipairs(Config.Rarities) do
 		if rarity.tier >= (minimumTier or 1) then
-			local luckMultiplier = 1 + (math.max(0, luck) * math.max(0, rarity.tier - 1) * 0.04)
-			local diceMultiplier = rarity.tier > 1 and (1 + math.max(0, diceLuck or 0) / 100) or 1
-			local adjustedWeight = rarity.weight * luckMultiplier * diceMultiplier
-			totalWeight += adjustedWeight
-			table.insert(weightedRarities, {
-				rarity = rarity,
-				weight = adjustedWeight,
-			})
+			table.insert(list, rarity)
+			total += rarity.weight
 		end
 	end
-
-	local roll = random:NextNumber(0, totalWeight)
-	local runningWeight = 0
-	for _, entry in ipairs(weightedRarities) do
-		runningWeight += entry.weight
-		if roll <= runningWeight then
-			return entry.rarity
+	table.sort(list, function(a, b)
+		return a.tier > b.tier
+	end)
+	luckMult = math.max(1, luckMult or 1)
+	for _, rarity in ipairs(list) do
+		if random:NextNumber() < math.min(1, rarity.weight / total * luckMult) then
+			return rarity
 		end
 	end
-
-	return weightedRarities[#weightedRarities].rarity
+	return list[#list] -- the most common one allowed
 end
 
 local function chooseMonster(rarityName)
@@ -99,33 +95,33 @@ local function chooseWheelSlice()
 	return #Config.Wild.wheel
 end
 
+-- every luck boost as ONE multiplier (before softening):
+--   luck points (shop, Luck upgrade, Luck skills): +10% each
+--   dice, rebirths, biomes: their +%
+--   Luck Potion 2x, server luck event, Blessing / Infinity / Chaos skills
+function RollService.GetLuck(profile)
+	local points = (profile.luck or 0) + Config.GetUpgradeBonus(profile.upgrades, "luck") + Config.Skill(profile, "luck")
+	local m = 1 + points * 0.1
+	m *= 1 + Config.GetDice(profile.equippedDice).luck / 100
+	m *= 1 + (profile.rebirths or 0) * Config.Rebirth.luckBonus / 100
+	m *= 1 + Config.GetBiomeBonusCount(profile) * Config.BiomeBonus.luck / 100
+	if Config.IsBoostActive(profile, "luck") then
+		m *= 2
+	end
+	m *= math.max(1, Config.GlobalBoost("luck"))
+	m *= math.max(1, Config.SkillLuckMultiplier(profile))
+	return m
+end
+
 function RollService.Roll(profile)
 	-- (pity system removed)
 	-- (+ Luck skills of your equipped monsters)
-	local effectiveLuck = profile.luck + Config.GetUpgradeBonus(profile.upgrades, "luck") + Config.Skill(profile, "luck")
-	local diceLuck = Config.GetDice(profile.equippedDice).luck
-	-- rebirths: +10% luck each
-	diceLuck = ((1 + diceLuck / 100) * (1 + (profile.rebirths or 0) * Config.Rebirth.luckBonus / 100) - 1) * 100
-	-- every unlocked biome: +5% luck
-	diceLuck = ((1 + diceLuck / 100) * (1 + Config.GetBiomeBonusCount(profile) * Config.BiomeBonus.luck / 100) - 1) * 100
-	-- Luck Potion: 2x luck
-	if Config.IsBoostActive(profile, "luck") then
-		diceLuck = ((1 + diceLuck / 100) * 2 - 1) * 100
-	end
-	-- Dev server-wide luck effect (1x-8x)
-	local globalLuck = Config.GlobalBoost("luck")
-	if globalLuck > 1 then
-		diceLuck = ((1 + diceLuck / 100) * globalLuck - 1) * 100
-	end
-	-- Blessing / Infinity / Chaos skills: luck multiplier
-	local skillLuck = Config.SkillLuckMultiplier(profile)
-	if skillLuck > 1 then
-		diceLuck = ((1 + diceLuck / 100) * skillLuck - 1) * 100
-	end
+	local luckMult = RollService.GetLuck(profile)
 	-- hidden pity: every 25th roll is a 2x luck roll
 	if (profile.rolls + 1) % Config.PityEvery == 0 then
-		diceLuck = ((1 + diceLuck / 100) * Config.PityLuckMultiplier - 1) * 100
+		luckMult *= Config.PityLuckMultiplier
 	end
+	luckMult = Config.SoftLuck(luckMult)
 	-- WILD chain: each WILD rolls again; all 3 in a row spins the egg wheel
 	local wilds = 0
 	-- Wild Chance upgrade: makes the 1st WILD more likely
@@ -145,7 +141,7 @@ function RollService.Roll(profile)
 		wheelIndex = chooseWheelSlice()
 		rarity = Config.GetRarity(Config.Wild.wheel[wheelIndex].rarity)
 	else
-		rarity = chooseRarity(effectiveLuck, 1, diceLuck)
+		rarity = chooseRarity(luckMult, 1)
 	end
 	local monster = chooseMonster(rarity.key)
 	local monsterTier = getTier(monster.rarity)
@@ -173,7 +169,7 @@ end
 -- a reward egg: a random egg of at least this rarity (normal odds above
 -- it, so it's usually that rarity). Size / finish roll like normal.
 function RollService.GiveEgg(profile, minRarityKey)
-	local rarity = chooseRarity(0, getTier(minRarityKey or "Common"), 0)
+	local rarity = chooseRarity(1, getTier(minRarityKey or "Common"))
 	local monster = chooseMonster(rarity.key)
 	local size = chooseVariant(Config.SizeVariants, 0)
 	local finish = chooseVariant(Config.FinishVariants, 0)

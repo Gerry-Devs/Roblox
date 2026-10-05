@@ -3,12 +3,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local GuiService = game:GetService("GuiService")
 
 --------------------------------------------------------------------
--- Day / night + weather (Config.WorldEventAt, the real clock): a banner
--- at the top with what's on and how long it lasts, a message when it
--- starts, and the look of each one (only on this screen):
+-- Day / night + weather (Config.WorldEventAt, the real clock): a message
+-- when it starts (the timer is the icon in the HUD's boost tray), and the look of each one (only on this screen):
 --   Night:       dark blue night sky (eggs grow 1.5x faster)
 --   Starfall:    evening sky full of shooting stars
 --   Golden Hour: golden sunset light, gold sparkles falling
@@ -21,7 +19,6 @@ local folder = ReplicatedStorage:WaitForChild("MonsterRNG")
 local Config = require(folder:WaitForChild("Config"))
 local notify = folder:WaitForChild("ClientBridge"):WaitForChild("Notify")
 
-local OUTLINE = Color3.fromRGB(10, 12, 22)
 local DAY_TIME = 13
 
 local cc = Instance.new("ColorCorrectionEffect")
@@ -38,70 +35,6 @@ local function particlesOn()
 end
 local function C(t)
 	return Color3.fromRGB(t[1], t[2], t[3])
-end
-
---------------------------------------------------------------------
--- banner (top middle, under Roblox's top bar)
---------------------------------------------------------------------
-local gui = Instance.new("ScreenGui")
-gui.Name = "WorldEventsGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 8
-gui.Parent = player:WaitForChild("PlayerGui")
-local holder = Instance.new("Frame")
-holder.AnchorPoint = Vector2.new(0.5, 0)
-holder.Size = UDim2.fromOffset(420, 80)
-holder.BackgroundTransparency = 1
-holder.Parent = gui
-local holderScale = Instance.new("UIScale")
-holderScale.Parent = holder
-local list = Instance.new("UIListLayout")
-list.HorizontalAlignment = Enum.HorizontalAlignment.Center
-list.Padding = UDim.new(0, 4)
-list.SortOrder = Enum.SortOrder.LayoutOrder
-list.Parent = holder
-local function fit()
-	local v = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
-	holderScale.Scale = math.min(v.Y / 720, v.X / 1100, 1)
-	holder.Position = UDim2.new(0.5, 0, 0, GuiService:GetGuiInset().Y + 6)
-end
-fit()
-workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit)
-
-local function makePill(order)
-	local pill = Instance.new("Frame")
-	pill.LayoutOrder = order
-	pill.Size = UDim2.fromOffset(400, 34)
-	pill.BackgroundColor3 = Color3.fromRGB(20, 24, 44)
-	pill.BackgroundTransparency = 0.15
-	pill.Visible = false
-	pill.Parent = holder
-	Instance.new("UICorner", pill).CornerRadius = UDim.new(1, 0)
-	local st = Instance.new("UIStroke")
-	st.Thickness = 3
-	st.Color = OUTLINE
-	st.Parent = pill
-	local l = Instance.new("TextLabel")
-	l.Size = UDim2.new(1, -24, 0.7, 0)
-	l.Position = UDim2.fromScale(0.5, 0.5)
-	l.AnchorPoint = Vector2.new(0.5, 0.5)
-	l.BackgroundTransparency = 1
-	l.Font = Enum.Font.LuckiestGuy
-	l.TextScaled = true
-	l.TextColor3 = Color3.new(1, 1, 1)
-	l.TextStrokeTransparency = 0
-	l.TextStrokeColor3 = OUTLINE
-	l.Parent = pill
-	return pill, l
-end
-local nightPill, nightText = makePill(1)
-local weatherPill, weatherText = makePill(2)
-nightText.TextColor3 = Color3.fromRGB(170, 195, 255)
-
-local function mmss(sec)
-	sec = math.max(0, math.floor(sec))
-	return string.format("%d:%02d", sec // 60, sec % 60)
 end
 
 --------------------------------------------------------------------
@@ -337,14 +270,6 @@ while true do
 		end
 		wasNight = ev.night
 	end
-	-- (hidden while the Upgrades screen is open: it uses the top middle)
-	local up = player.PlayerGui:FindFirstChild("UpgradeTree")
-	local dim = up and up:FindFirstChild("Dim")
-	holder.Visible = not (dim and dim.Visible)
-	nightPill.Visible = ev.night
-	if ev.night then
-		nightText.Text = "\u{1F319} NIGHT  \u{2022}  EGGS GROW 1.5X FASTER  \u{2022}  " .. mmss(ev.nightEnds - now)
-	end
 	-- weather
 	local key = ev.weather and ev.weather.key or nil
 	if key ~= weatherKey then
@@ -361,11 +286,6 @@ while true do
 			end
 		end
 		weatherKey = key
-	end
-	weatherPill.Visible = key ~= nil
-	if key then
-		weatherText.Text = ev.weather.name .. "  \u{2022}  " .. ev.weather.text:upper() .. "  \u{2022}  " .. mmss(ev.weatherEnds - now)
-		weatherText.TextColor3 = C(ev.weather.color)
 	end
 	task.wait(0.5)
 end

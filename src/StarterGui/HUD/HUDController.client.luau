@@ -1547,6 +1547,8 @@ tip.Visible = false
 tip.ZIndex = 50
 tip.Parent = gui
 Instance.new("UICorner", tip).CornerRadius = UDim.new(0, 14)
+local tipScale = Instance.new("UIScale") -- smaller on phones, like the tray
+tipScale.Parent = tip
 local tipStroke = Instance.new("UIStroke")
 tipStroke.Color = Color3.fromRGB(225, 228, 235)
 tipStroke.Thickness = 2.5
@@ -1636,6 +1638,7 @@ end
 local function placeTray()
 	tray.Position = UDim2.new(1, trayRight(), 1, trayBottom())
 	trayScale.Scale = isTouch and 0.58 or 1
+	tipScale.Scale = isTouch and 0.62 or 1
 end
 task.spawn(function() -- the jump button can appear / move later
 	while tray.Parent do
@@ -1672,6 +1675,11 @@ local function showTip(potion)
 	tipDot.BackgroundColor3 = typeof(c) == "Color3" and c or (type(c) == "table" and Color3.fromRGB(c[1], c[2], c[3])) or GOLD
 	tip.Position = UDim2.new(1, trayRight(), 1, trayBottom() - 72 * trayScale.Scale)
 	tip.Visible = true
+	-- a long text (night / weather timers) widens the box instead of spilling out
+	task.defer(function()
+		local w = tipDesc.TextBounds.X + (tipIcon.Visible and 28 or 20) + 48
+		tip.Size = UDim2.fromOffset(math.max(260, math.ceil(w)), 100)
+	end)
 end
 local function hideTip(key)
 	if tipKey == key then

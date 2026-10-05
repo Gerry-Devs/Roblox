@@ -30,6 +30,12 @@ local closeAllBridge = bridge:WaitForChild("CloseAll")
 local notify = bridge:FindFirstChild("Notify")
 
 local gui = script.Parent
+-- the UPGRADE button can be pressed while this script is still loading
+-- (just joined, the profile isn't here yet): remember it, open at the end
+local pendingOpen = false
+local earlyOpen = openBridge.Event:Connect(function()
+	pendingOpen = true
+end)
 local profile = profileRemote:InvokeServer()
 
 local OUTLINE = Color3.fromRGB(12, 16, 34)
@@ -743,7 +749,8 @@ view.InputBegan:Connect(function(input)
 		panMoved = false
 	end
 end)
-local DRAG_START = 8 -- pixels a press must move before it becomes a drag
+local DRAG_START = 12 -- pixels a press must move before it becomes a drag
+local TOUCH_DRAG = 0.6 -- phones: the honeycomb moves a bit slower than the finger
 local ContextActionService = game:GetService("ContextActionService")
 local function mouseInView()
 	local m = UserInputService:GetMouseLocation() -- this ScreenGui ignores the top-bar inset
@@ -808,7 +815,7 @@ UserInputService.InputChanged:Connect(function(input)
 		local delta = input.Position - dragStart
 		if panMoved or Vector2.new(delta.X, delta.Y).Magnitude > DRAG_START then
 			panMoved = true
-			offset = offsetStart + Vector2.new(delta.X, delta.Y) / zoom.Scale
+			offset = offsetStart + Vector2.new(delta.X, delta.Y) * TOUCH_DRAG / zoom.Scale
 			applyOffset()
 			info.Visible = false
 			tip.Visible = false
@@ -930,7 +937,8 @@ fitScreen = function()
 	local v = workspace.CurrentCamera.ViewportSize
 	local inset = game:GetService("GuiService"):GetGuiInset().Y
 	local s = math.min((v.Y - inset) / DESIGN_H, v.X / DESIGN_W, 1.15)
-	zoom.Scale = s
+	-- phones: the hexes are bigger than the rest (drag to see the others)
+	zoom.Scale = v.Y < 600 and math.min(s * 1.5, 1) or s
 	for _, sc in pairs(chromeScales) do
 		sc.Scale = s
 	end
@@ -954,11 +962,14 @@ end)
 local function open()
 	closeAllBridge:Fire("upgrades")
 	lockCamera()
-	local ok, p = pcall(function()
-		return profileRemote:InvokeServer()
-	end)
-	if ok and p then
-		profile = p
+	-- (opens right away with the profile we have; ProfileUpdated keeps it fresh)
+	if not profile then
+		local ok, p = pcall(function()
+			return profileRemote:InvokeServer()
+		end)
+		if ok and p then
+			profile = p
+		end
 	end
 	fitScreen()
 	offset = Vector2.new(0, 0)
@@ -978,6 +989,7 @@ local function close()
 	info.Visible = false
 	dragging = false
 end
+earlyOpen:Disconnect()
 openBridge.Event:Connect(open)
 closeBridge.Event:Connect(close)
 closeBtn.Activated:Connect(close)
@@ -992,3 +1004,6 @@ profileUpdated.OnClientEvent:Connect(function(p)
 		refreshAll()
 	end
 end)
+if pendingOpen then
+	open()
+end

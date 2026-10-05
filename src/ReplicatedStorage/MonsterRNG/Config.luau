@@ -1246,7 +1246,21 @@ Config.Rebirth = {
 	cashBonus = 25, -- +% cash income per rebirth
 	luckBonus = 10, -- +% luck per rebirth
 	shardBonus = 25, -- +% Rift Shards from enemies per rebirth
+	biomeShardBonus = 20, -- +% Rift Shards per biome after the first (harder biomes drop more)
 }
+-- how far along a biome is (Forest = 0, the next one = 1, ...)
+function Config.BiomeStep(biomeKey)
+	local step = -1
+	for _, b in ipairs(Config.Biomes) do
+		if b.key ~= "home" then
+			step += 1
+			if b.key == biomeKey then
+				return step
+			end
+		end
+	end
+	return 0
+end
 function Config.GetRebirthCost(rebirths)
 	local R = Config.Rebirth
 	local n = rebirths or 0

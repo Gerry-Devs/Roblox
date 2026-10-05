@@ -547,6 +547,8 @@ local function rewardPlayer(player, profile, e, rec, xpTotal, pos)
 	local shardAmountBonus = 1 + (Config.GetUpgradeBonus(profile.upgrades, "crystal") + Config.Skill(profile, "shardAmount")) / 100
 	-- rebirths: +25% Rift Shards each
 	shardAmountBonus *= 1 + (profile.rebirths or 0) * (Config.Rebirth.shardBonus or 0) / 100
+	-- harder biomes: +20% Rift Shards for each biome after the first
+	shardAmountBonus *= 1 + Config.BiomeStep(e.biome and e.biome.key) * (Config.Rebirth.biomeShardBonus or 0) / 100
 	bonus = bonus * Config.PassDropMultiplier(profile) -- More Drops / Supporter gamepasses
 		if rng:NextNumber() < math.min(1, C.shardChance * bonus * shardChanceBonus) then
 		local n = math.floor((1 + math.floor(e.level / 5)) * math.max(1, math.floor(e.mult)) * shardAmountBonus + 0.5)

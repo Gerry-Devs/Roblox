@@ -649,6 +649,7 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 			table.insert(profile.monsters, monsterEntry)
 		end
 		profile.owned[egg.monsterId] = (profile.owned[egg.monsterId] or 0) + 1
+		DataService.RecordIndex(profile, monsterEntry)
 
 		-- (each step on its own: one failing never leaves the pen out of date)
 		local okMark, errMark = pcall(WorldService.MarkHatched, player, monsterEntry, not fitsInPen, position)
@@ -1479,6 +1480,7 @@ giftRespondRemote.OnServerInvoke = function(player, giftId, accept)
 			if kind == "monsters" then
 				sp.owned[e.monsterId] = math.max(0, (sp.owned[e.monsterId] or 1) - 1)
 				rp.owned[e.monsterId] = (rp.owned[e.monsterId] or 0) + 1
+				DataService.RecordIndex(rp, e)
 			end
 		end
 	end
@@ -2208,6 +2210,7 @@ do
 					entry.level = 1
 					table.insert(profile.monsters, entry)
 					profile.owned[m.id] = (profile.owned[m.id] or 0) + 1
+					DataService.RecordIndex(profile, entry)
 				end
 			end
 			local label = kind == "egg" and (Config.GetRarity(key).name .. " Egg") or monster.name

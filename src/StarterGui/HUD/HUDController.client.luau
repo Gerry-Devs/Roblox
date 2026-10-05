@@ -434,6 +434,169 @@ local function getMonsterIcon(monsterId)
 	return v and v.Value or ""
 end
 
+--------------------------------------------------------------------
+-- Index info: tap a monster you found to see its odds, your biggest kg
+-- and which sizes / finishes you got (with the odds of each)
+--------------------------------------------------------------------
+local VARIANT_COLORS = {
+	Normal = Color3.fromRGB(220, 225, 235),
+	Big = Color3.fromRGB(150, 220, 255),
+	Huge = Color3.fromRGB(190, 150, 255),
+	Titan = Color3.fromRGB(255, 170, 60),
+	Gigantic = Color3.fromRGB(255, 90, 90),
+	Gold = Color3.fromRGB(255, 205, 60),
+	Silver = Color3.fromRGB(215, 225, 240),
+	Diamond = Color3.fromRGB(150, 230, 255),
+	Rainbow = Color3.fromRGB(255, 130, 220),
+	Galaxy = Color3.fromRGB(170, 110, 255),
+}
+local indexInfo = Instance.new("Frame")
+indexInfo.Name = "IndexInfo"
+indexInfo.AnchorPoint = Vector2.new(0.5, 0.5)
+indexInfo.Position = UDim2.fromScale(0.5, 0.52)
+indexInfo.Size = UDim2.fromOffset(330, 0)
+indexInfo.AutomaticSize = Enum.AutomaticSize.Y
+indexInfo.BackgroundColor3 = Color3.fromRGB(24, 26, 36)
+indexInfo.Visible = false
+indexInfo.ZIndex = 40
+indexInfo.Active = true
+indexInfo.Parent = indexPanel
+Instance.new("UICorner", indexInfo).CornerRadius = UDim.new(0, 14)
+do
+	local st = Instance.new("UIStroke")
+	st.Color = Color3.fromRGB(10, 15, 35)
+	st.Thickness = 4
+	st.Parent = indexInfo
+	local pad = Instance.new("UIPadding")
+	pad.PaddingTop, pad.PaddingBottom = UDim.new(0, 10), UDim.new(0, 12)
+	pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 14), UDim.new(0, 14)
+	pad.Parent = indexInfo
+end
+-- the rows (in a list) + the X in the corner (outside the list)
+local indexInfoBody = Instance.new("Frame")
+indexInfoBody.Name = "Body"
+indexInfoBody.Size = UDim2.fromScale(1, 0)
+indexInfoBody.AutomaticSize = Enum.AutomaticSize.Y
+indexInfoBody.BackgroundTransparency = 1
+indexInfoBody.ZIndex = 41
+indexInfoBody.Parent = indexInfo
+do
+	local list = Instance.new("UIListLayout")
+	list.SortOrder = Enum.SortOrder.LayoutOrder
+	list.Padding = UDim.new(0, 3)
+	list.Parent = indexInfoBody
+end
+local indexInfoClose = Instance.new("TextButton")
+indexInfoClose.Name = "InfoClose"
+indexInfoClose.Size = UDim2.fromOffset(30, 30)
+indexInfoClose.AnchorPoint = Vector2.new(1, 0)
+indexInfoClose.Position = UDim2.new(1, 6, 0, -4)
+indexInfoClose.BackgroundColor3 = Color3.fromRGB(235, 70, 80)
+indexInfoClose.Text = "X"
+indexInfoClose.TextScaled = true
+indexInfoClose.Font = Enum.Font.GothamBlack
+indexInfoClose.TextColor3 = Color3.new(1, 1, 1)
+indexInfoClose.ZIndex = 45
+indexInfoClose.Parent = indexInfo
+Instance.new("UICorner", indexInfoClose).CornerRadius = UDim.new(0, 8)
+local indexInfoFor
+local function closeIndexInfo()
+	indexInfo.Visible = false
+	indexInfoFor = nil
+end
+indexInfoClose.Activated:Connect(closeIndexInfo)
+indexPanel:GetPropertyChangedSignal("Visible"):Connect(function()
+	if not indexPanel.Visible then
+		closeIndexInfo()
+	end
+end)
+local function infoText(order, text, size, color, font, align)
+	local l = Instance.new("TextLabel")
+	l.LayoutOrder = order
+	l.Size = UDim2.new(1, 0, 0, size + 6)
+	l.BackgroundTransparency = 1
+	l.Text = text
+	l.TextSize = size
+	l.Font = font or Enum.Font.GothamBold
+	l.TextColor3 = color or Color3.new(1, 1, 1)
+	l.TextStrokeTransparency = 0.5
+	l.TextXAlignment = align or Enum.TextXAlignment.Left
+	l.TextWrapped = true
+	l.ZIndex = 42
+	l.Parent = indexInfoBody
+	return l
+end
+-- one size / finish row: name, its odds, got it?
+local function infoRow(order, name, chanceText, got)
+	local row = Instance.new("Frame")
+	row.LayoutOrder = order
+	row.Size = UDim2.new(1, 0, 0, 22)
+	row.BackgroundColor3 = got and Color3.fromRGB(40, 70, 50) or Color3.fromRGB(38, 40, 52)
+	row.ZIndex = 42
+	row.Parent = indexInfoBody
+	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+	local function cell(text, x, w, color, align)
+		local l = Instance.new("TextLabel")
+		l.Position = UDim2.new(x, 8, 0, 0)
+		l.Size = UDim2.new(w, -16, 1, 0)
+		l.BackgroundTransparency = 1
+		l.Text = text
+		l.TextSize = 14
+		l.Font = Enum.Font.GothamBlack
+		l.TextColor3 = color
+		l.TextStrokeTransparency = 0.5
+		l.TextXAlignment = align
+		l.ZIndex = 43
+		l.Parent = row
+	end
+	cell(name, 0, 0.42, VARIANT_COLORS[name] or Color3.new(1, 1, 1), Enum.TextXAlignment.Left)
+	cell(chanceText, 0.38, 0.42, Color3.fromRGB(200, 210, 230), Enum.TextXAlignment.Center)
+	cell(got and "\u{2713}" or "\u{2014}", 0.78, 0.22, got and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(120, 125, 140), Enum.TextXAlignment.Right)
+end
+local function variantOdds(list, key)
+	local total, w = 0, 0
+	for _, v in ipairs(list) do
+		total += v.weight
+		if v.key == key then
+			w = v.weight
+		end
+	end
+	return w > 0 and Config.FormatOdds(total / w) or "-"
+end
+local function showIndexInfo(monster)
+	if indexInfoFor == monster.id and indexInfo.Visible then
+		closeIndexInfo()
+		return
+	end
+	indexInfoFor = monster.id
+	for _, c in ipairs(indexInfoBody:GetChildren()) do
+		if c:IsA("GuiObject") then
+			c:Destroy()
+		end
+	end
+	local rarity = Config.GetRarity(monster.rarity)
+	local color = Color3.fromRGB(rarity.color[1], rarity.color[2], rarity.color[3])
+	local rec = (profile and profile.indexStats and profile.indexStats[monster.id]) or { maxKg = 0, sizes = {}, finishes = {} }
+	local o = 0
+	local function nxt()
+		o += 1
+		return o
+	end
+	infoText(nxt(), monster.name, 22, color, Enum.Font.GothamBlack)
+	infoText(nxt(), rarity.name:upper() .. "  \u{2022}  " .. Config.FormatOdds(Config.GetOdds(monster.id, "Normal", "Normal")), 15, color:Lerp(Color3.new(1, 1, 1), 0.25))
+	local count = (profile and profile.owned and profile.owned[monster.id]) or 0
+	infoText(nxt(), "Owned: " .. count .. "     Biggest: " .. ((rec.maxKg or 0) > 0 and Config.FormatKg(rec.maxKg) or "-"), 15, Color3.fromRGB(230, 235, 245))
+	infoText(nxt(), "SIZES", 16, GOLD, Enum.Font.GothamBlack)
+	for _, v in ipairs(Config.SizeVariants) do
+		infoRow(nxt(), v.key, variantOdds(Config.SizeVariants, v.key), rec.sizes and rec.sizes[v.key])
+	end
+	infoText(nxt(), "FINISHES", 16, GOLD, Enum.Font.GothamBlack)
+	for _, v in ipairs(Config.FinishVariants) do
+		infoRow(nxt(), v.key, variantOdds(Config.FinishVariants, v.key), rec.finishes and rec.finishes[v.key])
+	end
+	indexInfo.Visible = true
+end
+
 refreshers.IndexPanel = function()
 	local grid = indexBody.Well.Grid
 	for _, c in ipairs(grid:GetChildren()) do
@@ -498,7 +661,21 @@ refreshers.IndexPanel = function()
 		card.Fallback.Letter.Text = discovered and string.sub(monster.name, 1, 1) or "?"
 		card.ItemName.Text = discovered and monster.name or "???"
 		if discovered then
-			card.Info.Text = indexTab == "pets" and (rarity.name:upper()) or ("Defeated " .. Config.FormatNumber(count))
+			-- pets you found: the monster's odds (the card color is its rarity)
+			card.Info.Text = indexTab == "pets" and Config.FormatOdds(Config.GetOdds(monster.id, "Normal", "Normal")) or ("Defeated " .. Config.FormatNumber(count))
+			if indexTab == "pets" then
+				-- tap for the full info (sizes / finishes / biggest kg)
+				local hit = Instance.new("TextButton")
+				hit.Name = "Tap"
+				hit.Size = UDim2.fromScale(1, 1)
+				hit.BackgroundTransparency = 1
+				hit.Text = ""
+				hit.ZIndex = 10
+				hit.Parent = card
+				hit.Activated:Connect(function()
+					showIndexInfo(monster)
+				end)
+			end
 		else
 			card.Info.Text = rarity.name:upper()
 		end

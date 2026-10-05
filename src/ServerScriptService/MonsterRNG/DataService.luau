@@ -160,6 +160,7 @@ local function newProfile()
 		autoSell = nil, -- Auto Sell settings (saved; always starts OFF on join)
 		pvp = { credits = 0, points = 0, season = "", wins = 0, losses = 0 }, -- PvP credits + this season's points
 		guildId = nil, -- the guild this player is in
+		indexStats = {}, -- Index: per monster { maxKg, sizes = {Big = true}, finishes = {Gold = true} }
 		guildCredits = 0, -- paid guild creates not used yet (Robux never lost)
 		lastOnline = nil, -- when this save was last written (for offline earnings)
 		quests = nil, -- daily quests (QuestService)
@@ -173,6 +174,25 @@ local function sanitize(data)
 	end
 
 	profile.owned = copyOwned(data.owned)
+	-- Index records (sizes / finishes collected, biggest kg)
+	if type(data.indexStats) == "table" then
+		for id, st in pairs(data.indexStats) do
+			if type(id) == "string" and type(st) == "table" then
+				local rec = { maxKg = tonumber(st.maxKg) or 0, sizes = {}, finishes = {} }
+				for k, v in pairs(type(st.sizes) == "table" and st.sizes or {}) do
+					if type(k) == "string" and v == true then
+						rec.sizes[k] = true
+					end
+				end
+				for k, v in pairs(type(st.finishes) == "table" and st.finishes or {}) do
+					if type(k) == "string" and v == true then
+						rec.finishes[k] = true
+					end
+				end
+				profile.indexStats[id] = rec
+			end
+		end
+	end
 	profile.base = copyBase(data.base)
 	profile.eggs = copyEggs(data.eggs)
 	profile.monsters = copyMonsters(data.monsters)
@@ -330,6 +350,14 @@ local function sanitize(data)
 			end
 		end
 	end
+	-- monsters you already have count for the Index records
+	for _, list in ipairs({ profile.monsters or {}, profile.base or {} }) do
+		for _, e in ipairs(list) do
+			if e.kind ~= "egg" and e.monsterId then
+				DataService.RecordIndex(profile, e)
+			end
+		end
+	end
 	return profile
 end
 
@@ -398,8 +426,23 @@ function DataService.Remove(player)
 	profiles[player] = nil
 end
 
+-- the Index remembers every size / finish of a monster you got and its
+-- biggest kg (even after you sell it)
+function DataService.RecordIndex(profile, entry)
+	if not profile or type(entry) ~= "table" or type(entry.monsterId) ~= "string" then
+		return
+	end
+	profile.indexStats = profile.indexStats or {}
+	local rec = profile.indexStats[entry.monsterId] or { maxKg = 0, sizes = {}, finishes = {} }
+	profile.indexStats[entry.monsterId] = rec
+	rec.sizes[entry.size or "Normal"] = true
+	rec.finishes[entry.finish or "Normal"] = true
+	rec.maxKg = math.max(rec.maxKg or 0, tonumber(entry.kg) or 0)
+end
+
 function DataService.PublicProfile(profile)
 	return {
+		indexStats = profile.indexStats,
 		owned = copyOwned(profile.owned),
 		base = copyBase(profile.base),
 		eggs = copyEggs(profile.eggs),

@@ -1057,37 +1057,39 @@ do
 	end
 end
 
--- the window grows to fit every row (Combat, Tag... were added later);
--- WindowAnimator then shrinks the whole window to fit phone screens
+-- the rows scroll inside a window of a normal height (Combat, Tag...
+-- were added later; a taller window got tiny on phones). The Body keeps
+-- its rows (other scripts use sb.Graphics etc.); it now sits in a
+-- ScrollingFrame that takes the Body's old spot.
 do
-	local list = sb:FindFirstChildOfClass("UIListLayout")
-	local baseW = settingsPanel.Size.X.Offset
-	local top = sb.Position.Y.Offset
-	local bottomPad = math.max(16, -(sb.Size.Y.Offset) - top)
-	local function fitRows()
-		if not list then
+	local ok, err = pcall(function()
+		if sb.Parent ~= settingsPanel then
 			return
 		end
-		-- AbsoluteContentSize is in screen pixels: undo the window's scale
-		local scale = settingsPanel.AbsoluteSize.X / math.max(1, settingsPanel.Size.X.Offset)
-		if scale <= 0 then
-			return
-		end
-		local h = math.ceil(list.AbsoluteContentSize.Y / scale)
-		local want = top + h + bottomPad
-		if math.abs(settingsPanel.Size.Y.Offset - want) > 1 then
-			settingsPanel.Size = UDim2.new(settingsPanel.Size.X.Scale, baseW, 0, want)
-		end
-	end
-	if list then
-		list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(fitRows)
-	end
-	settingsPanel:GetPropertyChangedSignal("Visible"):Connect(function()
-		if settingsPanel.Visible then
-			task.defer(fitRows)
-		end
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Name = "BodyScroll"
+		scroll.Position = sb.Position
+		scroll.Size = sb.Size
+		scroll.AnchorPoint = sb.AnchorPoint
+		scroll.BackgroundTransparency = 1
+		scroll.BorderSizePixel = 0
+		scroll.ScrollBarThickness = 6
+		scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+		scroll.CanvasSize = UDim2.new()
+		scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		scroll.ZIndex = sb.ZIndex
+		scroll.Parent = settingsPanel
+		sb.AnchorPoint = Vector2.new(0, 0)
+		sb.Position = UDim2.fromOffset(0, 0)
+		sb.Size = UDim2.new(1, -10, 0, 0)
+		sb.AutomaticSize = Enum.AutomaticSize.Y
+		sb.Parent = scroll
+		-- a normal window height (it was 596 for the first 6 rows)
+		settingsPanel.Size = UDim2.new(settingsPanel.Size.X.Scale, settingsPanel.Size.X.Offset, 0, 470)
 	end)
-	task.defer(fitRows)
+	if not ok then
+		warn("Settings scroll failed (Settings still works): " .. tostring(err))
+	end
 end
 
 refreshers.SettingsPanel = function()

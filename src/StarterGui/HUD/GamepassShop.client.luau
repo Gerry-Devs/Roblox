@@ -185,7 +185,15 @@ render()
 -- TESTER, BETA, VIP, SUPPORTER) or NONE.
 --------------------------------------------------------------------
 task.spawn(function()
-	local sBody = gui.Panels:WaitForChild("SettingsPanel"):WaitForChild("Body")
+	-- (the Body may sit inside a scroll frame: HUDController moves it there)
+	local settingsPanel = gui.Panels:WaitForChild("SettingsPanel")
+	local sBody
+	repeat
+		sBody = settingsPanel:FindFirstChild("Body") or (settingsPanel:FindFirstChild("BodyScroll") and settingsPanel.BodyScroll:FindFirstChild("Body"))
+		if not sBody then
+			task.wait(0.1)
+		end
+	until sBody
 	local template = sBody:WaitForChild("OwnPets")
 	local row = mk("Frame", { Name = "TagRow", Size = template.Size, LayoutOrder = 9, BackgroundTransparency = template.BackgroundTransparency, BackgroundColor3 = template.BackgroundColor3, Visible = false, ZIndex = 5 }, sBody)
 	mk("UICorner", { CornerRadius = UDim.new(0, 12) }, row)

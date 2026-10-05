@@ -266,7 +266,7 @@ renderItems = function()
 					color = Color3.fromRGB(r.color[1], r.color[2], r.color[3])
 				else
 					local r = Config.GetRarity(e.rarity)
-					name = r.name .. " Egg"
+					name = Config.EggDisplayName(e)
 					sub = "Hatch: " .. Config.FormatDuration(Config.GetEggHatchDuration(e))
 					color = Color3.fromRGB(r.color[1], r.color[2], r.color[3])
 				end

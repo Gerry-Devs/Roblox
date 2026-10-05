@@ -816,7 +816,7 @@ sellQuoteRemote.OnServerInvoke = function(player, heldUid)
 	if type(heldUid) == "string" then
 		for _, e in ipairs(profile.eggs) do
 			if e.uid == heldUid then
-				held = { kind = "egg", name = Config.GetRarity(e.rarity).name .. " Egg", value = math.floor(eggSaleValue(e) * boost), favorite = e.favorite == true }
+				held = { kind = "egg", name = Config.EggDisplayName(e), value = math.floor(eggSaleValue(e) * boost), favorite = e.favorite == true }
 			end
 		end
 		for _, m in ipairs(profile.monsters) do

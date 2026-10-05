@@ -49,7 +49,7 @@ local function grant(player, profile, m)
 	end
 	if m.egg then
 		local egg = RollService.GiveEgg(profile, m.egg)
-		table.insert(parts, "a " .. Config.GetRarity(egg.rarity).name .. " Egg")
+		table.insert(parts, "a " .. Config.EggDisplayName(egg))
 	end
 	return table.concat(parts, " + ")
 end

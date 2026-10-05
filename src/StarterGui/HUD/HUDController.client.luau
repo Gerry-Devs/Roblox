@@ -1725,6 +1725,88 @@ task.spawn(function()
 				item.Timer.Text = left2 >= 3600 and string.format("%d:%02d:%02d", left2 // 3600, (left2 % 3600) // 60, left2 % 60) or string.format("%d:%02d", left2 // 60, left2 % 60)
 			end
 		end
+		-- night + weather (Config.WorldEventAt): an icon like a potion, with
+		-- the time left; hover (PC) or hold / tap (phone) for the info
+		local ev = Config.WorldEventAt(now)
+		for slot, e in ipairs({
+			ev.night and { id = "EV_night", name = "Night", icon = "\u{1F319}", color = { 120, 140, 255 }, text = "Eggs grow 1.5x faster", ends = ev.nightEnds } or { id = "EV_night" },
+			ev.weather and { id = "EV_weather", name = ev.weather.name, icon = ({ starfall = "\u{1F320}", golden = "\u{2600}", storm = "\u{26C8}", lucky = "\u{1F340}", rainbow = "\u{1F308}" })[ev.weather.key] or "\u{2728}", color = ev.weather.color, text = ev.weather.text, ends = ev.weatherEnds, wkey = ev.weather.key } or { id = "EV_weather" },
+		}) do
+			local item = boostItems[e.id]
+			if item and e.ends and item:GetAttribute("WKey") ~= e.wkey then
+				item:Destroy() -- a different weather: new icon
+				boostItems[e.id] = nil
+				item = nil
+			end
+			if e.ends and not item then
+				item = Instance.new("Frame")
+				item.Name = "Boost_" .. e.id
+				item.LayoutOrder = 200 + slot
+				item.Size = UDim2.fromOffset(44, 62)
+				item.BackgroundTransparency = 1
+				item:SetAttribute("WKey", e.wkey)
+				item.Parent = tray
+				local color = Color3.fromRGB(e.color[1], e.color[2], e.color[3])
+				local btn = Instance.new("TextButton")
+				btn.Name = "Button"
+				btn.Size = UDim2.fromOffset(44, 44)
+				btn.BackgroundColor3 = color:Lerp(Color3.new(0, 0, 0), 0.45)
+				btn.Text = e.icon
+				btn.TextScaled = true
+				btn.Font = Enum.Font.GothamBold
+				btn.TextColor3 = Color3.new(1, 1, 1)
+				btn.AutoButtonColor = false
+				btn.Parent = item
+				Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+				local st = Instance.new("UIStroke")
+				st.Color = color
+				st.Thickness = 2.5
+				st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				st.Parent = btn
+				local pad = Instance.new("UIPadding")
+				pad.PaddingTop, pad.PaddingBottom, pad.PaddingLeft, pad.PaddingRight = UDim.new(0, 6), UDim.new(0, 6), UDim.new(0, 6), UDim.new(0, 6)
+				pad.Parent = btn
+				local timer = Instance.new("TextLabel")
+				timer.Name = "Timer"
+				timer.Size = UDim2.new(1, 8, 0, 16)
+				timer.Position = UDim2.fromOffset(-4, 45)
+				timer.BackgroundTransparency = 1
+				timer.Font = Enum.Font.LuckiestGuy
+				timer.TextSize = 15
+				timer.TextColor3 = Color3.new(1, 1, 1)
+				timer.TextStrokeTransparency = 0
+				timer.Parent = item
+				local info = { key = e.id, name = e.name, text = e.text, color = e.color }
+				btn.MouseEnter:Connect(function()
+					showTip(info)
+				end)
+				btn.MouseLeave:Connect(function()
+					hideTip(e.id)
+				end)
+				-- phones: hold to read, let go to hide (a quick tap toggles)
+				btn.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.Touch then
+						showTip(info)
+					end
+				end)
+				btn.InputEnded:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.Touch then
+						task.delay(1.5, function()
+							hideTip(e.id)
+						end)
+					end
+				end)
+				boostItems[e.id] = item
+			elseif not e.ends and item then
+				item:Destroy()
+				boostItems[e.id] = nil
+				hideTip(e.id)
+			end
+			if e.ends and item then
+				local left2 = math.max(0, math.ceil(e.ends - now))
+				item.Timer.Text = string.format("%d:%02d", left2 // 60, left2 % 60)
+			end
+		end
 		for i, potion in ipairs(boostDefs) do
 			local ends = profile and profile.activeBoosts and profile.activeBoosts[potion.key]
 			local active = ends and ends > now
@@ -1766,6 +1848,12 @@ task.spawn(function()
 					if tipKey == potion.key then
 						hideTip(potion.key)
 					else
+						showTip(potion)
+					end
+				end)
+				-- phones: holding shows the info too
+				btn.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.Touch then
 						showTip(potion)
 					end
 				end)

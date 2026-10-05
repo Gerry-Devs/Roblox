@@ -80,7 +80,8 @@ local function announceHatch(player, entry)
 		monsterId = entry.monsterId,
 		size = entry.size,
 		finish = entry.finish,
-		odds = Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg),
+		odds = Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg, entry.grade),
+		grade = entry.grade,
 	}
 	task.spawn(function()
 		local sent = pcall(function()
@@ -672,6 +673,7 @@ placeMonsterRemote.OnServerInvoke = function(player, monsterUid, x, z)
 		monsterId = monster.monsterId,
 		size = monster.size,
 		finish = monster.finish,
+		grade = monster.grade,
 		kg = monster.kg,
 		level = monster.level,
 		xp = monster.xp,
@@ -708,6 +710,7 @@ unequipRemote.OnServerInvoke = function(player, baseUid)
 		monsterId = entry.monsterId,
 		size = entry.size,
 		finish = entry.finish,
+		grade = entry.grade,
 		kg = entry.kg,
 		level = entry.level,
 		xp = entry.xp,
@@ -765,7 +768,8 @@ hatchRemote.OnServerInvoke = function(player, baseUid)
 			monsterId = egg.monsterId,
 			size = egg.size,
 			finish = egg.finish,
-		kg = egg.kg,
+			grade = Config.RollGrade(), -- E is common, SSS is 1 in 100,000
+			kg = egg.kg,
 			level = 1,
 			favorite = egg.favorite,
 		}
@@ -2244,7 +2248,7 @@ inspectRemote.OnServerInvoke = function(player, targetId)
 	for _, list in ipairs({ profile.base or {}, profile.monsters or {} }) do
 		for _, e in ipairs(list) do
 			if e.kind ~= "egg" and e.monsterId then
-				table.insert(all, { monsterId = e.monsterId, size = e.size, finish = e.finish, level = e.level or 1, kg = e.kg, income = Config.GetEntryIncome(e) })
+				table.insert(all, { monsterId = e.monsterId, size = e.size, finish = e.finish, grade = e.grade, level = e.level or 1, kg = e.kg, income = Config.GetEntryIncome(e) })
 			end
 		end
 	end
@@ -2277,6 +2281,12 @@ Players.PlayerRemoving:Connect(function(p)
 	lastInspect[p] = nil
 end)
 
+-- Fusion Machine (Desert): 3 same pets + grade + a Fusion Ticket -> next grade
+require(game:GetService("ServerScriptService").MonsterRNG.FusionService).Start({
+	DataService = DataService,
+	sync = sync,
+	getRemote = getRemote,
+})
 -- global leaderboards (Cash/s, Rebirths) beside the Gear Shop
 require(game:GetService("ServerScriptService").MonsterRNG.LeaderboardService).Start({
 	DataService = DataService,

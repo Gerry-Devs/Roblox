@@ -960,7 +960,7 @@ function Config.FormatKg(kg)
 	return string.format("%.1f kg", kg)
 end
 
-function Config.GetOdds(monsterId, sizeKey, finishKey, kg)
+function Config.GetOdds(monsterId, sizeKey, finishKey, kg, gradeKey)
 	local monster = Config.GetMonster(monsterId)
 	if not monster then
 		return 0
@@ -992,6 +992,10 @@ function Config.GetOdds(monsterId, sizeKey, finishKey, kg)
 		* variantChance(Config.SizeVariants, sizeKey or "Normal")
 		* variantChance(Config.FinishVariants, finishKey or "Normal")
 	p = p / Config.GetKgOddsMultiplier(monsterId, sizeKey, kg)
+	-- (a hatched pet's grade counts too; nil = leave the grade out)
+	if gradeKey then
+		p *= Config.GradeChance(gradeKey)
+	end
 	if p <= 0 then
 		return 0
 	end
@@ -1175,6 +1179,64 @@ function Config.WorldEventAt(t)
 	return ev
 end
 
+--------------------------------------------------------------------
+-- Grades (E lowest ... SSS highest). Rolled when an egg hatches: low
+-- grades are common, high ones very rare. Each grade above E: +10% cash,
+-- damage and health. Fusion: 3 of the same monster + grade (+ a Fusion
+-- Ticket) -> 1 of the next grade (best size / finish of the three).
+--------------------------------------------------------------------
+Config.Grades = {
+	{ key = "E", weight = 60, color = { 170, 175, 190 } },
+	{ key = "D", weight = 25, color = { 110, 220, 110 } },
+	{ key = "C", weight = 10, color = { 80, 170, 255 } },
+	{ key = "B", weight = 4, color = { 180, 110, 255 } },
+	{ key = "A", weight = 0.9, color = { 255, 205, 60 } },
+	{ key = "S", weight = 0.09, color = { 255, 110, 60 } },
+	{ key = "SS", weight = 0.009, color = { 255, 90, 200 } },
+	{ key = "SSS", weight = 0.001, color = { 90, 255, 230 } },
+}
+Config.GradeBonus = 10 -- % cash / damage / health per grade above E
+function Config.GradeIndex(key)
+	for i, g in ipairs(Config.Grades) do
+		if g.key == key then
+			return i
+		end
+	end
+	return 1
+end
+function Config.GetGrade(key)
+	return Config.Grades[Config.GradeIndex(key)]
+end
+function Config.GradeColor(key)
+	local c = Config.GetGrade(key).color
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
+function Config.GradeMultiplier(key)
+	return 1 + (Config.GradeIndex(key) - 1) * Config.GradeBonus / 100
+end
+-- chance of rolling this grade (for the odds)
+function Config.GradeChance(key)
+	local total = 0
+	for _, g in ipairs(Config.Grades) do
+		total += g.weight
+	end
+	return Config.GetGrade(key).weight / total
+end
+function Config.RollGrade(rng)
+	local total = 0
+	for _, g in ipairs(Config.Grades) do
+		total += g.weight
+	end
+	local pick = (rng and rng:NextNumber() or math.random()) * total
+	for _, g in ipairs(Config.Grades) do
+		pick -= g.weight
+		if pick <= 0 then
+			return g.key
+		end
+	end
+	return "E"
+end
+
 -- Friends: +10% income for each friend in your server (max +30%).
 -- Group: +5% luck for members of the game's group (0 = off for now).
 Config.FriendBonus = { perFriend = 10, max = 30 }
@@ -1282,7 +1344,7 @@ function Config.GetEntryIncome(entry)
 	local size = Config.GetSizeVariant(entry.size)
 	local finish = Config.GetFinishVariant(entry.finish)
 	local levelMultiplier = math.max(1, entry.level or 1) ^ 1.25
-	return math.max(1, math.floor((rarity.tier * 5 + monster.power * 0.25) * size.incomeMultiplier * finish.incomeMultiplier * levelMultiplier * Config.GetKgIncomeMultiplier(entry)))
+	return math.max(1, math.floor((rarity.tier * 5 + monster.power * 0.25) * size.incomeMultiplier * finish.incomeMultiplier * levelMultiplier * Config.GetKgIncomeMultiplier(entry) * Config.GradeMultiplier(entry.grade)))
 end
 
 --------------------------------------------------------------------
@@ -1382,6 +1444,7 @@ end
 
 Config.Items = {
 	warpRemote = { name = "Warp Remote", imageId = "rbxassetid://80619965977171", text = "Use one to warp", button = "IN WARP" },
+	fusionTicket = { name = "Fusion Ticket", imageId = "", text = "Fuse 3 of the same pet + grade into the next grade (Fusion Machine, Desert)" },
 	giftCard = { name = "Gift Card", imageId = "rbxassetid://119686941815919", text = "Gift to players (Rebirth 3+)", button = "GIFT" },
 }
 
@@ -1630,7 +1693,7 @@ end
 function Config.GetPetStats(entry, profile, now)
 	local monster = Config.GetMonster(entry.monsterId)
 	local tier = monster and Config.GetRarity(monster.rarity).tier or 1
-	local power = (Config.RarityPower[tier] or 1) * (Config.PetSizePower[entry.size] or 1) * (Config.PetFinishPower[entry.finish] or 1)
+	local power = (Config.RarityPower[tier] or 1) * (Config.PetSizePower[entry.size] or 1) * (Config.PetFinishPower[entry.finish] or 1) * Config.GradeMultiplier(entry.grade)
 	local hp, dmg = Config.BaseCombatStats(entry.level)
 	local upgrades = profile and profile.upgrades
 	hp *= power * (1 + (Config.GetUpgradeBonus(upgrades, "health") + Config.Skill(profile, "health")) / 100)

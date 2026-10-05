@@ -271,6 +271,9 @@ local function showPopup(kind, item, card, rarity, rarityColor, odds)
 		popLine(nxt(), "Hatch: " .. Config.FormatDuration(Config.GetEggHatchDuration(item)), 16, Color3.fromRGB(200, 220, 255), nil, nil, true)
 	else
 		popLine(nxt(), "Level " .. (item.level or 1), 18, Color3.new(1, 1, 1), nil, nil, true)
+		-- the grade, in its color (+10% cash / damage / health per grade)
+		local gradeKey = item.grade or "E"
+		popLine(nxt(), "Grade " .. gradeKey .. (gradeKey ~= "E" and ("  (+" .. math.floor((Config.GradeMultiplier(gradeKey) - 1) * 100 + 0.5) .. "%)") or ""), 18, Config.GradeColor(gradeKey), Enum.Font.GothamBlack)
 		if item.finish and item.finish ~= "Normal" then
 			popLine(nxt(), item.finish, 17, Color3.fromRGB(255, 215, 110), nil, nil, true)
 		end
@@ -364,7 +367,7 @@ local function createCard(kind, item, order)
 		local secs = Config.GetEggHatchDuration(item)
 		card.Stats.Text = "Hatch: " .. Config.FormatDuration(secs)
 	else
-		odds = Config.GetOdds(item.monsterId, item.size, item.finish, item.kg)
+		odds = Config.GetOdds(item.monsterId, item.size, item.finish, item.kg, item.grade)
 		card.Stats.Text = Config.FormatKg(item.kg) .. "  " .. "$" .. Config.FormatNumber(Config.GetEntryIncome(item)) .. "/s  \226\128\162  Lv. " .. (item.level or 1)
 	end
 	card.Rarity.Text = rarity.name:upper() .. "  \226\128\162  " .. Config.FormatOdds(odds)
@@ -392,6 +395,23 @@ local function createCard(kind, item, order)
 		lv.TextStrokeColor3 = UIStyle.OUTLINE
 		lv.ZIndex = 6
 		lv.Parent = card
+		-- the grade in the top right, in its color
+		local gradeKey = item.grade or "E"
+		local g = Instance.new("TextLabel")
+		g.Name = "Grade"
+		g.AnchorPoint = Vector2.new(1, 0)
+		g.Position = UDim2.new(1, -6, 0, 4)
+		g.Size = UDim2.new(0.45, 0, 0.22, 0)
+		g.BackgroundTransparency = 1
+		g.Font = Enum.Font.LuckiestGuy
+		g.Text = gradeKey
+		g.TextScaled = true
+		g.TextXAlignment = Enum.TextXAlignment.Right
+		g.TextColor3 = Config.GradeColor(gradeKey)
+		g.TextStrokeTransparency = 0
+		g.TextStrokeColor3 = UIStyle.OUTLINE
+		g.ZIndex = 6
+		g.Parent = card
 	end
 	card.Fallback.UICorner.CornerRadius = kind == "egg" and UDim.new(1, 0) or UDim.new(0, 14)
 	card.Fallback.Letter.Text = kind == "egg" and "EGG" or string.sub(card.ItemName.Text, 1, 1)

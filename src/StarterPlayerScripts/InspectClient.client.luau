@@ -100,6 +100,7 @@ local function render(d)
 			label(card, string.sub(m and m.name or "?", 1, 1), UDim2.fromScale(0.4, 0.4), UDim2.fromScale(0.3, 0.08))
 		end
 		label(card, Config.BuildDisplayName(m and m.name or "?", e.size, e.finish), UDim2.new(1, -8, 0.2, 0), UDim2.new(0, 4, 0.56, 0), { TextColor3 = color:Lerp(WHITE, 0.3) })
+		label(card, e.grade or "E", UDim2.fromScale(0.3, 0.2), UDim2.new(0.7, -4, 0, 4), { TextColor3 = Config.GradeColor(e.grade or "E"), TextXAlignment = Enum.TextXAlignment.Right })
 		label(card, "Lv " .. e.level .. "  $" .. Config.FormatNumber(e.income) .. "/s", UDim2.new(1, -8, 0.18, 0), UDim2.new(0, 4, 0.78, 0), { Font = Enum.Font.GothamBold, TextStrokeTransparency = 0.6 })
 	end
 end

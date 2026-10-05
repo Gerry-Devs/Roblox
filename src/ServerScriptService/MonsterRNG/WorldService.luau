@@ -2739,7 +2739,7 @@ local function createMonsterDisplay(parent, entry, index, slotPosition, penState
 	lines.Parent = nameFrame
 
 	local DOT = "  \226\128\162  "
-	local odds = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg))
+	local odds = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg, entry.grade))
 	local infoLines = {
 		{ Config.BuildDisplayName(monster.name, entry.size, entry.finish), Color3.fromRGB(245, 245, 245), 0.28 },
 		-- rarity in its own color (Common is plain white)
@@ -2961,7 +2961,7 @@ local function hatchInfoBillboard(parent, entry, offsetY)
 	local lines = {
 		{ Config.BuildDisplayName(monster and monster.name or "Monster", entry.size, entry.finish), color, 0.38 },
 		{ "$" .. WorldService.GetEntryIncome(entry) .. "/s", Color3.fromRGB(255, 205, 93), 0.3 },
-		{ Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg)) .. "  \226\128\162  " .. Config.FormatKg(entry.kg), Color3.new(1, 1, 1), 0.28 },
+		{ "Grade " .. (entry.grade or "E") .. "  \226\128\162  " .. Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg, entry.grade)) .. "  \226\128\162  " .. Config.FormatKg(entry.kg), Color3.new(1, 1, 1), 0.28 },
 	}
 	local y = 0
 	local labels = {}

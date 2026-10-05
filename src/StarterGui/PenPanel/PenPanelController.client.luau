@@ -337,7 +337,7 @@ local function renderMonsters()
 			row.Line1.TextColor3 = Color3.fromRGB(255, 120, 120)
 			row.Ball.BackgroundColor3 = Color3.fromRGB(95, 100, 115)
 		end
-		row.Line2.Text = Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg))
+		row.Line2.Text = "Grade " .. (entry.grade or "E") .. "  \u{2022}  " .. Config.FormatOdds(Config.GetOdds(entry.monsterId, entry.size, entry.finish, entry.kg, entry.grade))
 			.. "  \u{2022}  " .. Config.FormatKg(entry.kg)
 		-- its skill (active while it's in the pen)
 		local sk, v = Config.GetEntrySkill(entry)

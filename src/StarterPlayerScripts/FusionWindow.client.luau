@@ -62,7 +62,7 @@ local closeBtn = mk("TextButton", { Name = "CloseButton", Size = UDim2.fromOffse
 mk("UICorner", { CornerRadius = UDim.new(0, 10) }, closeBtn)
 
 local ticketText = label(main, "", UDim2.new(1, -110, 0, 28), UDim2.fromOffset(20, 40), { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Color3.fromRGB(230, 190, 255) })
-label(main, "3 of the same pet + grade + 1 ticket = the next grade (keeps the best size / finish)", UDim2.new(1, -40, 0, 30), UDim2.fromOffset(20, 70), {
+label(main, "3 of the same pet + grade + 1 ticket + shards = the next grade (keeps the best size / finish). A, S and SS can FAIL!", UDim2.new(1, -40, 0, 30), UDim2.fromOffset(20, 70), {
 	Font = Enum.Font.GothamBold,
 	TextStrokeTransparency = 1,
 	TextWrapped = true,
@@ -149,7 +149,8 @@ render = function()
 		local function hex(c)
 			return string.format("#%02X%02X%02X", math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5))
 		end
-		gl.Text = string.format('<font color="%s">GRADE %s</font>  \u{2192}  <font color="%s">%s</font>', hex(Config.GradeColor(g.grade)), g.grade, hex(Config.GradeColor(nextGrade)), nextGrade)
+		local cost = Config.FusionCosts[nextGrade] or { chance = 1, shards = 0 }
+		gl.Text = string.format('<font color="%s">GRADE %s</font>  \u{2192}  <font color="%s">%s</font>  <font color="#BFD2FF">\u{2022} %s shards%s</font>', hex(Config.GradeColor(g.grade)), g.grade, hex(Config.GradeColor(nextGrade)), nextGrade, Config.FormatNumber(cost.shards), cost.chance < 1 and string.format("  \u{2022} %d%%", math.floor(cost.chance * 100 + 0.5)) or "")
 		local btn = mk("TextButton", { Size = UDim2.fromOffset(100, 44), AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0), BackgroundColor3 = tickets > 0 and GREEN or GRAY, Text = "FUSE", TextScaled = true, Font = FONT, TextColor3 = WHITE, TextStrokeTransparency = 0, TextStrokeColor3 = OUTLINE }, row)
 		mk("UICorner", { CornerRadius = UDim.new(0, 10) }, btn)
 		mk("UIStroke", { Color = OUTLINE, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }, btn)
@@ -184,7 +185,7 @@ render = function()
 			end)
 			busy = false
 			if ok and res then
-				notify:Fire(res.message or "", res.success and Color3.fromRGB(230, 190, 255) or Color3.fromRGB(255, 120, 120))
+				notify:Fire(res.message or "", res.success and Color3.fromRGB(230, 190, 255) or (res.failed and Color3.fromRGB(255, 160, 60)) or Color3.fromRGB(255, 120, 120))
 			end
 			pcall(function()
 				profile = profileRemote:InvokeServer()

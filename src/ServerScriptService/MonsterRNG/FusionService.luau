@@ -178,6 +178,23 @@ local function fuse(player, uids)
 	if gi >= #Config.Grades then
 		return { success = false, message = "That pet is already the best grade (SSS)!" }
 	end
+	local nextGrade = Config.Grades[gi + 1].key
+	local cost = Config.FusionCosts[nextGrade] or { chance = 1, shards = 0 }
+	if (profile.riftShards or 0) < cost.shards then
+		return { success = false, message = "You need " .. Config.FormatNumber(cost.shards) .. " Rift Shards to fuse into Grade " .. nextGrade .. "." }
+	end
+	-- the ticket + shards are used either way
+	profile.items.fusionTicket -= 1
+	if profile.items.fusionTicket <= 0 then
+		profile.items.fusionTicket = nil
+	end
+	profile.riftShards -= cost.shards
+	if math.random() > cost.chance then
+		-- failed: the 3 pets stay in the backpack
+		deps.sync(player)
+		task.spawn(deps.DataService.Save, player)
+		return { success = false, failed = true, message = "Fusion FAILED! The ticket and " .. Config.FormatNumber(cost.shards) .. " shards are gone. Your pets are safe in your backpack." }
+	end
 	-- the result keeps the best of the three
 	local bestSize, bestFinish, bestKg, bestLevel = "Normal", "Normal", 0, 1
 	for _, e in ipairs(picked) do
@@ -202,16 +219,12 @@ local function fuse(player, uids)
 		table.remove(profile.monsters, i)
 	end
 	profile.owned[first.monsterId] = math.max(1, (profile.owned[first.monsterId] or 3) - 2)
-	profile.items.fusionTicket -= 1
-	if profile.items.fusionTicket <= 0 then
-		profile.items.fusionTicket = nil
-	end
 	local result = {
 		uid = HttpService:GenerateGUID(false),
 		monsterId = first.monsterId,
 		size = bestSize,
 		finish = bestFinish,
-		grade = Config.Grades[gi + 1].key,
+		grade = nextGrade,
 		kg = bestKg > 0 and bestKg or nil,
 		level = bestLevel,
 		xp = 0,

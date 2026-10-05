@@ -1196,6 +1196,17 @@ Config.Grades = {
 	{ key = "SSS", weight = 0.001, color = { 90, 255, 230 } },
 }
 Config.GradeBonus = 10 -- % cash / damage / health per grade above E
+-- fusing INTO a grade: success chance + Rift Shard cost. A failed fusion
+-- loses the ticket + the shards; the 3 pets stay in the backpack.
+Config.FusionCosts = {
+	D = { chance = 1, shards = 50 },
+	C = { chance = 1, shards = 150 },
+	B = { chance = 1, shards = 400 },
+	A = { chance = 1, shards = 1000 },
+	S = { chance = 0.75, shards = 3000 },
+	SS = { chance = 0.5, shards = 10000 },
+	SSS = { chance = 0.2, shards = 30000 },
+}
 function Config.GradeIndex(key)
 	for i, g in ipairs(Config.Grades) do
 		if g.key == key then

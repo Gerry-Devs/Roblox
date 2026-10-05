@@ -56,6 +56,7 @@ local function copyBase(base)
 				clean.rarity = type(entry.rarity) == "string" and entry.rarity or "Common"
 				clean.placedAt = tonumber(entry.placedAt) or os.time()
 				clean.readyAt = tonumber(entry.readyAt) or os.time()
+				clean.nightHour = tonumber(entry.nightHour) -- night boost already given
 			end
 			result[index] = clean
 		end

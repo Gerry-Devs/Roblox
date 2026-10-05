@@ -1123,6 +1123,58 @@ function Config.IndexSizesDone(profile)
 	return n
 end
 
+--------------------------------------------------------------------
+-- Day / night + weather, by the real clock (the same in every server;
+-- server and players work it out themselves from the time).
+--   Night: the first 3 minutes of every hour (eggs grow 1.5x faster)
+--   Weather: 70% of hours, starts at a random minute (8-52), 5 minutes
+--------------------------------------------------------------------
+Config.WorldEvents = {
+	nightSeconds = 180,
+	nightEggSpeed = 1.5,
+	weatherChance = 0.7,
+	weatherSeconds = 300,
+	weatherStartMin = 8,
+	weatherStartMax = 52,
+	weathers = {
+		{ key = "starfall", name = "STARFALL", text = "Galaxy 3x more common", weight = 25, finishes = { Galaxy = 3 }, color = { 190, 150, 255 } },
+		{ key = "golden", name = "GOLDEN HOUR", text = "Gold 3x more common", weight = 25, finishes = { Gold = 3 }, color = { 255, 205, 60 } },
+		{ key = "storm", name = "GIANT STORM", text = "Big sizes 3x more common", weight = 25, sizes = { Big = 3, Huge = 3, Titan = 3, Gigantic = 3 }, color = { 140, 170, 210 } },
+		{ key = "lucky", name = "LUCKY WIND", text = "2x luck", weight = 15, luck = 2, color = { 110, 230, 120 } },
+		{ key = "rainbow", name = "RAINBOW SKY", text = "Rainbow 3x more common", weight = 10, finishes = { Rainbow = 3 }, color = { 255, 140, 220 } },
+	},
+}
+-- what's happening at time t (seconds, os.time / GetServerTimeNow):
+-- { night = bool, nightEnds = t, weather = def or nil, weatherEnds = t }
+function Config.WorldEventAt(t)
+	local W = Config.WorldEvents
+	local hour = math.floor(t / 3600)
+	local hourStart = hour * 3600
+	local ev = { night = t - hourStart < W.nightSeconds, nightEnds = hourStart + W.nightSeconds, hour = hour }
+	local rng = Random.new(hour * 7919 + 13)
+	if rng:NextNumber() < W.weatherChance then
+		local start = hourStart + rng:NextInteger(W.weatherStartMin, W.weatherStartMax) * 60
+		local total = 0
+		for _, w in ipairs(W.weathers) do
+			total += w.weight
+		end
+		local pick = rng:NextNumber() * total
+		local chosen = W.weathers[#W.weathers]
+		for _, w in ipairs(W.weathers) do
+			pick -= w.weight
+			if pick <= 0 then
+				chosen = w
+				break
+			end
+		end
+		if t >= start and t < start + W.weatherSeconds then
+			ev.weather, ev.weatherEnds = chosen, start + W.weatherSeconds
+		end
+		ev.nextWeather, ev.nextWeatherAt = chosen, start
+	end
+	return ev
+end
+
 -- Friends: +10% income for each friend in your server (max +30%).
 -- Group: +5% luck for members of the game's group (0 = off for now).
 Config.FriendBonus = { perFriend = 10, max = 30 }

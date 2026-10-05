@@ -53,7 +53,7 @@ local function chooseMonster(rarityName)
 	return matches[#matches]
 end
 
-local function chooseVariant(variants, bonusPercent)
+local function chooseVariant(variants, bonusPercent, extra)
 	local multiplier = 1 + math.max(0, bonusPercent or 0) / 100
 	local totalWeight = 0
 	local weighted = {}
@@ -61,6 +61,10 @@ local function chooseVariant(variants, bonusPercent)
 		local weight = variant.weight
 		if variant.key ~= "Normal" then
 			weight *= multiplier
+		end
+		-- weather: e.g. Starfall makes Galaxy 3x more common
+		if extra and extra[variant.key] then
+			weight *= extra[variant.key]
 		end
 		totalWeight += weight
 		table.insert(weighted, { variant = variant, weight = weight })
@@ -110,6 +114,11 @@ function RollService.GetLuck(profile)
 	end
 	m *= math.max(1, Config.GlobalBoost("luck"))
 	m *= math.max(1, Config.SkillLuckMultiplier(profile))
+	-- weather: Lucky Wind
+	local weather = Config.WorldEventAt(os.time()).weather
+	if weather and weather.luck then
+		m *= weather.luck
+	end
 	-- Index rewards (completed rarities) + the group reward
 	local indexLuck = Config.IndexBonus(profile)
 	m *= 1 + indexLuck / 100
@@ -153,8 +162,9 @@ function RollService.Roll(profile)
 	local monsterTier = getTier(monster.rarity)
 	-- (+ Nature's Gift skill: more mutations and bigger sizes)
 	local gift = Config.Skill(profile, "mutation")
-	local size = chooseVariant(Config.SizeVariants, Config.GetUpgradeBonus(profile.upgrades, "size") + gift)
-	local finish = chooseVariant(Config.FinishVariants, Config.GetUpgradeBonus(profile.upgrades, "mutation") + gift)
+	local weather = Config.WorldEventAt(os.time()).weather
+	local size = chooseVariant(Config.SizeVariants, Config.GetUpgradeBonus(profile.upgrades, "size") + gift, weather and weather.sizes)
+	local finish = chooseVariant(Config.FinishVariants, Config.GetUpgradeBonus(profile.upgrades, "mutation") + gift, weather and weather.finishes)
 
 	local egg = {
 		uid = HttpService:GenerateGUID(false),

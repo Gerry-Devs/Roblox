@@ -325,6 +325,44 @@ indexAnnounce = function(player, profile, before)
 end
 
 --------------------------------------------------------------------
+-- Night (first 3 min of every real hour): eggs grow 1.5x faster. Each
+-- incubating egg gets the time it gains over the rest of the night in
+-- one go (once per night), so egg models don't rebuild every second.
+--------------------------------------------------------------------
+task.spawn(function()
+	local W = Config.WorldEvents
+	while true do
+		task.wait(2)
+		local now = os.time()
+		local ev = Config.WorldEventAt(now)
+		if ev.night then
+			local nightLeft = math.max(0, ev.nightEnds - now)
+			for _, player in ipairs(Players:GetPlayers()) do
+				local profile = DataService.Get(player)
+				local changed = false
+				for _, e in ipairs(profile and profile.base or {}) do
+					if e.kind == "egg" and not e.hatching and e.nightHour ~= ev.hour and (e.readyAt or 0) > now then
+						e.nightHour = ev.hour
+						local left = e.readyAt - now
+						-- 1.5x speed: it gains half of the night time left, but
+						-- never more than a third of its own time left
+						local gain = math.min(nightLeft * (W.nightEggSpeed - 1), left * (1 - 1 / W.nightEggSpeed))
+						if gain > 0 then
+							e.readyAt -= math.floor(gain)
+							changed = true
+						end
+					end
+				end
+				if changed then
+					pcall(WorldService.UpdateBase, player, profile)
+					pcall(sync, player)
+				end
+			end
+		end
+	end
+end)
+
+--------------------------------------------------------------------
 -- Group (+5% luck) and friends in the server (+10% income each, max 30%)
 --------------------------------------------------------------------
 local friendCache = {} -- "a:b" -> true / false

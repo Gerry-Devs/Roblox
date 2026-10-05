@@ -2225,6 +2225,63 @@ require(script:FindFirstChild("MonsterRNG") and script.MonsterRNG.PvpService or 
 	sync = sync,
 	getRemote = getRemote,
 })
+-- Inspect: tap a player to see their rebirths, cash/s, Index, pen and
+-- their 6 best pets
+local inspectRemote = getRemote("InspectPlayer", "RemoteFunction")
+local lastInspect = {}
+inspectRemote.OnServerInvoke = function(player, targetId)
+	local now = os.clock()
+	if now - (lastInspect[player] or 0) < 0.5 then
+		return nil
+	end
+	lastInspect[player] = now
+	local target = type(targetId) == "number" and Players:GetPlayerByUserId(targetId)
+	local profile = target and DataService.Get(target)
+	if not profile then
+		return nil
+	end
+	local all = {}
+	for _, list in ipairs({ profile.base or {}, profile.monsters or {} }) do
+		for _, e in ipairs(list) do
+			if e.kind ~= "egg" and e.monsterId then
+				table.insert(all, { monsterId = e.monsterId, size = e.size, finish = e.finish, level = e.level or 1, kg = e.kg, income = Config.GetEntryIncome(e) })
+			end
+		end
+	end
+	table.sort(all, function(a, b)
+		return a.income > b.income
+	end)
+	local best = {}
+	for i = 1, math.min(6, #all) do
+		best[i] = all[i]
+	end
+	local found = 0
+	for _ in pairs(profile.owned or {}) do
+		found += 1
+	end
+	return {
+		userId = target.UserId,
+		name = target.Name,
+		displayName = target.DisplayName,
+		rebirths = profile.rebirths or 0,
+		income = WorldService.GetProfileIncome(profile),
+		rolls = profile.rolls or 0,
+		indexFound = found,
+		indexTotal = #Config.Monsters,
+		pen = Config.IndexPenFinish(profile),
+		sizesDone = Config.IndexSizesDone(profile),
+		best = best,
+	}
+end
+Players.PlayerRemoving:Connect(function(p)
+	lastInspect[p] = nil
+end)
+
+-- global leaderboards (Cash/s, Rebirths) beside the Gear Shop
+require(game:GetService("ServerScriptService").MonsterRNG.LeaderboardService).Start({
+	DataService = DataService,
+	WorldService = WorldService,
+})
 -- play-time milestone rewards
 require(game:GetService("ServerScriptService").MonsterRNG.PlaytimeService).Start({
 	DataService = DataService,
